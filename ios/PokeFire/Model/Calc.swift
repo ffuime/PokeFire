@@ -571,8 +571,8 @@ enum Calc {
         let priorityText = remarks.first(where: { $0.hasPrefix("優先度") })?.replacingOccurrences(of: "優先度", with: "") ?? "0"
         let priority = Int(priorityText) ?? 0
         if terrain == "サイコ", defGrounded, priority > 0 { return .fail(.immune, "フィールドにより無効") }
-        if atk.move == "アイアンローラー", terrain.isEmpty { return .fail(.immune, "フィールドがないと失敗する") }
-        if atk.move == "ポルターガイスト", defItem.isEmpty { return .fail(.immune, "相手が道具を持っていないと失敗する") }
+        if atk.move == "アイアンローラー", terrain.isEmpty { return .fail(.immune, "うまく決まらなかった") }
+        if atk.move == "ポルターガイスト", defItem.isEmpty { return .fail(.immune, "うまく決まらなかった") }
 
         let defHP = hpOf(def)
         let atkHP = hpOf(atk)
@@ -591,7 +591,7 @@ enum Calc {
         if atk.move == "いかりのまえば" { return fixed(defHP.now / 2, "相手のHPの半分") }
         if atk.move == "いのちがけ" { return fixed(atkHP.now, "自分のHP分") }
         if atk.move == "がむしゃら" {
-            if defHP.now <= atkHP.now { return .fail(.immune, "失敗する（相手のHPが自分以下）") }
+            if defHP.now <= atkHP.now { return .fail(.immune, "うまく決まらなかった") }
             return fixed(defHP.now - atkHP.now, "相手と自分のHPの差")
         }
 

@@ -547,7 +547,7 @@ struct EnvironmentSegments: View {
 
     private func image(_ key: String) -> UIImage {
         let base = UIImage(named: "\(kind)_\(key)") ?? UIImage()
-        let size = CGSize(width: 24, height: 24)
+        let size = CGSize(width: 30, height: 30)
         let resized = UIGraphicsImageRenderer(size: size).image { _ in
             base.draw(in: CGRect(origin: .zero, size: size))
         }
@@ -559,7 +559,8 @@ struct EnvironmentSegments: View {
         NativeSegmented(
             segments: keys.map { .image(image($0)) },
             selected: keys.firstIndex(of: selected) ?? 0,
-            height: 56
+            height: 56,
+            allowsReselect: true
         ) { index in
             if keys.indices.contains(index) { onSelect(keys[index]) }
         }

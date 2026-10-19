@@ -5,6 +5,7 @@ struct SegmentBar: View {
     let value: Int
     let color: Color
     var height: CGFloat = 32
+    var allowsReselect = false
     let onChange: (Int) -> Void
 
     @State private var dragging = false
@@ -274,6 +275,26 @@ struct RankControl: View {
     }
 }
 
+final class ReselectableSegmentedControl: UISegmentedControl {
+    var allowsReselect = false
+    private var touchStart: CGPoint?
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        touchStart = touches.first?.location(in: self)
+        super.touchesBegan(touches, with: event)
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        let previous = selectedSegmentIndex
+        let start = touchStart
+        let end = touches.first?.location(in: self)
+        super.touchesEnded(touches, with: event)
+        guard allowsReselect, previous == selectedSegmentIndex, let start, let end,
+              hypot(end.x - start.x, end.y - start.y) < 10 else { return }
+        sendActions(for: .valueChanged)
+    }
+}
+
 struct NativeSegmented: UIViewRepresentable {
     enum Segment {
         case text(String)
@@ -291,12 +312,13 @@ struct NativeSegmented: UIViewRepresentable {
         Coordinator(onChange: onChange)
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UISegmentedControl, context: Context) -> CGSize? {
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: ReselectableSegmentedControl, context: Context) -> CGSize? {
         CGSize(width: proposal.width ?? uiView.intrinsicContentSize.width, height: height)
     }
 
-    func makeUIView(context: Context) -> UISegmentedControl {
-        let control = UISegmentedControl()
+    func makeUIView(context: Context) -> ReselectableSegmentedControl {
+        let control = ReselectableSegmentedControl()
+        control.allowsReselect = allowsReselect
         for (index, segment) in segments.enumerated() {
             switch segment {
             case .text(let title):
@@ -314,7 +336,7 @@ struct NativeSegmented: UIViewRepresentable {
         return control
     }
 
-    func updateUIView(_ control: UISegmentedControl, context: Context) {
+    func updateUIView(_ control: ReselectableSegmentedControl, context: Context) {
         context.coordinator.onChange = onChange
         for (index, segment) in segments.enumerated() where index < control.numberOfSegments {
             switch segment {
@@ -369,12 +391,12 @@ struct NatureControl: View {
             segments: [.text("×0.9"), .text("×1.0"), .text("×1.1")],
             selected: options.firstIndex(of: nature) ?? 1,
             selectedColor: UIColor(color(nature)),
-            height: 32
+            height: 40
         ) { index in
             let value = options[max(0, min(options.count - 1, index))]
             if value != nature { onChange(value) }
         }
-        .frame(width: 186, height: 32)
+        .frame(width: 186, height: 40)
         .accessibilityLabel("性格補正")
     }
 }
@@ -513,7 +535,10 @@ struct SelectButton: View {
             .frame(height: height)
             .background {
                 if translucent {
-                    UnevenBox().fill(.ultraThinMaterial)
+                    ZStack {
+                        UnevenBox().fill(.ultraThinMaterial)
+                        UnevenBox().fill(Color.white.opacity(0.6))
+                    }
                 } else {
                     UnevenBox().fill(Color.white)
                 }
