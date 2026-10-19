@@ -335,16 +335,41 @@ struct MoveSection: View {
                 present(.move)
             }
 
-            if (range == nil && !model.isAxel) || model.showsPowerUp || range != nil {
+            if (range == nil && !model.isAxel) || model.showsPowerUp || range != nil || model.showsFling {
                 FlowLayout(spacing: 6) {
                     if range == nil, !model.isAxel {
                         ToggleChip(title: "急所", isOn: side.crit || model.critLocked, locked: model.critLocked) {
                             model.toggleCrit()
                         }
                     }
+                    if model.showsRankBoost {
+                        Button {
+                            Haptics.play(.light)
+                            withAnimation(.spring(response: 0.36, dampingFraction: 0.8)) {
+                                model.rankBoostEditing = true
+                            }
+                        } label: {
+                            PillLabel(title: "ランク上昇", value: "×\(model.rankBoostTotal)")
+                        }
+                        .buttonStyle(PressableStyle())
+                    }
                     if model.showsPowerUp {
                         ToggleChip(title: "威力アップ", isOn: side.powerUp) {
                             model.togglePowerUp()
+                        }
+                    }
+                    if model.showsFainted {
+                        CountPill(title: "ひんし数", range: 0...5, value: side.fainted, openEnded: true, unit: "匹", pickerRange: 0...100) { model.setFainted($0) }
+                    }
+                    if model.showsFling {
+                        Menu {
+                            Picker("威力", selection: Binding(get: { side.flingPower }, set: { model.setFlingPower($0) })) {
+                                ForEach(Calc.flingPowers, id: \.self) { power in
+                                    Text("\(power)").tag(power)
+                                }
+                            }
+                        } label: {
+                            PillLabel(title: "威力", value: "\(side.flingPower)")
                         }
                     }
                     if let range {

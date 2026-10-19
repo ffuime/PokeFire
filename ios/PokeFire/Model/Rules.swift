@@ -135,6 +135,7 @@ enum Rules {
         "いかりのまえば": StatRule(basestat: [.h], evs: [.h]),
         "ちきゅうなげ": StatRule(basestat: [.h], evs: [.h]),
         "ナイトヘッド": StatRule(basestat: [.h], evs: [.h]),
+        "サイコショック": StatRule(basestat: [.h, .b], evs: [.h, .b]),
     ]
     static let defenderStatExtra: [String: [StatKey]] = [
         "エレキボール": [.s],

@@ -5,6 +5,7 @@ struct SegmentBar: View {
     let value: Int
     let color: Color
     var height: CGFloat = 32
+    var minimum = 0
     let onChange: (Int) -> Void
 
     @State private var dragging = false
@@ -14,7 +15,7 @@ struct SegmentBar: View {
             HStack(spacing: 1.5) {
                 ForEach(0..<count, id: \.self) { index in
                     Capsule()
-                        .fill(index < value ? color : Palette.track)
+                        .fill(index < minimum ? color.opacity(0.35) : index < value ? color : Palette.track)
                         .scaleEffect(y: dragging && index == value - 1 ? 1.18 : 1)
                 }
             }
@@ -25,7 +26,7 @@ struct SegmentBar: View {
                     .onChanged { gesture in
                         dragging = true
                         let ratio = max(0, min(1, gesture.location.x / max(1, geometry.size.width)))
-                        let next = Int(Calc.jsRound(ratio * Double(count)))
+                        let next = max(minimum, Int(Calc.jsRound(ratio * Double(count))))
                         if next != value {
                             Haptics.play(.selection)
                             onChange(next)
@@ -401,18 +402,47 @@ struct NatureControl: View {
     }
 }
 
+struct PillLabel: View {
+    let title: String
+    let value: String
+    var unit = ""
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .foregroundStyle(Palette.accent.opacity(0.65))
+            NumberText(value, value: Double(value))
+                .fontWeight(.bold)
+            if !unit.isEmpty {
+                Text(unit)
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(Palette.accent)
+        .padding(.horizontal, 13)
+        .frame(height: 30)
+        .background(Capsule().fill(Color.white))
+        .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 1))
+        .contentShape(Capsule())
+    }
+}
+
 struct CountPill: View {
     let title: String
     let range: ClosedRange<Int>
     let value: Int
     var openEnded = false
+    var unit = "回"
+    var pickerRange: ClosedRange<Int>?
     let onChange: (Int) -> Void
 
     @State private var picking = false
     @State private var width: CGFloat = 1
 
+    private var upper: Int { (pickerRange ?? range).upperBound }
+
     private func label(_ number: Int) -> String {
-        openEnded && number == range.upperBound ? "\(number)+" : "\(number)"
+        openEnded && number == upper ? "\(number)+" : "\(number)"
     }
 
     var body: some View {
@@ -421,7 +451,7 @@ struct CountPill: View {
                 .foregroundStyle(Palette.accent.opacity(0.65))
             NumberText(String(value), value: Double(value))
                 .fontWeight(.bold)
-            Text(openEnded && value == range.upperBound ? "回以上" : "回")
+            Text(openEnded && value == upper ? "\(unit)以上" : unit)
         }
         .font(.subheadline)
         .foregroundStyle(Palette.accent)
@@ -446,6 +476,16 @@ struct CountPill: View {
             }
         }))
         .popover(isPresented: $picking) {
+            if let pickerRange {
+                Picker(title, selection: Binding(get: { value }, set: { onChange($0) })) {
+                    ForEach(Array(pickerRange), id: \.self) { number in
+                        Text(label(number)).tag(number)
+                    }
+                }
+                .pickerStyle(.wheel)
+                .frame(width: 180, height: 180)
+                .presentationCompactAdaptation(.popover)
+            } else {
             VStack(alignment: .leading, spacing: 10) {
                 Text(title)
                     .font(.caption.weight(.bold))
@@ -469,6 +509,7 @@ struct CountPill: View {
             }
             .padding(14)
             .presentationCompactAdaptation(.popover)
+            }
         }
         .accessibilityElement(children: .combine)
         .accessibilityValue("\(value)回")

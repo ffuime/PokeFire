@@ -69,6 +69,7 @@ final class AppModel {
     var toast: ToastMessage?
     var history: [HistoryEntry] = Storage.history
     var isLoadingShare = false
+    var rankBoostEditing = false
 
     @ObservationIgnored private var shared: [String: SharedBuild] = [:]
     @ObservationIgnored private var swapSlots: [SideSnapshot] = [SideSnapshot(), SideSnapshot()]
@@ -246,6 +247,9 @@ final class AppModel {
             f.crits = range != nil ? side.crits : nil
             f.axel = side.axel
             f.metronome = side.item == "メトロノーム" ? side.metronome : nil
+            f.rankBoost = side.rankBoost
+            f.fainted = side.fainted
+            f.flingPower = side.flingPower
             f.powerUp = Calc.powerUpMoves[side.move] != nil && side.powerUp
             f.move = side.move
         }
@@ -578,6 +582,7 @@ final class AppModel {
         let old = side.move
         side.move = name
         side.powerUp = false
+        side.rankBoost = 0
         if Calc.alwaysCritMoves.contains(name) {
             side.crit = true
         } else if Calc.alwaysCritMoves.contains(old) {
@@ -636,6 +641,37 @@ final class AppModel {
         guard attacker.axel.indices.contains(index), attacker.axel[index].hit else { return }
         update(.attacker) { $0.axel[index].crit.toggle() }
         Haptics.play(.light)
+    }
+
+    var rankBoostAuto: Int {
+        Calc.rankSum(liveFighter(.attacker))
+    }
+
+    var rankBoostTotal: Int {
+        min(Calc.rankBoostLimit, rankBoostAuto + attacker.rankBoost)
+    }
+
+    var showsRankBoost: Bool { Calc.rankBoostMoves.contains(attacker.move) }
+    var showsFainted: Bool { attacker.move == "おはかまいり" }
+    var showsFling: Bool { attacker.move == "なげつける" }
+
+    func setRankBoostTotal(_ total: Int) {
+        let extra = max(0, min(Calc.rankBoostLimit, total) - rankBoostAuto)
+        guard extra != attacker.rankBoost else { return }
+        update(.attacker) { $0.rankBoost = extra }
+    }
+
+    func setFainted(_ value: Int) {
+        let next = min(100, max(0, value))
+        guard next != attacker.fainted else { return }
+        update(.attacker) { $0.fainted = next }
+        Haptics.play(.selection)
+    }
+
+    func setFlingPower(_ value: Int) {
+        guard value != attacker.flingPower else { return }
+        update(.attacker) { $0.flingPower = value }
+        Haptics.play(.selection)
     }
 
     func setMetronome(_ value: Int) {
@@ -815,7 +851,10 @@ final class AppModel {
                 hits: range != nil ? side.hits : nil,
                 crits: range != nil ? side.crits : nil,
                 axel: side.axel,
-                metronome: side.metronome
+                metronome: side.metronome,
+                rankBoost: side.rankBoost,
+                fainted: side.fainted,
+                flingPower: side.flingPower
             )
         }
         return snap
@@ -907,6 +946,9 @@ final class AppModel {
             }
             side.axel = (0..<3).map { counts.axel.indices.contains($0) ? counts.axel[$0] : AxelRow() }
             side.metronome = min(6, max(1, counts.metronome))
+            side.rankBoost = min(Calc.rankBoostLimit, max(0, counts.rankBoost))
+            side.fainted = min(100, max(0, counts.fainted))
+            side.flingPower = Calc.flingPowers.contains(counts.flingPower) ? counts.flingPower : 130
         }
         if let hp = slot.hp ?? defaults.hp {
             side.hpNow = hp.now

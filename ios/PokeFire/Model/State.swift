@@ -24,6 +24,9 @@ struct SideState: Equatable {
     var crits = 0
     var axel: [AxelRow] = Array(repeating: AxelRow(), count: 3)
     var metronome = 1
+    var rankBoost = 0
+    var fainted = 2
+    var flingPower = 130
 
     var pokemon: Pokemon? { GameData.shared.pokemons[name] }
     var base: BaseStats { pokemon?.base ?? BaseStats() }
@@ -86,6 +89,9 @@ struct CountsSnapshot: Equatable {
     var crits: Int?
     var axel: [AxelRow]
     var metronome: Int
+    var rankBoost = 0
+    var fainted = 2
+    var flingPower = 130
 }
 
 struct SideSnapshot {
@@ -164,7 +170,7 @@ enum EnvironmentInfo {
 
 enum ShareCodec {
     static let base = "https://ffui.me/poke/fire/"
-    static let defaultCounts = [-1, -1, 21, 1]
+    static let defaultCounts = [-1, -1, 21, 1, 0, 2, 130]
 
     static func trimTail(_ list: [JSON]) -> [JSON] {
         var out = list
@@ -240,7 +246,7 @@ enum ShareCodec {
             let bits = side.axel.prefix(3).enumerated().reduce(0) { bits, row in
                 bits | (row.element.hit ? 1 << (row.offset * 2) : 0) | (row.element.crit ? 2 << (row.offset * 2) : 0)
             }
-            let counts = [range != nil ? side.hits : -1, range != nil ? side.crits : -1, bits, side.metronome]
+            let counts = [range != nil ? side.hits : -1, range != nil ? side.crits : -1, bits, side.metronome, side.rankBoost, side.fainted, side.flingPower]
             out.append(JSON(side.move))
             out.append(JSON((side.crit ? 1 : 0) | (side.powerUp ? 2 : 0)))
             out.append(counts == defaultCounts ? JSON(0) : .array(counts.map { JSON($0) }))
@@ -281,12 +287,15 @@ enum ShareCodec {
             snapshot.weak = flags & 1 != 0
             snapshot.powerUp = flags & 2 != 0
             let counts = item(10)?.array?.compactMap(\.int) ?? defaultCounts
-            let values = counts.count == 4 ? counts : defaultCounts
+            let values = counts.count >= 4 ? counts + defaultCounts.dropFirst(counts.count) : defaultCounts
             snapshot.counts = CountsSnapshot(
                 hits: values[0] < 0 ? nil : values[0],
                 crits: values[1] < 0 ? nil : values[1],
                 axel: (0..<3).map { AxelRow(hit: values[2] & (1 << ($0 * 2)) != 0, crit: values[2] & (2 << ($0 * 2)) != 0) },
-                metronome: values[3]
+                metronome: values[3],
+                rankBoost: values[4],
+                fainted: values[5],
+                flingPower: values[6]
             )
         }
         return snapshot

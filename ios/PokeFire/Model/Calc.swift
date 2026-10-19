@@ -72,6 +72,9 @@ struct Fighter {
     var hpNow = 0
     var speedConditions: [String] = []
     var speedAbility: Bool?
+    var rankBoost = 0
+    var fainted = 2
+    var flingPower = 130
     var single = false
 }
 
@@ -278,13 +281,13 @@ enum Calc {
 
     static let variableMultiHit: Set<String> = ["スイープビンタ", "スケイルショット", "タネマシンガン", "つららばり", "ボーンラッシュ", "ミサイルばり", "みずしゅりけん", "ロックブラスト"]
     static let ohkoMoves: Set<String> = ["じわれ", "ぜったいれいど", "つのドリル", "ハサミギロチン"]
-    static let unsupportedMoves: Set<String> = ["カウンター", "ほうふく", "ミラーコート", "メタルバースト", "はきだす", "なげつける", "ふくろだたき"]
+    static let unsupportedMoves: Set<String> = ["カウンター", "ほうふく", "ミラーコート", "メタルバースト", "はきだす", "ふくろだたき"]
     static let alwaysCritMoves: Set<String> = ["こおりのいぶき", "トリックフラワー", "やまあらし"]
     static let screenBreakMoves: Set<String> = ["かわらわり", "サイコファング", "レイジングブル"]
     static let axelPowers = [20, 40, 60]
 
     enum PowerUpKind {
-        case base, power, damage
+        case base, power, damage, custom
     }
 
     struct PowerUp {
@@ -297,6 +300,7 @@ enum Calc {
         "しっぺがえし": PowerUp(kind: .base), "じだんだ": PowerUp(kind: .base), "やけっぱち": PowerUp(kind: .base), "ダメおし": PowerUp(kind: .base),
         "ゆきなだれ": PowerUp(kind: .base), "たたりめ": PowerUp(kind: .base), "ひゃっきやこう": PowerUp(kind: .base), "どくばりセンボン": PowerUp(kind: .base),
         "きまぐレーザー": PowerUp(kind: .base), "りんしょう": PowerUp(kind: .base),
+        "アクロバット": PowerUp(kind: .base), "はたきおとす": PowerUp(kind: .custom),
         "からげんき": PowerUp(kind: .power, mod: 8192), "うっぷんばらし": PowerUp(kind: .power, mod: 8192), "ベノムショック": PowerUp(kind: .power, mod: 8192),
         "Gのちから": PowerUp(kind: .power, mod: 6144),
         "じしん": PowerUp(kind: .damage, label: "地中状態"), "なみのり": PowerUp(kind: .damage, label: "水中状態"), "うずしお": PowerUp(kind: .damage, label: "水中状態"),
@@ -381,6 +385,14 @@ enum Calc {
         if let fixed = fixedMultiHit[move], move != "トリプルアクセル" { return (fixed.count, fixed.count, fixed.count) }
         if !variableMultiHit.contains(move) { return nil }
         return ability == "スキルリンク" ? (5, 5, 5) : (2, 5, 2)
+    }
+
+    static let flingPowers = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 130]
+    static let rankBoostMoves: Set<String> = ["アシストパワー", "つけあがる"]
+    static let rankBoostLimit = 42
+
+    static func rankSum(_ atk: Fighter) -> Int {
+        [StatKey.a, .b, .c, .d, .s].reduce(0) { $0 + max(0, atk.evs[$1]?.rank ?? 0) }
     }
 
     static func hitPlan(_ atk: Fighter) -> [PlanRow]? {
@@ -626,12 +638,13 @@ enum Calc {
         case "ハードプレス":
             basePower = max(1, 100 * defHP.now / max(1, defHP.max))
         case "アシストパワー", "つけあがる":
-            let boosts = [StatKey.a, .b, .c, .d, .s].reduce(0) { $0 + max(0, atk.evs[$1]?.rank ?? 0) }
-            basePower = 20 + 20 * boosts
+            basePower = 20 + 20 * (rankSum(atk) + max(0, atk.rankBoost))
+        case "おはかまいり":
+            basePower = 50 + 50 * min(100, max(0, atk.fainted))
+        case "なげつける":
+            basePower = max(1, atk.flingPower)
         case "ライジングボルト":
             if terrain == "エレキ", defGrounded { basePower *= 2 }
-        case "アクロバット":
-            if atkItem.isEmpty { basePower *= 2 }
         default:
             break
         }
@@ -640,7 +653,7 @@ enum Calc {
         if basePower == 0 { return .fail(.unsupported, "この技は計算できません") }
 
         let solarWeak = ["ソーラービーム", "ソーラーブレード"].contains(atk.move) && ["あめ", "すなあらし", "ゆき"].contains(moveWeather)
-        let knockOff = atk.move == "はたきおとす" && !defItem.isEmpty
+        let knockOff = atk.move == "はたきおとす" && atk.powerUp
         let expanding = atk.move == "ワイドフォース" && terrain == "サイコ" && atkGrounded
         var displayMods: [Int] = []
         if knockOff { displayMods.append(6144) }

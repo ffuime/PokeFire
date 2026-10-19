@@ -77,6 +77,26 @@ struct MainScreen: View {
         .background {
             EnvironmentBackdrop(weather: model.weather, field: model.field)
         }
+        .overlay {
+            if model.rankBoostEditing {
+                ZStack {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { _ in
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                        model.rankBoostEditing = false
+                                    }
+                                }
+                        )
+                        .transition(.opacity)
+                    RankBoostPopup()
+                        .padding(.horizontal, 20)
+                        .transition(.scale(scale: 0.85).combined(with: .opacity))
+                }
+            }
+        }
         .sheet(item: $sheet) { item in
             sheetContent(item)
         }
@@ -162,6 +182,40 @@ struct EnvironmentPanel: View {
                         dragY = 0
                     }
                 }
+        )
+    }
+}
+
+struct RankBoostPopup: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let total = model.rankBoostTotal
+        let auto = model.rankBoostAuto
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("ランク上昇").sectionTitle()
+                Spacer()
+                NumberText("×\(total)", value: Double(total))
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Palette.accent)
+            }
+            SegmentBar(count: Calc.rankBoostLimit, value: total, color: Palette.accent, minimum: auto) {
+                model.setRankBoostTotal($0)
+            }
+            HStack {
+                Text(auto > 0 ? "ランク補正の+\(auto)段階を含みます" : "なぞって上昇した段階数を指定")
+                Spacer()
+                NumberText("威力 \(20 + 20 * total)", value: Double(total))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(Palette.secondary)
+        }
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.2), radius: 24, y: 8)
         )
     }
 }
