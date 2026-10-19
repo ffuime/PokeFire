@@ -282,21 +282,9 @@ extension View {
 }
 
 enum BundleSprite {
-    private static var cache: [String: UIImage] = [:]
-    private static var missing: Set<String> = []
-
     static func image(_ name: String) -> UIImage? {
-        if let hit = cache[name] { return hit }
-        if missing.contains(name) { return nil }
-        for candidate in [name, name.precomposedStringWithCanonicalMapping, name.decomposedStringWithCanonicalMapping] {
-            if let path = Bundle.main.path(forResource: candidate, ofType: "png", inDirectory: "sprite"),
-               let image = UIImage(contentsOfFile: path) {
-                cache[name] = image
-                return image
-            }
-        }
-        missing.insert(name)
-        return nil
+        let hex = Array(name.precomposedStringWithCanonicalMapping.utf8).map { String(format: "%02x", $0) }.joined()
+        return UIImage(named: "sprite_\(hex)")
     }
 }
 

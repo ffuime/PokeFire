@@ -27,9 +27,6 @@ targets:
       - path: ../usage_names.json
         group: Data
         buildPhase: resources
-      - path: ../sprite
-        type: folder
-        buildPhase: resources
     scheme: {}
     info:
       path: PokeFire/Info.plist
