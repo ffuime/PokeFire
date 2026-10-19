@@ -362,7 +362,7 @@ struct EntrySearchSheet: View {
         let selected = current
         VStack(spacing: 0) {
             SearchHeader(
-                title: "\(kind.title)（\(model.side(role).name)）",
+                title: kind.title,
                 modes: kind.hasHistory ? ["使用率", "履歴"] : [],
                 mode: $mode,
                 query: $query,
@@ -504,7 +504,7 @@ struct TypeSheet: View {
                 }
                 .padding(20)
             }
-            .navigationTitle("\(side.name)のタイプ")
+            .navigationTitle("タイプ")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -534,7 +534,7 @@ struct EnvironmentSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .frame(maxHeight: .infinity, alignment: .top)
-        .presentationDetents([.height(340)])
+        .presentationDetents([.height(290)])
         .presentationDragIndicator(.visible)
     }
 }
@@ -559,10 +559,10 @@ struct EnvironmentSegments: View {
         NativeSegmented(
             segments: keys.map { .image(image($0)) },
             selected: keys.firstIndex(of: selected) ?? 0,
-            height: 84
+            height: 56
         ) { index in
             if keys.indices.contains(index) { onSelect(keys[index]) }
         }
-        .frame(height: 84)
+        .frame(height: 56)
     }
 }

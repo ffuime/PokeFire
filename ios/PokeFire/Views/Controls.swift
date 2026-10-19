@@ -369,12 +369,12 @@ struct NatureControl: View {
             segments: [.text("×0.9"), .text("×1.0"), .text("×1.1")],
             selected: options.firstIndex(of: nature) ?? 1,
             selectedColor: UIColor(color(nature)),
-            height: 50
+            height: 32
         ) { index in
             let value = options[max(0, min(options.count - 1, index))]
             if value != nature { onChange(value) }
         }
-        .frame(width: 186, height: 50)
+        .frame(width: 186, height: 32)
         .accessibilityLabel("性格補正")
     }
 }

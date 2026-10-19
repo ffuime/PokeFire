@@ -171,7 +171,7 @@ struct PokemonHeader: View {
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 48)
-                .background(UnevenBox(strong: 28, weak: 6).fill(Color.white))
+                .background(UnevenBox(strong: 28, weak: 6).fill(.ultraThinMaterial))
                 .overlay(UnevenBox(strong: 28, weak: 6).stroke(Color(hex: 0xDADADA), lineWidth: 1))
                 .contentShape(UnevenBox(strong: 28, weak: 6))
             }
