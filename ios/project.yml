@@ -1,0 +1,32 @@
+name: PokeFire
+options:
+  bundleIdPrefix: me.ffui
+  deploymentTarget:
+    iOS: "26.0"
+targets:
+  PokeFire:
+    type: application
+    platform: iOS
+    sources:
+      - path: PokeFire
+      - path: web
+        type: folder
+        buildPhase: resources
+    scheme: {}
+    settings:
+      base:
+        PRODUCT_NAME: PokeFire
+        PRODUCT_BUNDLE_IDENTIFIER: me.ffui.pokefire
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: PokéFire
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES

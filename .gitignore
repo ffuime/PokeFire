@@ -1,0 +1,9 @@
+node_modules/
+app.bundle.js
+ios/web/
+ios/build/
+ios/Payload/
+ios/*.xcodeproj/
+*.ipa
+.DS_Store
+i.tmp

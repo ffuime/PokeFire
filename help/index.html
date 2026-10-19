@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ヘルプ｜PokéFire ポケモンチャンピオンズ ダメージ計算・火力指数計算ツール</title>
+    <meta name="description" content="PokéFire（ポケモンチャンピオンズのダメージ計算・火力指数計算ツール）の使い方。ポケモンの選び方、連続技、加算計算、定数ダメージ、ダメージの詳細、計算の仕様を解説します。">
+    <meta name="theme-color" content="#f0f0f0">
+    <link rel="canonical" href="https://ffui.me/poke/fire/help/">
+    <meta property="og:type" content="article">
+    <meta property="og:url" content="https://ffui.me/poke/fire/help/">
+    <meta property="og:image" content="https://ffui.me/poke/fire/ogp.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="PokéFire">
+    <meta property="og:title" content="ヘルプ｜PokéFire ポケモンチャンピオンズ ダメージ計算・火力指数計算ツール">
+    <meta property="og:description" content="PokéFire（ポケモンチャンピオンズのダメージ計算・火力指数計算ツール）の使い方。ポケモンの選び方、連続技、加算計算、定数ダメージ、ダメージの詳細、計算の仕様を解説します。">
+    <meta property="og:locale" content="ja_JP">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://ffui.me/poke/fire/ogp.png">
+    <meta name="twitter:title" content="ヘルプ｜PokéFire ポケモンチャンピオンズ ダメージ計算・火力指数計算ツール">
+    <meta name="twitter:description" content="PokéFire（ポケモンチャンピオンズのダメージ計算・火力指数計算ツール）の使い方。ポケモンの選び方、連続技、加算計算、定数ダメージ、ダメージの詳細、計算の仕様を解説します。">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap">
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="../favicon/favicon.ico" sizes="any">
+    <link rel="icon apple-touch-icon" href="../favicon/favicon-apple-touch-icon.png">
+    <link rel="icon" href="../favicon/favicon-16x16.png" sizes="16x16">
+    <link rel="icon" href="../favicon/favicon-32x32.png" sizes="32x32">
+    <link rel="manifest" href="../site.webmanifest">
+    <script src="help.js" defer></script>
+</head>
+<body>
+
+    <main>
+        <a class="help_back" href="../">
+            <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+            PokéFireに戻る
+        </a>
+
+        <button class="help_news_open" aria-label="おしらせ" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg>
+        </button>
+
+        <div class="help_news" role="dialog" aria-label="おしらせ" hidden>
+            <div class="help_news_panel">
+                <div class="help_news_header">
+                    <p>おしらせ</p>
+                    <button class="help_news_close" aria-label="閉じる"><svg viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+                </div>
+                <ol class="help_news_list">
+                    <li>
+                        <time datetime="2026-10-18">2026.10.18</time>
+                        <p>計算条件をURLで共有できるようになりました。ダメージの詳細の右上にある共有ボタンから、今の条件を開けるURLを送れます。</p>
+                    </li>
+                    <li>
+                        <time datetime="2026-10-18">2026.10.18</time>
+                        <p>PokéFire を公開しました。</p>
+                    </li>
+                </ol>
+            </div>
+        </div>
+
+        <header class="help_header">
+            <h1>PokéFire ヘルプ</h1>
+            <p class="help_lead">PokéFire は、ポケモンチャンピオンズのダメージと火力指数を計算するツールです。シングルバトルを前提に、乱数・確定数・加算計算・反動や回復までまとめて確認できます。</p>
+        </header>
+
+        <nav class="help_toc">
+            <p class="help_toc_ttl">もくじ</p>
+            <ol>
+                <li><a href="#screen">画面の見方</a></li>
+                <li><a href="#pokemon">ポケモンを選ぶ</a></li>
+                <li><a href="#stats">能力ポイント・性格・ランク</a></li>
+                <li><a href="#move">わざ</a></li>
+                <li><a href="#ability">とくせい・もちもの・じょうたい</a></li>
+                <li><a href="#environment">天候・フィールド</a></li>
+                <li><a href="#swap">攻守交代</a></li>
+                <li><a href="#order">加算計算（タブ）</a></li>
+                <li><a href="#constant">定数ダメージ・定数回復</a></li>
+                <li><a href="#result">結果カード</a></li>
+                <li><a href="#detail">ダメージの詳細</a></li>
+                <li><a href="#spec">計算の仕様</a></li>
+                <li><a href="#data">データの出典</a></li>
+            </ol>
+        </nav>
+
+        <section class="help_section" id="screen">
+            <h2>画面の見方</h2>
+            <p>左側が<strong>攻撃側</strong>、右側が<strong>防御側</strong>のパネルです。スマートフォンでは横にスクロールするか、パネルの間の余白をタップすると切り替わります。</p>
+            <figure class="help_figure" data-file="images/overview.png">
+                <img src="images/overview.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>全体の画面</figcaption>
+            </figure>
+            <dl class="help_list">
+                <dt>上部のタブ</dt>
+                <dd>加算計算の順番です。攻撃・定数ダメージ・定数回復を並べられます。</dd>
+                <dt>天候・フィールド</dt>
+                <dd>一番上のつまみをタップするか、ページの一番上で下にスワイプすると開きます。</dd>
+                <dt>攻守交代ボタン</dt>
+                <dd>2つのパネルの間に浮いているボタンです。</dd>
+                <dt>結果カード</dt>
+                <dd>画面下にいつも表示されている計算結果です。タップすると詳細が開きます。</dd>
+            </dl>
+        </section>
+
+        <section class="help_section" id="pokemon">
+            <h2>ポケモンを選ぶ</h2>
+            <p>ポケモン名の欄をタップすると一覧が開きます。一覧はシングルの使用率順で、メガシンカは元のポケモンのすぐ下に並びます。</p>
+            <figure class="help_figure" data-file="images/pokemon_select.png">
+                <img src="images/pokemon_select.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>ポケモンの一覧</figcaption>
+            </figure>
+            <ul class="help_points">
+                <li>ひらがな・カタカナ・ローマ字・よく使われる略称で検索できます。</li>
+                <li><kbd>Enter</kbd> を押すと、一覧の一番上のポケモンに決まります。</li>
+                <li>選ぶと、使用率1位の<strong>とくせい</strong>と、使用率がいちばん高い<strong>攻撃技</strong>（攻撃側のみ）が自動で入ります。もちものは使用率1位がこのツールで扱えるものの場合だけ入り、それ以外は「なし」になります。</li>
+                <li>能力ポイントと性格は、ポケモンごとに前回の調整を覚えています。初めて選んだポケモンは H2・A32・C32・ほかは0 です。</li>
+            </ul>
+            <h3>フォルムチェンジ</h3>
+            <p>ポケモンの画像をタップすると、同じ図鑑番号のほかの姿（メガシンカ・リージョンフォームなど）が並びます。数が多いときは横にスクロールできます。</p>
+            <h3>タイプの変更</h3>
+            <p>タイプの欄をタップするとタイプ選択が開き、タイプを付けたり外したりできます。「リセット」でそのポケモン本来のタイプに戻ります。</p>
+        </section>
+
+        <section class="help_section" id="stats">
+            <h2>能力ポイント・性格・ランク</h2>
+            <figure class="help_figure" data-file="images/stats.png">
+                <img src="images/stats.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>能力ポイントのバーと性格・ランク</figcaption>
+            </figure>
+            <dl class="help_list">
+                <dt>能力ポイント</dt>
+                <dd>バーをタップするか横になぞって 0〜32 を指定します。右上に実数値が表示されます。</dd>
+                <dt>性格補正</dt>
+                <dd>×0.9・×1.0・×1.1 から選びます。</dd>
+                <dt>ランク</dt>
+                <dd>セレクトか上下ボタンで −6〜+6 を指定します。上がっていると赤、下がっていると青の枠になります。</dd>
+                <dt>のこりHP</dt>
+                <dd>防御側は常に、攻撃側はふんか・しおふき・じたばた・きしかいせい・いのちがけ・がむしゃらのときに表示されます。バーをタップかなぞって指定します。</dd>
+            </dl>
+            <p class="help_note">表示される能力は、選んだわざに合わせて切り替わります（物理なら攻撃側は A、防御側は H・B など）。</p>
+        </section>
+
+        <section class="help_section" id="move">
+            <h2>わざ</h2>
+            <p>わざの欄をタップすると検索が開きます。上には選んでいるポケモンがよく使うわざが、使用率付きで並びます。</p>
+            <ul class="help_points">
+                <li>開いたときは前回の検索文字が全選択された状態なので、そのまま打ち直せます。</li>
+                <li><kbd>Enter</kbd> で一番上のわざに決まります。</li>
+                <li>右上の威力は、今の条件で変わった威力です。元より上がっていると赤字になります。</li>
+            </ul>
+            <h3>急所・威力アップ</h3>
+            <p>「急所」で急所に当たったときの計算になります。こおりのいぶき・トリックフラワー・やまあらしは必ず急所なので、ONのまま鍵が付いて固定されます。「威力アップ」は、相手が地中にいるときのじしんなど、条件で威力が上がるわざのときだけ表示されます。</p>
+            <h3>連続技</h3>
+            <figure class="help_figure" data-file="images/multihit.png">
+                <img src="images/multihit.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>ヒット回数と急所回数</figcaption>
+            </figure>
+            <p>連続技では急所ボタンの代わりに「ヒット回数」「急所回数」が表示されます。タップで選ぶほか、ボタンの中から指を置いて横になぞると回数を変えられます（左端が最小、右端が最大）。</p>
+            <ul class="help_points">
+                <li>2〜5回のわざは2回、ネズミざんは10回が初期値です。スキルリンクなら5回で固定です。</li>
+                <li>トリプルアクセルは、1〜3回目それぞれの「ヒット」「急所」を個別に切り替えられます。</li>
+            </ul>
+        </section>
+
+        <section class="help_section" id="ability">
+            <h2>とくせい・もちもの・じょうたい</h2>
+            <dl class="help_list">
+                <dt>とくせい</dt>
+                <dd>候補から選ぶか、検索から選びます。条件付きで効くとくせい（もうか・マルチスケイルなど）には「発動」ボタンが付き、ON/OFFを切り替えられます。常に効くとくせいは鍵付きでONに固定されます。へんげんじざい・リベロでは「タイプ変更」ボタンで、今のわざのタイプになります。</dd>
+                <dt>もちもの</dt>
+                <dd>検索から選びます。メガシンカのポケモンを選ぶと自動で「メガストーン」になります。メトロノームのときは「連続攻撃回数」で何回目の攻撃かを指定できます。</dd>
+                <dt>じょうたい</dt>
+                <dd>攻撃側は「やけど」「じゅうでん」「地面にいる」、防御側は「リフレクター」「ひかりのかべ」「地面にいる」「無防備状態」を切り替えられます。からげんき・こんじょうのときは、やけどの半減が関係ないので鍵が付きます。</dd>
+            </dl>
+        </section>
+
+        <section class="help_section" id="environment">
+            <h2>天候・フィールド</h2>
+            <figure class="help_figure" data-file="images/environment.png">
+                <img src="images/environment.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>天候・フィールドの設定</figcaption>
+            </figure>
+            <p>画面上部のつまみをタップするか、ページの一番上で下にスワイプすると開きます。上にスワイプするか、外側をタップすると閉じます。</p>
+            <ul class="help_points">
+                <li>選んでいるものをもう一度タップすると「なし」に戻ります。</li>
+                <li>天候は画面の上から、フィールドは下から、背景に色が付きます。</li>
+            </ul>
+        </section>
+
+        <section class="help_section" id="swap">
+            <h2>攻守交代</h2>
+            <p>2つのパネルの間のボタンで、攻撃側と防御側のポケモンを入れ替えます。能力ポイント・性格・とくせい・もちものなどの調整は、それぞれのポケモンに付いたまま入れ替わります。定数ダメージ・定数回復のタブを選んでいる間は表示されません。</p>
+        </section>
+
+        <section class="help_section" id="order">
+            <h2>加算計算（タブ）</h2>
+            <figure class="help_figure" data-file="images/order.png">
+                <img src="images/order.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>上部のタブ</figcaption>
+            </figure>
+            <p>上部の「＋」で、攻撃・定数ダメージ・定数回復のタブを今のタブの次に追加できます。左右の矢印で選んでいるタブの順番を入れ替え、×で削除します。タブが2つ以上あると、結果は並び順どおりに当てたときの「ひんし率」になります。</p>
+            <ul class="help_points">
+                <li>防御側のポケモンはすべてのタブで共通です。どのタブで変えても全体がそのポケモン基準になります。</li>
+                <li>同じポケモンなら、もちもの・とくせい・能力ポイント・性格はタブ同士で共通です。</li>
+                <li>タイプ・ランク・わざ・じょうたい・とくせいの発動は、タブごとに別々に持てます。</li>
+            </ul>
+        </section>
+
+        <section class="help_section" id="constant">
+            <h2>定数ダメージ・定数回復</h2>
+            <figure class="help_figure" data-file="images/constant.png">
+                <img src="images/constant.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>定数ダメージのパネル</figcaption>
+            </figure>
+            <p>定数のタブを選ぶと、攻撃側のパネルが専用の画面になります。防御側の最大HPを基準に計算し、右上に合計を表示します。</p>
+            <dl class="help_list">
+                <dt>割合</dt>
+                <dd>1/32〜1/2 などの割合ごとに、受けた（回復した）回数を −0＋ で指定します。各行には当てはまる例（ステルスロック・たべのこしなど）が書いてあります。</dd>
+                <dt>もうどく（ダメージのみ）</dt>
+                <dd>1〜15ターン目それぞれの回数を指定します。</dd>
+                <dt>固定</dt>
+                <dd>50ダメージ（ちきゅうなげ・ナイトヘッド）や10回復（オレンのみ）の回数と、「＋ 追加」で好きな量を入力できます。</dd>
+            </dl>
+            <p class="help_note">回復は減っているHPの分までしか入らず、ひんしになった後は回復しません。</p>
+        </section>
+
+        <section class="help_section" id="result">
+            <h2>結果カード</h2>
+            <figure class="help_figure" data-file="images/result.png">
+                <img src="images/result.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>結果カード</figcaption>
+            </figure>
+            <dl class="help_list">
+                <dt>ダメージ</dt>
+                <dd>最大HPに対する割合と、実際のダメージ量です。</dd>
+                <dt>HPバー</dt>
+                <dd>濃い部分が確実に残るHP、薄い部分が乱数次第で残るHPです。50%以上は緑、25%以上はオレンジ、それ未満は赤です。</dd>
+                <dt>判定</dt>
+                <dd>攻撃1つのときは「確定○発」「乱数○発（確率）」、タブが2つ以上のときは「ひんし率」を表示します。</dd>
+            </dl>
+        </section>
+
+        <section class="help_section" id="detail">
+            <h2>ダメージの詳細</h2>
+            <figure class="help_figure" data-file="images/detail.png">
+                <img src="images/detail.png" alt="" loading="lazy" onerror="this.parentElement.classList.add('is-missing')">
+                <figcaption>ダメージの詳細</figcaption>
+            </figure>
+            <p>結果カードをタップすると下から開きます。上部をタップするか、一番上から下にスワイプすると閉じます。</p>
+            <dl class="help_list">
+                <dt>フロー</dt>
+                <dd>タブの順に攻撃が並びます。攻撃をタップすると、その攻撃だけの結果が上に表示され、乱数表（85〜100%）と補正の一覧が開きます。∑を選ぶと全体の結果に戻ります。</dd>
+                <dt>補正の一覧</dt>
+                <dd>ダメージを上げる補正は緑、下げる補正は赤で表示されます。</dd>
+                <dt>攻撃側の反動・回復</dt>
+                <dd>吸収わざ・反動わざ・いのちのたま・かいがらのすず・おおきなねっこ、相手のゴツゴツメット・さめはだなどによるHPの増減です。接触による反動は1回ごとに分けて表示されます。</dd>
+                <dt>火力指数</dt>
+                <dd>個別の攻撃を選んでいるときに表示されます。下の「計算の仕様」を参照してください。</dd>
+                <dt>共有</dt>
+                <dd>右上の共有ボタンで、今の計算条件（両方のポケモン・調整・わざ・タブ・天候・フィールドなど）をそのまま開けるURLを作れます。スマートフォンでは共有メニューが開き、パソコンではURLがコピーされます。</dd>
+            </dl>
+        </section>
+
+        <section class="help_section" id="spec">
+            <h2>計算の仕様</h2>
+            <dl class="help_list">
+                <dt>実数値（レベル50）</dt>
+                <dd>H = 種族値 + 75 + 能力ポイント<br>H以外 = (種族値 + 20 + 能力ポイント) × 性格補正（切り捨て）</dd>
+                <dt>ダメージ</dt>
+                <dd>第9世代のダメージ計算式に準拠しています。補正は 4096 を1倍とする方式で、各段階の丸め（切り捨て・四捨五入・五捨五超入）も本作の計算どおりに行います。</dd>
+                <dt>火力指数</dt>
+                <dd>補正後の攻撃の実数値 × 補正後の威力 × タイプ一致 × 天候 × 攻撃側の最終補正（いのちのたま・メトロノームなど）× 急所 × やけど。タイプ相性や相手のとくせい・もちもの・壁など、相手によって変わる補正は含みません。連続技は全ヒットの合計です。</dd>
+                <dt>表記</dt>
+                <dd>%は小数第1位まで（四捨五入）、乱数○発の確率だけ小数第2位までです。</dd>
+            </dl>
+            <p class="help_note">カウンター・ミラーコート・メタルバースト・ほうふく・はきだす・なげつける・ふくろだたきなど、一部のわざは計算できません。</p>
+        </section>
+
+        <section class="help_section" id="data">
+            <h2>データの出典</h2>
+            <ul class="help_points">
+                <li>わざ・とくせい・もちもの・ポケモンのデータは、GameWith の攻略情報をもとにしています。</li>
+                <li>ポケモンの画像と検索用の略称は、ポケソルのデータを使用しています。</li>
+                <li>使用率は <a href="https://championsbattledata.com/" target="_blank" rel="noopener">Pokémon Champions Battle Data</a> のシングルのデータを使用しています（Battle data provided by Pokémon Champions Battle Data）。</li>
+                <li>英語名と日本語名の対応には PokéAPI のデータを使用しています。</li>
+            </ul>
+            <p class="help_note">PokéFire は非公式のファンツールです。株式会社ポケモン・任天堂・クリーチャーズ・ゲームフリークとは関係ありません。</p>
+        </section>
+
+        <footer>
+            <p class="copyright" style="text-align: right; color: #777;">&copy; 2026 fifth.</p>
+        </footer>
+    </main>
+
+</body>
+</html>

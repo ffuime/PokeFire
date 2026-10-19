@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PokéFire｜ポケモンチャンピオンズ ダメージ計算(ダメ計)・火力指数計算ツール</title>
+    <meta name="description" content="ポケモンチャンピオンズ（シングル）のダメージ計算できる非公式ツール。加算計算、定数ダメージ・回復、連続技、反動や回復、使用率順の検索、計算条件のURL共有に対応。">
+    <meta name="theme-color" content="#f0f0f0">
+    <link rel="canonical" href="https://ffui.me/poke/fire/">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ffui.me/poke/fire/">
+    <meta property="og:image" content="https://ffui.me/poke/fire/ogp.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="PokéFire">
+    <meta property="og:title" content="PokéFire｜ポケモンチャンピオンズ ダメージ計算(ダメ計)・火力指数計算ツール">
+    <meta property="og:description" content="ポケモンチャンピオンズ（シングル）のダメージ計算できる非公式ツール。加算計算、定数ダメージ・回復、連続技、反動や回復、使用率順の検索、計算条件のURL共有に対応。">
+    <meta property="og:locale" content="ja_JP">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://ffui.me/poke/fire/ogp.png">
+    <meta name="twitter:title" content="PokéFire｜ポケモンチャンピオンズ ダメージ計算(ダメ計)・火力指数計算ツール">
+    <meta name="twitter:description" content="ポケモンチャンピオンズ（シングル）のダメージ計算できる非公式ツール。加算計算、定数ダメージ・回復、連続技、反動や回復、使用率順の検索、計算条件のURL共有に対応。">
+    <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"PokéFire","url":"https://ffui.me/poke/fire/","image":"https://ffui.me/poke/fire/ogp.png","alternateName":"ポケモンチャンピオンズ ダメージ計算・火力指数計算ツール","applicationCategory":"GameApplication","operatingSystem":"Any","inLanguage":"ja","isAccessibleForFree":true,"description":"ポケモンチャンピオンズ（シングル）のダメージ計算できる非公式ツール。加算計算、定数ダメージ・回復、連続技、反動や回復、使用率順の検索、計算条件のURL共有に対応。","offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}}</script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=LINE+Seed+JP:wght@400;700&display=swap">
+    <link rel="stylesheet" href="style.css?v=20261018190112">
+    <script src="app.min.js?v=20261018190112" defer></script>
+    <link rel="icon" href="favicon/favicon.ico" sizes="any">
+    <link rel="icon apple-touch-icon" href="favicon/favicon-apple-touch-icon.png">
+    <link rel="icon" href="favicon/favicon-16x16.png" sizes="16x16">
+    <link rel="icon" href="favicon/favicon-32x32.png" sizes="32x32">
+    <link rel="manifest" href="site.webmanifest">
+</head>
+
+<body>
+
+    <h1 class="visually_hidden">PokéFire ポケモンチャンピオンズ ダメージ計算・火力指数計算ツール</h1>
+
+    <div class="weather_flash"></div>
+    <div class="field_flash"></div>
+
+    <a href="help/" class="gohelp">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <path d="M12 17h.01"/>
+        </svg>
+    </a>
+
+    <section class="order_container">
+
+        <button class="order_left">
+            <svg viewBox="0 0 24 24">
+                <path d="M13 9a1 1 0 0 1-1-1V4.707a.707.707 0 0 0-1.207-.5l-6.94 6.94a1.207 1.207 0 0 0 0 1.707l6.94 6.94a.707.707 0 0 0 1.207-.5V16a1 1 0 0 1 1-1h2a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1z"/>
+                <path d="M20 9v6"/>
+            </svg>
+        </button>
+
+        <div class="order_main">
+
+            <div class="order_main_item attack active">
+                <svg viewBox="0 0 24 24"><use href="#i1"/></svg>
+                <p>攻撃</p>
+                <div class="order_main_item_delete">
+                    <svg viewBox="0 0 24 24"><use href="#i2"/></svg>
+                </div>
+            </div>
+            <div class="order_main_item damage">
+                <svg viewBox="0 0 24 24"><use href="#i3"/></svg>
+                <p>定数</p>
+                <div class="order_main_item_delete">
+                    <svg viewBox="0 0 24 24"><use href="#i2"/></svg>
+                </div>
+            </div>
+            <div class="order_main_item heel">
+                <svg viewBox="0 0 24 24"><use href="#i4"/></svg>
+                <p>回復</p>
+                <div class="order_main_item_delete">
+                    <svg viewBox="0 0 24 24"><use href="#i2"/></svg>
+                </div>
+            </div>
+
+            <button class="order_main_item_add">
+                <svg viewBox="0 0 24 24">
+                    <path d="M11.252 20.2498C11.252 20.6641 11.5878 20.9999 12.002 20.9999C12.4162 20.9999 12.752 20.6641 12.752 20.2499V12.7498H20.2519C20.6661 12.7498 21.0019 12.414 21.0019 11.9998C21.0019 11.5856 20.6661 11.2498 20.2519 11.2498H12.752V3.74988C12.752 3.33567 12.4162 2.99988 12.002 2.99988C11.5878 2.99988 11.252 3.33566 11.252 3.74988V11.2498H3.75195C3.33774 11.2498 3.00195 11.5856 3.00195 11.9998C3.00195 12.414 3.33774 12.7498 3.75195 12.7498H11.252V20.2498Z"/>
+                </svg>
+            </button>
+
+        </div>
+
+        <button class="order_right">
+            <svg viewBox="0 0 24 24">
+                <path d="M11 9a1 1 0 0 0 1-1V4.707a.707.707 0 0 1 1.207-.5l6.94 6.94a1.207 1.207 0 0 1 0 1.707l-6.94 6.94a.707.707 0 0 1-1.207-.5V16a1 1 0 0 0-1-1H9a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z"/>
+                <path d="M4 9v6"/>
+            </svg>
+        </button>
+
+    </section>
+    <div class="order_choose_container">
+        <div class="order_choose_list">
+            <div class="order_choose_item" data-kind="attack">
+                <svg viewBox="0 0 24 24"><use href="#i1"/></svg>
+                <p>ポケモンの攻撃</p>
+            </div>
+            <div class="order_choose_item" data-kind="damage">
+                <svg viewBox="0 0 24 24"><use href="#i3"/></svg>
+                <p>定数ダメージ</p>
+            </div>
+            <div class="order_choose_item" data-kind="heel">
+                <svg viewBox="0 0 24 24"><use href="#i4"/></svg>
+                <p>定数回復</p>
+            </div>
+        </div>
+        <button class="order_choose_close" aria-label="閉じる">
+            <svg viewBox="0 0 24 24"><use href="#i-up"/></svg>
+        </button>
+    </div>
+
+    <main class="attacker">
+
+        <div class="main_icon attacker">
+            <svg viewBox="0 0 24 24"><use href="#i1"/></svg>
+        </div>
+
+        <label for="main_search" class="main_search">
+            <div class="main_search_sprite">
+                <img src="https://pokesol.app/api/images/assets/pokemons/0445.png" alt="" class="main_search_sprite_img">
+
+                <div class="main_search_change">
+                    <svg viewBox="0 0 24 24"><use href="#i6"/></svg>
+                </div>
+            </div>
+            <div class="main_search_info">
+                <input type="text" id="main_search" placeholder="ポケモン名…" autocomplete="off" value="ガブリアス">
+                <div class="main_search_info_types">
+                    <div class="main_search_info_types_item" data-type="ドラゴン">
+                        <p>ドラゴン</p>
+                    </div>
+                    <div class="main_search_info_types_item" data-type="じめん">
+                        <p>じめん</p>
+                    </div>
+                    <div class="main_search_info_types_edit">
+                        <svg viewBox="0 0 24 24"><use href="#i7"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="main_search_otherforms">
+                <div class="main_search_otherforms_close">
+                    <svg viewBox="0 0 24 24"><use href="#i8"/></svg>
+                </div>
+
+                <div class="main_search_otherform_item">
+                    <img src="https://pokesol.app/api/images/assets/pokemons/0006.png" alt="" class="main_search_otherform_img">
+                </div>
+                <div class="main_search_otherform_item">
+                    <img src="https://pokesol.app/api/images/assets/pokemons/0006_01.png" alt="" class="main_search_otherform_img">
+                </div>
+            </div>
+        </label>
+
+        <div class="main_pokemon_choose">
+            <div class="main_pokemon_choose_list"></div>
+            <button class="main_choose_close" aria-label="閉じる">
+                <svg viewBox="0 0 24 24"><use href="#i-up"/></svg>
+            </button>
+        </div>
+
+        <div class="main_choose_overlay"></div>
+
+        <div class="main_type_choose">
+            <div class="main_type_choose_list"></div>
+            <div class="main_type_choose_footer">
+                <button class="main_type_choose_reset">リセット</button>
+                <button class="main_choose_close" aria-label="閉じる">
+                    <svg viewBox="0 0 24 24"><use href="#i-up"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="main_basestats">
+            <div class="main_basestats_item h">
+                <span>H</span>
+                <p>108</p>
+            </div>
+            <div class="main_basestats_item a active">
+                <span>A</span>
+                <p>130</p>
+            </div>
+            <div class="main_basestats_item b">
+                <span>B</span>
+                <p>95</p>
+            </div>
+            <div class="main_basestats_item c">
+                <span>C</span>
+                <p>80</p>
+            </div>
+            <div class="main_basestats_item d">
+                <span>D</span>
+                <p>85</p>
+            </div>
+            <div class="main_basestats_item s">
+                <span>S</span>
+                <p>102</p>
+            </div>
+        </div>
+
+        <div class="main_move">
+            <div class="main_move_header">
+                <p>わざ</p>
+
+                <div class="main_move_header_info">
+                    <div class="main_move_header_info_type" data-type-svg="じめん"></div>
+                    <div class="main_move_header_info_category" data-category-svg="物理"></div>
+                    <span class="main_move_header_info_power">100</span>
+                </div>
+            </div>
+            <button class="main_move_choose" ontouchstart="">
+                <div class="main_move_choose_icon">
+                    <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+                </div>
+                <p>じしん</p>
+            </button>
+            <div class="main_move_btn">
+                <button class="main_move_weak">急所</button>
+                <button class="main_move_powerup" hidden>威力アップ</button>
+            </div>
+        </div>
+
+        <div class="main_evs main_evs_h" data-evs="HP|185|2"></div>
+
+        <div class="main_hpleft" hidden>
+            <div class="main_hpleft_header">
+                <p class="ttl">のこりHP</p>
+
+                <div class="main_hpleft_header_value">
+                    <p class="percent">100%</p>
+                    <p class="num">
+                        <span class="now">185</span>
+                        <span class="max">/185</span>
+                    </p>
+                </div>
+            </div>
+            <div class="main_hpleft_range">
+                <span class="background"></span>
+                <span class="active"></span>
+            </div>
+        </div>
+
+        <div class="main_evs main_evs_a active" data-evs="こうげき|182|32|1"></div>
+
+        <div class="main_evs main_evs_vsa" data-evs="相手のこうげき|182|32|1"></div>
+
+        <div class="main_evs main_evs_c" data-evs="とくこう|132|32|1"></div>
+        <div class="main_evs main_evs_b" data-evs="ぼうぎょ|115|0|1"></div>
+        <div class="main_evs main_evs_s" data-evs="すばやさ|122|0|1"></div>
+
+        <div class="main_ability">
+            <div class="main_ability_header">
+                <p>とくせい</p>
+
+                <div class="main_ability_header_ex">
+                    <span class="selected">さめはだ</span>
+                    <span>すながくれ</span>
+                </div>
+            </div>
+            <button class="main_ability_choose" ontouchstart="">
+                <div class="main_ability_choose_icon">
+                    <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+                </div>
+                <p>さめはだ</p>
+            </button>
+            <div class="main_ability_btn">
+                <button class="main_ability_on">発動</button>
+            </div>
+        </div>
+
+        <div class="main_item">
+            <div class="main_item_header">
+                <p>もちもの</p>
+            </div>
+            <button class="main_item_choose" ontouchstart="">
+                <div class="main_item_choose_icon">
+                    <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+                </div>
+                <p>なし</p>
+            </button>
+        </div>
+
+        <div class="main_condition">
+            <div class="main_condition_list">
+                <button class="main_condition_item">やけど</button>
+                <button class="main_condition_item">じゅうでん</button>
+                <button class="main_condition_item">地面にいる</button>
+            </div>
+        </div>
+
+    </main>
+
+    <button class="changethem">
+        <svg viewBox="0 0 24 24">
+            <path d="m16 3 4 4-4 4"/>
+            <path d="M20 7H4"/>
+            <path d="m8 21-4-4 4-4"/>
+            <path d="M4 17h16"/>
+        </svg>
+    </button>
+
+    <main class="defender">
+
+        <div class="main_icon defender">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/>
+                <path d="M12 3v18"/>
+            </svg>
+        </div>
+
+        <label for="main_search_d" class="main_search">
+            <div class="main_search_sprite">
+                <img src="https://pokesol.app/api/images/assets/pokemons/0006_01.png" alt="" class="main_search_sprite_img">
+
+                <div class="main_search_change">
+                    <svg viewBox="0 0 24 24"><use href="#i6"/></svg>
+                </div>
+            </div>
+            <div class="main_search_info">
+                <input type="text" id="main_search_d" placeholder="ポケモン名…" autocomplete="off" value="メガリザードンX">
+                <div class="main_search_info_types">
+                    <div class="main_search_info_types_item" data-type="ほのお">
+                        <p>ほのお</p>
+                    </div>
+                    <div class="main_search_info_types_item" data-type="ドラゴン">
+                        <p>ドラゴン</p>
+                    </div>
+                    <div class="main_search_info_types_edit">
+                        <svg viewBox="0 0 24 24"><use href="#i7"/></svg>
+                    </div>
+                </div>
+            </div>
+            <div class="main_search_otherforms">
+                <div class="main_search_otherforms_close">
+                    <svg viewBox="0 0 24 24"><use href="#i8"/></svg>
+                </div>
+
+                <div class="main_search_otherform_item">
+                    <img src="https://pokesol.app/api/images/assets/pokemons/0006.png" alt="" class="main_search_otherform_img">
+                </div>
+                <div class="main_search_otherform_item">
+                    <img src="https://pokesol.app/api/images/assets/pokemons/0006_01.png" alt="" class="main_search_otherform_img">
+                </div>
+            </div>
+        </label>
+
+        <div class="main_pokemon_choose">
+            <div class="main_pokemon_choose_list"></div>
+            <button class="main_choose_close" aria-label="閉じる">
+                <svg viewBox="0 0 24 24"><use href="#i-up"/></svg>
+            </button>
+        </div>
+
+        <div class="main_choose_overlay"></div>
+
+        <div class="main_type_choose">
+            <div class="main_type_choose_list"></div>
+            <div class="main_type_choose_footer">
+                <button class="main_type_choose_reset">リセット</button>
+                <button class="main_choose_close" aria-label="閉じる">
+                    <svg viewBox="0 0 24 24"><use href="#i-up"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="main_basestats">
+            <div class="main_basestats_item h active">
+                <span>H</span>
+                <p>78</p>
+            </div>
+            <div class="main_basestats_item a">
+                <span>A</span>
+                <p>130</p>
+            </div>
+            <div class="main_basestats_item b active">
+                <span>B</span>
+                <p>111</p>
+            </div>
+            <div class="main_basestats_item c">
+                <span>C</span>
+                <p>130</p>
+            </div>
+            <div class="main_basestats_item d">
+                <span>D</span>
+                <p>85</p>
+            </div>
+            <div class="main_basestats_item s">
+                <span>S</span>
+                <p>100</p>
+            </div>
+        </div>
+
+        <div class="main_hpleft">
+            <div class="main_hpleft_header">
+                <p class="ttl">のこりHP</p>
+
+                <div class="main_hpleft_header_value">
+                    <p class="percent">100%</p>
+                    <p class="num">
+                        <span class="now">155</span>
+                        <span class="max">/155</span>
+                    </p>
+                </div>
+            </div>
+            <div class="main_hpleft_range">
+                <span class="background"></span>
+                <span class="active"></span>
+            </div>
+        </div>
+
+        <div class="main_evs main_evs_h active" data-evs="HP|155|2"></div>
+        <div class="main_evs main_evs_b active" data-evs="ぼうぎょ|131|0|1"></div>
+        <div class="main_evs main_evs_d" data-evs="とくぼう|105|0|1"></div>
+        <div class="main_evs main_evs_s" data-evs="すばやさ|120|0|1"></div>
+
+        <div class="main_ability">
+            <div class="main_ability_header">
+                <p>とくせい</p>
+
+                <div class="main_ability_header_ex">
+                    <span class="selected">かたいツメ</span>
+                </div>
+            </div>
+            <button class="main_ability_choose" ontouchstart="">
+                <div class="main_ability_choose_icon">
+                    <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+                </div>
+                <p>かたいツメ</p>
+            </button>
+            <div class="main_ability_btn">
+                <button class="main_ability_on">発動</button>
+            </div>
+        </div>
+
+        <div class="main_item">
+            <div class="main_item_header">
+                <p>もちもの</p>
+            </div>
+            <button class="main_item_choose" ontouchstart="">
+                <div class="main_item_choose_icon">
+                    <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+                </div>
+                <p>メガストーン</p>
+            </button>
+        </div>
+
+        <div class="main_condition">
+            <div class="main_condition_header">
+                <p>じょうたい</p>
+            </div>
+            <div class="main_condition_list">
+                <button class="main_condition_item">リフレクター</button>
+                <button class="main_condition_item">ひかりのかべ</button>
+                <button class="main_condition_item">地面にいる</button>
+                <button class="main_condition_item">無防備状態</button>
+            </div>
+        </div>
+
+    </main>
+
+    <div class="card_result">
+        <div class="card_result_damage">
+            <p class="card_result_damage_percent">101.9%～121.3%</p>
+            <div class="card_result_damage_num">
+                <p class="card_result_damage_num_take">158～188</p>
+                <p class="card_result_damage_num_max">155</p>
+            </div>
+        </div>
+        <div class="card_result_hpbar">
+            <div class="card_result_hpbar_kaku"></div>
+            <div class="card_result_hpbar_ran"></div>
+        </div>
+        <div class="card_result_judge">
+            <button class="card_speed open_speed" aria-label="すばやさ比較">
+                <svg viewBox="0 0 24 24"><use href="#i10"/></svg>
+            </button>
+            <p class="card_result_judgement">確定1発</p>
+            <p class="card_result_judge_percent" hidden></p>
+        </div>
+    </div>
+
+    <section class="modal_searchmove">
+        <label for="modal_searchmove_search" class="modal_searchmove_search">
+            <div class="modal_searchmove_search_icon">
+                <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+            </div>
+            <input type="text" id="modal_searchmove_search" placeholder="わざの名前を検索…" autocomplete="off">
+            <div class="modal_searchmove_search_close">
+                <svg viewBox="0 0 24 24"><use href="#i-down"/></svg>
+            </div>
+        </label>
+
+    </section>
+
+    <section class="modal_searchability">
+        <label for="modal_searchability_search" class="modal_searchability_search">
+            <div class="modal_searchability_search_icon">
+                <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+            </div>
+            <input type="text" id="modal_searchability_search" placeholder="とくせいの名前を検索…" autocomplete="off">
+            <div class="modal_searchability_search_close">
+                <svg viewBox="0 0 24 24"><use href="#i-down"/></svg>
+            </div>
+        </label>
+
+    </section>
+
+    <section class="modal_searchitem">
+        <label for="modal_searchitem_search" class="modal_searchitem_search">
+            <div class="modal_searchitem_search_icon">
+                <svg viewBox="0 0 24 24"><use href="#i9"/></svg>
+            </div>
+            <input type="text" id="modal_searchitem_search" placeholder="もちものの名前を検索…" autocomplete="off">
+            <div class="modal_searchitem_search_close">
+                <svg viewBox="0 0 24 24"><use href="#i-down"/></svg>
+            </div>
+        </label>
+
+    </section>
+
+    <section class="modal_environment_container">
+
+        <div class="modal_environment" data-weather="天候" data-field="フィールド">
+            <div class="modal_environment_weather">
+                <p class="ttl">天候</p>
+
+                <div class="modal_environment_weather_select">
+                    <button class="modal_environment_weather_select_none selected">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.6"><use href="#i12"/></svg>
+                    </button>
+                    <button class="modal_environment_weather_select_sun">
+                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linecap="round" stroke-width="2.2">
+                            <circle cx="12" cy="12" r="4.6" stroke="none"/>
+                            <path d="M12 2.4v1.2M12 20.4v1.2M2.4 12h1.2M20.4 12h1.2M5.21 5.21l.85.85M17.94 17.94l.85.85M5.21 18.79l.85-.85M17.94 6.06l.85-.85"/>
+                        </svg>
+                    </button>
+                    <button class="modal_environment_weather_select_rain">
+                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linecap="round" stroke-width="2">
+                            <path stroke="none" d="M7.5 14a4 4 0 0 1-.6-7.95A5.5 5.5 0 0 1 17.4 6.6 3.7 3.7 0 0 1 17.5 14z"/>
+                            <path fill="none" d="M8.6 16.8l-.7 2.8M12.6 17.8l-.7 2.8M16.6 16.8l-.7 2.8"/>
+                        </svg>
+                    </button>
+                    <button class="modal_environment_weather_select_sand">
+                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round" stroke-width="1.5">
+                            <polygon points="9,10.2 14.04,13.86 12.11,19.79 5.89,19.79 3.96,13.86" transform="rotate(12 9 15.5)"/>
+                            <polygon points="7.5,2.9 10.36,4.98 9.27,8.35 5.73,8.35 4.64,4.98" transform="rotate(-10 7.5 6)"/>
+                            <path fill="none" stroke-width="2" d="M13 8h6a2.5 2.5 0 1 0-2.5-2.5M15.5 12h3.5a2.5 2.5 0 1 1-2.5 2.5"/>
+                        </svg>
+                    </button>
+                    <button class="modal_environment_weather_select_snow">
+                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-linejoin="round" stroke-width="1.5">
+                            <polygon points="15,10.6 19.24,13.05 19.24,17.95 15,20.4 10.76,17.95 10.76,13.05"/>
+                            <polygon points="8.5,4.6 11.01,6.05 11.01,8.95 8.5,10.4 5.99,8.95 5.99,6.05"/>
+                            <path stroke="none" d="M19 1.8Q19 5 22.2 5Q19 5 19 8.2Q19 5 15.8 5Q19 5 19 1.8z"/>
+                            <path stroke="none" d="M5 12.6Q5 15.5 7.9 15.5Q5 15.5 5 18.4Q5 15.5 2.1 15.5Q5 15.5 5 12.6z"/>
+                            <path stroke="none" d="M14 2.2Q14 3.8 15.6 3.8Q14 3.8 14 5.4Q14 3.8 12.4 3.8Q14 3.8 14 2.2z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="modal_environment_field">
+                <p class="ttl">フィールド</p>
+
+                <div class="modal_environment_field_select">
+                    <button class="modal_environment_field_select_none selected">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2.6"><use href="#i12"/></svg>
+                    </button>
+                    <button class="modal_environment_field_select_electric">
+                        <svg viewBox="0 0 76.71 76.71" fill="currentColor">
+                            <path d="M37.97 6.94c2.5 1.14 12.84 6.04 19.84 12.22.31.27.34.75.07 1.06-1.55 1.8-6.66 7.75-12.82 14.99-.27.32-.24.8.07 1.08 1.8 1.59 7.48 6.69 10.91 10.43.28.3.26.77-.04 1.06-2.98 2.87-17.73 17.06-23.45 21.97-.3.26-.76-.02-.67-.41.74-3.02 2.8-11.05 4.99-16.89.12-.31.02-.66-.25-.86-2.15-1.64-11.56-8.86-17.74-14.4a.746.746 0 01-.16-.91c1.36-2.62 7.8-14.72 18.32-29.07.21-.29.6-.4.92-.25z"></path>
+                        </svg>
+                    </button>
+                    <button class="modal_environment_field_select_grass">
+                        <svg viewBox="0 0 76.71 76.71" fill="currentColor">
+                            <path d="M11.47 66.62H29.1s4.82-44.39 2.33-44.39-19.96 44.39-19.96 44.39zm29.6 0h17.62S67 22.23 64.51 22.23 41.07 66.62 41.07 66.62zm-5.99 0l12.8-25.44s4.66-30.26 2.49-30.26-13.14 26.94-13.14 26.94l-2.16 28.76z"></path>
+                        </svg>
+                    </button>
+                    <button class="modal_environment_field_select_psycho">
+                        <svg viewBox="0 0 76.71 76.71" fill="currentColor">
+                            <path d="M38.35 16.28c.29 0 .59.16.72.48 2.62 6.29 8.79 10.32 15.47 10.32.71 0 1.43-.05 2.15-.14h.11c.63 0 1.01.73.61 1.26-4.58 5.98-4.58 14.34-.02 20.33.4.52.01 1.25-.61 1.25h-.11c-.72-.09-1.43-.14-2.14-.14-6.68 0-12.85 4.02-15.47 10.32-.13.32-.43.48-.72.48s-.59-.16-.72-.48C35 53.67 28.83 49.64 22.15 49.64c-.71 0-1.43.05-2.15.14h-.11c-.63 0-1.01-.73-.61-1.26 4.58-5.98 4.58-14.34.02-20.33-.4-.52-.01-1.25.61-1.25h.11c.72.09 1.43.14 2.14.14 6.68 0 12.85-4.02 15.47-10.32.13-.32.43-.48.72-.48m0-8.7c-3.84 0-7.28 2.29-8.75 5.84-1.23 2.96-4.22 4.96-7.44 4.96-.34 0-.68-.02-1.02-.07-.4-.05-.81-.08-1.22-.08-3.62 0-6.88 2.02-8.49 5.27a9.42 9.42 0 00.95 9.95c2.19 2.88 2.19 6.9 0 9.77a9.417 9.417 0 00-.97 9.96 9.407 9.407 0 008.49 5.28c.41 0 .82-.03 1.23-.08.34-.04.69-.07 1.03-.07 3.22 0 6.21 1.99 7.44 4.96 1.48 3.55 4.91 5.84 8.75 5.84s7.28-2.29 8.75-5.84c1.23-2.96 4.22-4.96 7.44-4.96.34 0 .68.02 1.02.07.4.05.81.08 1.22.08 3.62 0 6.88-2.02 8.49-5.27a9.42 9.42 0 00-.95-9.95c-2.19-2.88-2.19-6.9 0-9.77 2.21-2.89 2.58-6.7.97-9.96a9.407 9.407 0 00-8.49-5.28c-.41 0-.82.03-1.23.08-.34.04-.69.07-1.03.07-3.22 0-6.21-1.99-7.44-4.96a9.443 9.443 0 00-8.75-5.84z"></path>
+                        </svg>
+                    </button>
+                    <button class="modal_environment_field_select_mist">
+                        <svg viewBox="0 0 76.71 76.71" fill="currentColor">
+                            <path d="M66.36 12.08c-2.18-2.18-15.61-3.16-24.65 5.88-1.55 1.55-2.63 3.4-3.25 5.35-.62-1.96-1.7-3.8-3.25-5.35-9.04-9.04-22.47-8.06-24.65-5.88S7.4 27.69 16.44 36.73c1.91 1.91 4.26 3.11 6.73 3.61-5 4.33-5.57 11.18-4.61 12.52 1.02 1.42 8.4 3.21 14.31-.94-.27.79-.53 1.6-.79 2.44-2.47 8.08-3.39 14.96-2.07 15.36 1.33.41 4.41-5.81 6.88-13.89.62-2.03 1.15-3.99 1.56-5.79.41 1.8.94 3.76 1.56 5.79 2.47 8.08 5.55 14.3 6.88 13.89 1.33-.41.4-7.29-2.07-15.36-.26-.84-.52-1.65-.79-2.44 5.91 4.15 13.3 2.36 14.31.94.96-1.34.39-8.18-4.61-12.52 2.47-.5 4.82-1.7 6.73-3.61 9.04-9.04 8.06-22.47 5.88-24.65zm-27.9 28.05c-4.31 0-8.04-2.45-9.9-6.03 5.01-.02 9.15-3.74 9.81-8.57.02-.12.17-.12.18 0 .66 4.83 4.8 8.56 9.81 8.57-1.86 3.58-5.59 6.03-9.9 6.03z"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <section class="detail">
+
+        <header>
+            <p class="ttl">ダメージの詳細</p>
+            <button class="detail_speed open_speed" aria-label="すばやさ比較">
+                <svg viewBox="0 0 24 24"><use href="#i10"/></svg>
+            </button>
+            <button class="detail_share" aria-label="計算条件を共有">
+                <svg viewBox="0 0 24 24">
+                    <circle cx="18" cy="5" r="3"/>
+                    <circle cx="6" cy="12" r="3"/>
+                    <circle cx="18" cy="19" r="3"/>
+                    <path d="m8.59 13.51 6.83 3.98"/>
+                    <path d="m15.41 6.51-6.82 3.98"/>
+                </svg>
+            </button>
+            <button class="detail_close">
+                <svg viewBox="0 0 24 24"><use href="#i-down"/></svg>
+            </button>
+        </header>
+
+        <div class="detail_overview">
+            <div class="detail_overview_match">
+
+                <div class="detail_overview_match_item">
+                    <div class="detail_overview_match_sprite">
+                        <img src="https://pokesol.app/api/images/assets/pokemons/0445.png" alt="">
+
+                        <div class="detail_overview_match_sprite_types attacker"></div>
+                    </div>
+                    <p class="detail_overview_match_name">ガブリアス</p>
+                    <p class="detail_overview_match_stat">A32</p>
+                </div>
+
+                <div class="detail_overview_match_detail">
+                    <p class="detail_overview_match_detail_move">じしん</p>
+                    <div class="detail_overview_match_detail_info">
+                        <div class="detail_overview_match_detail_info_type"></div>
+                        <div class="detail_overview_match_detail_info_category"></div>
+                        <div class="detail_overview_match_detail_info_power">100</div>
+                    </div>
+                </div>
+
+                <div class="detail_overview_match_item">
+                    <div class="detail_overview_match_sprite">
+                        <img src="https://pokesol.app/api/images/assets/pokemons/0006_01.png" alt="">
+
+                        <div class="detail_overview_match_sprite_types defender"></div>
+                    </div>
+                    <p class="detail_overview_match_name">メガリザードンX</p>
+                    <p class="detail_overview_match_stat">H2 B0</p>
+                </div>
+
+            </div>
+
+            <div class="detail_overview_others">
+                <div class="detail_overview_others_attacker">
+                    <p class="detail_overview_others_ability">さめはだ</p>
+                    <p class="detail_overview_others_item">なし</p>
+                </div>
+                <div class="detail_overview_others_defender">
+                    <p class="detail_overview_others_ability">かたいツメ</p>
+                    <p class="detail_overview_others_item">メガストーン</p>
+                </div>
+            </div>
+
+            <div class="detail_overview_environment">天候なし・フィールドなし</div>
+
+            <div class="detail_overview_log">
+                <div class="detail_overview_log_damage">
+                    <p class="detail_overview_log_damage_percent">101.9%～121.3%</p>
+                    <div class="detail_overview_log_damage_num">
+                        <p class="detail_overview_log_damage_num_take">158～188</p>
+                        <p class="detail_overview_log_damage_num_max">155</p>
+                    </div>
+                </div>
+                <div class="detail_overview_log_hpbar">
+                    <div class="detail_overview_log_hpbar_kaku"></div>
+                    <div class="detail_overview_log_hpbar_ran"></div>
+                </div>
+                <div class="detail_overview_log_judge">
+                    <p class="detail_overview_log_judgement">確定1発</p>
+                    <p class="detail_overview_log_judge_percent" hidden></p>
+                </div>
+            </div>
+
+            <div class="detail_overview_flow">
+                <div class="detail_overview_flow_item is-static">
+                    <div class="detail_overview_flow_closing">
+                        <p class="detail_overview_flow_num">1</p>
+                        <div class="detail_overview_flow_info">
+                            <p class="detail_overview_flow_info_match">ガブリアス→メガリザードンX</p>
+                            <p class="detail_overview_flow_info_other">じしん</p>
+                        </div>
+                        <div class="detail_overview_flow_damage">
+                            <p class="detail_overview_flow_damage_percent">101.9～121.3%</p>
+                            <p class="detail_overview_flow_damage_num">158～188</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hr" hidden></div>
+
+        <div class="detail_hppm" hidden>
+            <div class="detail_hppm_header">
+                <p class="ttl">攻撃側の反動・回復</p>
+                <div class="detail_hppm_header_sum">
+                    <p class="detail_hppm_header_num">5～28</p>
+                    <p class="detail_hppm_header_percent">0.5～5.8%</p>
+                </div>
+            </div>
+
+            <div class="detail_hppm_hpbar">
+                <div class="detail_hppm_hpbar_kaku"></div>
+                <div class="detail_hppm_hpbar_ran"></div>
+            </div>
+
+            <div class="detail_hppm_list">
+                <div class="detail_hppm_item">
+                    <p class="detail_hppm_item_name">ドレインキッス</p>
+                    <div class="detail_hppm_item_damage">
+                        <p class="detail_hppm_item_num plus">16～22</p>
+                        <p class="detail_hppm_item_percent plus">16.9～21.0%</p>
+                    </div>
+                </div>
+                <div class="detail_hppm_item">
+                    <p class="detail_hppm_item_name">ゴツゴツメット</p>
+                    <div class="detail_hppm_item_damage">
+                        <p class="detail_hppm_item_num minus">30</p>
+                        <p class="detail_hppm_item_percent minus">16.4%</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <span class="hr"></span>
+
+        <div class="detail_hppm detail_counter" hidden>
+            <div class="detail_hppm_header">
+                <p class="ttl">ダメージ反射</p>
+            </div>
+            <div class="detail_hppm_list detail_counter_list"></div>
+        </div>
+
+        <span class="hr"></span>
+
+        <div class="detail_index">
+            <p class="detail_index_ttl">火力指数</p>
+            <p class="detail_index_num">27300</p>
+        </div>
+
+        <span class="hr"></span>
+
+        <div class="detail_adjust" hidden>
+            <table class="detail_adjust_table"></table>
+        </div>
+
+        <p class="detail_credit">PokéFire は非公式のファンツールです。株式会社ポケモン・任天堂・クリーチャーズ・ゲームフリークとは関係ありません。<br>Battle data provided by <a href="https://championsbattledata.com/" target="_blank" rel="noopener">Pokémon Champions Battle Data</a></p>
+
+    </section>
+
+    <section class="speed">
+
+        <header>
+            <p class="ttl">すばやさ比較</p>
+            <button class="speed_close">
+                <svg viewBox="0 0 24 24"><use href="#i-down"/></svg>
+            </button>
+        </header>
+
+        <div class="speed_pokemon">
+
+            <div class="speed_pokemon_item attacker">
+                <img src="https://pokesol.app/api/images/assets/pokemons/0445.png" alt="" class="speed_pokemon_item_sprite">
+                <p class="speed_pokemon_item_num">200</p>
+            </div>
+            <div class="speed_pokemon_item defender">
+                <img src="https://pokesol.app/api/images/assets/pokemons/0006_01.png" alt="" class="speed_pokemon_item_sprite">
+                <p class="speed_pokemon_item_num">198</p>
+            </div>
+
+        </div>
+
+        <div class="speed_pokemon_evs" data-evs="攻撃側のすばやさ|122|0|1">
+            <div class="main_evs_conditions">
+                <button class="main_evs_condition_item">まひ</button>
+                <button class="main_evs_condition_item">おいかぜ</button>
+                <button class="main_evs_condition_item">くろいてっきゅう</button>
+            </div>
+        </div>
+
+        <div class="speed_graph">
+
+            <div class="speed_graph_item attacker"></div>
+
+            <div class="speed_graph_item defender"></div>
+
+        </div>
+
+    </section>
+
+    <svg class="icon_sprite" style="display: none" aria-hidden="true"><symbol id="i1" viewBox="0 0 24 24"><path d="M21 3v5l-11 9l-4 4l-3 -3l4 -4l9 -11l5 0"/><path d="M5 13l6 6"/><path d="M14.32 17.32l3.68 3.68l3 -3l-3.365 -3.365"/><path d="M10 5.5l-2 -2.5h-5v5l3 2.5"/></symbol><symbol id="i2" viewBox="0 0 24 24"><path d="M8.50196 8.5C8.89248 8.10948 9.52565 8.10948 9.91617 8.5L12.002 10.5858L14.0877 8.5C14.4783 8.10948 15.1114 8.10948 15.502 8.5C15.8925 8.89053 15.8925 9.52369 15.502 9.91422L13.4162 12L15.502 14.0858C15.8925 14.4763 15.8925 15.1095 15.502 15.5C15.1114 15.8905 14.4783 15.8905 14.0877 15.5L12.002 13.4142L9.91616 15.5C9.52564 15.8905 8.89248 15.8905 8.50195 15.5C8.11143 15.1095 8.11143 14.4763 8.50195 14.0858L10.5877 12L8.50196 9.91422C8.11143 9.52369 8.11143 8.89053 8.50196 8.5Z"/><path fill-rule="evenodd" clip-rule="evenodd" d="M22.002 12C22.002 17.5228 17.5248 22 12.002 22C6.47911 22 2.00195 17.5228 2.00195 12C2.00195 6.47715 6.47911 2 12.002 2C17.5248 2 22.002 6.47715 22.002 12ZM20.002 12C20.002 16.4183 16.4202 20 12.002 20C7.58368 20 4.00195 16.4183 4.00195 12C4.00195 7.58172 7.58368 4 12.002 4C16.4202 4 20.002 7.58172 20.002 12Z"/></symbol><symbol id="i3" viewBox="0 0 24 24"><path d="M14 4.5a1 1 0 0 1 5 0 .5.5 0 0 0 .5.5 1 1 0 0 1 0 5c-.81 0-1.8-.7-2.5 0l-1.958 1.957a.15.15 0 0 1-.252-.072l-.493-2.07a.15.15 0 0 0-.111-.112l-2.072-.494a.15.15 0 0 1-.072-.252L14 7c.7-.7 0-1.69 0-2.5"/><path d="m16 20-1-2"/><path d="m20 16-2-1"/><path d="m4 8 2 1"/><path d="m8 4 1 2"/><path d="M9.698 14.19a.15.15 0 0 0 .112.112l2.074.489a.15.15 0 0 1 .072.252L10 17c-.7.7 0 1.69 0 2.5a1 1 0 0 1-5 0 .495.495 0 0 0-.5-.5 1 1 0 0 1 0-5c.81 0 1.8.7 2.5 0l1.956-1.957a.15.15 0 0 1 .252.072z"/></symbol><symbol id="i4" viewBox="0 0 24 24"><path d="M14.017 18l-2.017 2l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 0 1 8.153 5.784"/><path d="M15.99 20l4.197 -4.223a2.81 2.81 0 0 0 0 -3.948a2.747 2.747 0 0 0 -3.91 -.007l-.28 .282l-.279 -.283a2.747 2.747 0 0 0 -3.91 -.007a2.81 2.81 0 0 0 -.007 3.948l4.182 4.238l.007 0"/></symbol><symbol id="i-up" viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></symbol><symbol id="i6" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></symbol><symbol id="i7" viewBox="0 0 24 24"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></symbol><symbol id="i8" viewBox="0 0 24 24"><path d="M17.6585 4.92888C18.049 4.53836 18.6822 4.53835 19.0727 4.92888C19.4632 5.3194 19.4632 5.95257 19.0727 6.34309L13.4158 12L19.0727 17.6568C19.4632 18.0473 19.4632 18.6805 19.0727 19.071C18.6822 19.4615 18.049 19.4615 17.6585 19.071L12.0016 13.4142L6.34481 19.071C6.3387 19.0771 6.33254 19.0831 6.32632 19.089C5.93455 19.4614 5.31501 19.4554 4.93059 19.071C4.6377 18.7781 4.56447 18.3487 4.71092 17.9876C4.75973 17.8672 4.83296 17.7544 4.93059 17.6568L10.5874 12L4.93059 6.34314C4.54006 5.95262 4.54006 5.31945 4.93059 4.92893C5.32111 4.5384 5.95428 4.5384 6.3448 4.92893L12.0016 10.5857L17.6585 4.92888Z"/></symbol><symbol id="i9" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol><symbol id="i10" viewBox="0 0 24 24"><path d="m15 10.42 4.8-5.07"/><path d="M19 18h3"/><path d="M9.5 22 21.414 9.415A2 2 0 0 0 21.2 6.4l-5.61-4.208A1 1 0 0 0 14 3v2a2 2 0 0 1-1.394 1.906L8.677 8.053A1 1 0 0 0 8 9c-.155 6.393-2.082 9-4 9a2 2 0 0 0 0 4h14"/></symbol><symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol><symbol id="i12" viewBox="0 0 24 24"><path d="M18 6 6 18"/></symbol></svg>
+
+</body>
+
+</html>

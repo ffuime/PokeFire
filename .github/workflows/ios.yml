@@ -1,0 +1,72 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build web
+        run: node build.mjs
+
+      - name: Bundle web files
+        run: |
+          rm -rf ios/web
+          mkdir -p ios/web
+          cp index.html style.css app.min.js site.webmanifest ios/web/
+          cp pokemons.json moves.json abilities.json items.json aliases.json usage_names.json ios/web/
+          cp -R sprite favicon help ios/web/
+          rm -f ios/web/help/style.scss
+
+      - name: Select Xcode
+        run: |
+          XCODE=$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)
+          if [ -z "$XCODE" ]; then
+            echo "Xcode 26 not found" && ls /Applications && exit 1
+          fi
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Generate project
+        run: |
+          brew install xcodegen
+          cd ios && xcodegen generate
+
+      - name: Build app
+        run: |
+          cd ios
+          xcodebuild \
+            -project PokeFire.xcodeproj \
+            -scheme PokeFire \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package IPA
+        run: |
+          cd ios
+          rm -rf Payload PokeFire.ipa
+          mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/PokeFire.app Payload/
+          zip -qry PokeFire.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PokeFire-ipa
+          path: ios/PokeFire.ipa
+          retention-days: 30
