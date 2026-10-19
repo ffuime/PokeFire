@@ -13,6 +13,10 @@ private struct DetailViewData {
     var constantMode: Bool
 }
 
+private func detailText(_ text: String) -> String {
+    text == "うまく決まらなかった" ? "失敗" : text
+}
+
 private func statText(_ p: Fighter, _ keys: [StatKey], withRank: Bool = true) -> String {
     keys.compactMap { key -> String? in
         guard let value = p.evs[key] else { return nil }
@@ -352,7 +356,7 @@ private struct LogCard: View {
             DamageBar(sure: sure, maybe: maybe, color: Palette.hp(sure))
             HStack {
                 Spacer()
-                NumberText(judge)
+                NumberText(detailText(judge))
                     .font(.headline)
                     .foregroundStyle(Palette.rankDown)
                 if let rate {
@@ -545,7 +549,7 @@ private struct FlowItem: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Palette.boosted.opacity(0.75))
             } else {
-                Text(result?.message ?? "-")
+                Text(detailText(result?.message ?? "-"))
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Palette.minus)
                     .multilineTextAlignment(.trailing)
