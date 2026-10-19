@@ -534,7 +534,7 @@ struct EnvironmentSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .frame(maxHeight: .infinity, alignment: .top)
-        .presentationDetents([.height(290)])
+        .presentationDetents([.height(340)])
         .presentationDragIndicator(.visible)
     }
 }
@@ -558,10 +558,11 @@ struct EnvironmentSegments: View {
     var body: some View {
         NativeSegmented(
             segments: keys.map { .image(image($0)) },
-            selected: keys.firstIndex(of: selected) ?? 0
+            selected: keys.firstIndex(of: selected) ?? 0,
+            height: 84
         ) { index in
             if keys.indices.contains(index) { onSelect(keys[index]) }
         }
-        .frame(height: 64)
+        .frame(height: 84)
     }
 }

@@ -76,9 +76,10 @@ struct TabCollection: UIViewRepresentable {
         guard !view.hasActiveDrag else { return }
         let activeChanged = coordinator.active != active
         guard coordinator.items != items || activeChanged else { return }
+        let old = coordinator.items
         coordinator.items = items
         coordinator.active = active
-        view.reloadData()
+        coordinator.apply(view, from: old, to: items)
         if activeChanged, items.indices.contains(active) {
             DispatchQueue.main.async {
                 view.scrollToItem(at: IndexPath(item: active, section: 0), at: .centeredHorizontally, animated: true)
@@ -104,6 +105,49 @@ struct TabCollection: UIViewRepresentable {
                 TabChipLabel(item: item, index: number, active: isActive)
             }
             .margins(.all, 0)
+        }
+
+        func apply(_ collectionView: UICollectionView, from old: [TabItem], to new: [TabItem]) {
+            let oldIDs = old.map(\.id)
+            let newIDs = new.map(\.id)
+            if oldIDs == newIDs {
+                relabel(collectionView, order: new)
+                return
+            }
+            if oldIDs.count == newIDs.count + 1, let removed = oldIDs.firstIndex(where: { !newIDs.contains($0) }),
+               oldIDs.filter({ newIDs.contains($0) }) == newIDs {
+                collectionView.performBatchUpdates({
+                    collectionView.deleteItems(at: [IndexPath(item: removed, section: 0)])
+                }, completion: { _ in
+                    self.relabel(collectionView, order: self.items)
+                })
+                relabel(collectionView, order: new)
+                return
+            }
+            if newIDs.count == oldIDs.count + 1, let inserted = newIDs.firstIndex(where: { !oldIDs.contains($0) }),
+               newIDs.filter({ oldIDs.contains($0) }) == oldIDs {
+                collectionView.performBatchUpdates({
+                    collectionView.insertItems(at: [IndexPath(item: inserted, section: 0)])
+                }, completion: { _ in
+                    self.relabel(collectionView, order: self.items)
+                })
+                relabel(collectionView, order: new)
+                return
+            }
+            if Set(oldIDs) == Set(newIDs) {
+                collectionView.performBatchUpdates({
+                    for (from, id) in oldIDs.enumerated() {
+                        if let to = newIDs.firstIndex(of: id), to != from {
+                            collectionView.moveItem(at: IndexPath(item: from, section: 0), to: IndexPath(item: to, section: 0))
+                        }
+                    }
+                }, completion: { _ in
+                    self.relabel(collectionView, order: self.items)
+                })
+                relabel(collectionView, order: new)
+                return
+            }
+            collectionView.reloadData()
         }
 
         private func relabel(_ collectionView: UICollectionView, order: [TabItem]) {

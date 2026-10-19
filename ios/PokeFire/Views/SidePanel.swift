@@ -319,7 +319,7 @@ struct MoveSection: View {
                 }
             }
 
-            SelectButton(text: side.move, height: 40, font: .callout, translucent: true) {
+            SelectButton(text: side.move, translucent: true) {
                 Haptics.play(.light)
                 present(.move)
             }

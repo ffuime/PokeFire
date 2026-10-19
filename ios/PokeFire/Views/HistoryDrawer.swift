@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryDrawer: View {
     @Environment(AppModel.self) private var model
+    let isOpen: Bool
     let close: () -> Void
     let dragChanged: (CGFloat) -> Void
     let dragEnded: (CGFloat, CGFloat) -> Void
@@ -66,17 +67,17 @@ struct HistoryDrawer: View {
                     .font(.system(size: 30, weight: .bold))
                     .foregroundStyle(Color.black)
                 Spacer()
+                HStack(spacing: 0) {
                 Button {
                     Haptics.play(.light)
                     showHelp = true
                 } label: {
                     Icon(name: "help", size: 20)
                         .foregroundStyle(Color.black)
-                        .frame(width: 46, height: 46)
-                        .contentShape(Circle())
+                        .frame(width: 50, height: 46)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .buttonStyle(PressableStyle())
                 .accessibilityLabel("ヘルプ")
                 Button {
                     Haptics.play(.light)
@@ -98,12 +99,14 @@ struct HistoryDrawer: View {
                         }
                     }
                     .foregroundStyle(Color.black)
-                        .frame(width: 46, height: 46)
-                        .contentShape(Circle())
+                        .frame(width: 50, height: 46)
+                        .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Circle())
+                .buttonStyle(PressableStyle())
                 .accessibilityLabel(searching ? "検索を閉じる" : "履歴を検索")
+                }
+                .padding(.horizontal, 4)
+                .glassEffect(.regular.interactive(), in: Capsule())
             }
             .padding(.leading, 24)
             .padding(.trailing, 16)
@@ -166,6 +169,15 @@ struct HistoryDrawer: View {
         .background(Color.white.ignoresSafeArea())
         .sheet(isPresented: $showHelp) {
             HelpView()
+        }
+        .onChange(of: isOpen) { _, open in
+            if !open {
+                focused = false
+                if searching {
+                    searching = false
+                    query = ""
+                }
+            }
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 14, coordinateSpace: .global)

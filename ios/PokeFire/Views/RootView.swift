@@ -17,6 +17,7 @@ struct RootView: View {
                 Color.white.ignoresSafeArea()
 
                 HistoryDrawer(
+                    isOpen: drawerOpen,
                     close: { setDrawer(false) },
                     dragChanged: { dx in
                         dragging = true

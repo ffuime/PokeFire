@@ -284,10 +284,15 @@ struct NativeSegmented: UIViewRepresentable {
     let selected: Int
     var selectedColor: UIColor?
     var fontSize: CGFloat = 15
+    var height: CGFloat = 32
     let onChange: (Int) -> Void
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onChange: onChange)
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UISegmentedControl, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? uiView.intrinsicContentSize.width, height: height)
     }
 
     func makeUIView(context: Context) -> UISegmentedControl {
@@ -304,6 +309,7 @@ struct NativeSegmented: UIViewRepresentable {
         control.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .valueChanged)
         control.setContentHuggingPriority(.defaultLow, for: .horizontal)
         control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        control.setContentHuggingPriority(.defaultLow, for: .vertical)
         style(control)
         return control
     }
@@ -362,7 +368,8 @@ struct NatureControl: View {
         NativeSegmented(
             segments: [.text("×0.9"), .text("×1.0"), .text("×1.1")],
             selected: options.firstIndex(of: nature) ?? 1,
-            selectedColor: UIColor(color(nature))
+            selectedColor: UIColor(color(nature)),
+            height: 50
         ) { index in
             let value = options[max(0, min(options.count - 1, index))]
             if value != nature { onChange(value) }
