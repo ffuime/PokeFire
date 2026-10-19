@@ -367,7 +367,8 @@ struct NatureControl: View {
             let value = options[max(0, min(options.count - 1, index))]
             if value != nature { onChange(value) }
         }
-        .frame(width: 186, height: 36)
+        .frame(width: 186, height: 40)
+        .padding(.vertical, 6)
         .accessibilityLabel("性格補正")
     }
 }

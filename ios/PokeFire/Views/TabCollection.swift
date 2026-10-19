@@ -69,7 +69,7 @@ struct TabCollection: UIViewRepresentable {
     func updateUIView(_ view: UICollectionView, context: Context) {
         let coordinator = context.coordinator
         coordinator.model = model
-        guard !coordinator.dragging else { return }
+        guard !view.hasActiveDrag else { return }
         let activeChanged = coordinator.active != active
         guard coordinator.items != items || activeChanged else { return }
         coordinator.items = items

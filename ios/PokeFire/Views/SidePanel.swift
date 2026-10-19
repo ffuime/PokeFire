@@ -309,11 +309,11 @@ struct MoveSection: View {
                 Text("わざ").sectionTitle()
                 Spacer()
                 if let move {
-                    TypeIcon(type: move.type, size: 24)
-                    CategoryIcon(category: move.category, size: 22)
+                    TypeIcon(type: move.type, size: 18)
+                    CategoryIcon(category: move.category, size: 16)
                         .foregroundStyle(Palette.secondary)
                     NumberText(model.movePowerText, value: Double(model.movePowerText))
-                        .font(.title3.weight(.bold))
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(model.movePowerBoosted ? Palette.boosted : Palette.secondary)
                         .animation(.easeInOut(duration: 0.2), value: model.movePowerBoosted)
                 }
@@ -489,6 +489,8 @@ struct AbilitySection: View {
                                     .font(selected ? .subheadline.weight(.bold) : .footnote)
                                     .foregroundStyle(selected ? Palette.accent : Color(hex: 0xAAAAAA))
                                     .fixedSize()
+                                    .contentTransition(.interpolate)
+                                    .animation(.spring(response: 0.35, dampingFraction: 0.75), value: selected)
                             }
                             .buttonStyle(PressableStyle())
                         }

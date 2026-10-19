@@ -29,86 +29,42 @@ struct MainScreen: View {
 
     @State private var page: Role? = .attacker
     @State private var sheet: ActiveSheet?
+    @State private var progress: CGFloat = 0
     @State private var pulled = false
-    @State private var turns = 0
-
-    private var sideTitles: [String] {
-        let kind = model.activeTab?.kind ?? .attack
-        let attacker = model.isConstantActive ? (Constants.kinds[kind]?.title ?? "") : model.attacker.name
-        return [attacker, model.defender.name]
-    }
 
     var body: some View {
-        NavigationStack {
-            ScrollView(.horizontal) {
-                HStack(spacing: 0) {
-                    ForEach(Role.allCases, id: \.self) { role in
-                        SidePanel(role: role, present: { sheet = $0 })
-                            .containerRelativeFrame(.horizontal)
-                            .id(role)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: $page)
-            .scrollIndicators(.hidden)
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                geometry.contentOffset.x / max(1, geometry.containerSize.width)
-            } action: { _, value in
-                if value < -0.08, !pulled {
-                    pulled = true
-                    openDrawer()
-                } else if value >= 0, pulled {
-                    pulled = false
+        ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+                ForEach(Role.allCases, id: \.self) { role in
+                    SidePanel(role: role, present: { sheet = $0 })
+                        .containerRelativeFrame(.horizontal)
+                        .id(role)
                 }
             }
-            .safeAreaInset(edge: .top, spacing: 0) {
-                MainHeader(present: { sheet = $0 })
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $page)
+        .scrollIndicators(.hidden)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.x / max(1, geometry.containerSize.width)
+        } action: { _, value in
+            progress = value
+            if value < -0.08, !pulled {
+                pulled = true
+                openDrawer()
+            } else if value >= 0, pulled {
+                pulled = false
             }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                ResultCard(present: { sheet = $0 })
-            }
-            .background {
-                EnvironmentBackdrop(weather: model.weather, field: model.field)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: openDrawer) {
-                        Image("menu")
-                            .renderingMode(.template)
-                    }
-                    .accessibilityLabel("履歴")
-                }
-                ToolbarItem(placement: .principal) {
-                    NativeSegmented(
-                        segments: sideTitles.map { .text($0) },
-                        selected: (page ?? .attacker) == .attacker ? 0 : 1,
-                        fontSize: 13
-                    ) { index in
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            page = index == 0 ? .attacker : .defender
-                        }
-                    }
-                    .frame(width: 236, height: 34)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        turns += 1
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
-                            model.swapSides()
-                        }
-                    } label: {
-                        Image("swap")
-                            .renderingMode(.template)
-                            .rotationEffect(.degrees(Double(turns) * 180))
-                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: turns)
-                    }
-                    .disabled(model.isConstantActive)
-                    .accessibilityLabel("攻守交代")
-                }
-            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            MainHeader(page: $page, progress: progress, openDrawer: openDrawer, present: { sheet = $0 })
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            ResultCard(present: { sheet = $0 })
+        }
+        .background {
+            EnvironmentBackdrop(weather: model.weather, field: model.field)
         }
         .sheet(item: $sheet) { item in
             sheetContent(item)
@@ -177,16 +133,27 @@ struct EnvironmentBackdrop: View {
 }
 
 struct MainHeader: View {
+    @Environment(AppModel.self) private var model
+    @Binding var page: Role?
+    let progress: CGFloat
+    let openDrawer: () -> Void
     let present: (ActiveSheet) -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            EnvironmentPill { present(.environment) }
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                CircleIconButton(icon: "menu", label: "履歴", action: openDrawer)
+                Spacer(minLength: 0)
+                EnvironmentPill { present(.environment) }
+                Spacer(minLength: 0)
+                Color.clear.frame(width: 44, height: 44)
+            }
             TabStrip()
+            SideSwitcher(page: $page, progress: progress)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 2)
-        .padding(.bottom, 8)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
     }
 }
 
@@ -260,6 +227,107 @@ struct TabStrip: View {
             .glassEffect(.regular.interactive(), in: Circle())
             .accessibilityLabel("タブを追加")
         }
+    }
+}
+
+struct SideSwitcher: View {
+    @Environment(AppModel.self) private var model
+    @Binding var page: Role?
+    let progress: CGFloat
+    @State private var turns = 0
+    @State private var dragX: CGFloat?
+
+    var body: some View {
+        GeometryReader { geometry in
+            let swapWidth: CGFloat = 44
+            let spacing: CGFloat = 4
+            let side = max(1, (geometry.size.width - swapWidth - spacing * 2) / 2)
+            let travel = side + swapWidth + spacing * 2
+            let settled = min(1, max(0, progress)) * travel
+            let lensX = dragX.map { min(max(0, $0 - side / 2), travel) } ?? settled
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.black.opacity(0.045))
+                Capsule()
+                    .fill(Color.white.opacity(0.55))
+                    .frame(width: side - 4, height: geometry.size.height - 8)
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .scaleEffect(dragX == nil ? 1 : 1.08)
+                    .offset(x: lensX + 2)
+                HStack(spacing: spacing) {
+                    sideLabel(.attacker)
+                        .frame(width: side)
+                    Button {
+                        turns += 1
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
+                            model.swapSides()
+                        }
+                    } label: {
+                        Icon(name: "swap", size: 18)
+                            .foregroundStyle(model.isConstantActive ? Palette.secondary.opacity(0.4) : Palette.accent)
+                            .rotationEffect(.degrees(Double(turns) * 180))
+                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: turns)
+                            .frame(width: swapWidth, height: swapWidth)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(PressableStyle())
+                    .disabled(model.isConstantActive)
+                    .accessibilityLabel("攻守交代")
+                    sideLabel(.defender)
+                        .frame(width: side)
+                }
+            }
+            .contentShape(Capsule())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        dragX = value.location.x
+                    }
+                    .onEnded { value in
+                        let target: Role = value.location.x < geometry.size.width / 2 ? .attacker : .defender
+                        dragX = nil
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            page = target
+                        }
+                    }
+            )
+            .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.8), value: lensX)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragX == nil)
+        }
+        .frame(height: 50)
+    }
+
+    private func sideLabel(_ role: Role) -> some View {
+        let side = model.side(role)
+        let constant = role == .attacker && model.isConstantActive
+        let kind = model.activeTab?.kind ?? .attack
+        return HStack(spacing: 6) {
+            if constant {
+                Icon(name: kind.icon, size: 20)
+                    .foregroundStyle(Palette.tab(kind))
+                    .frame(width: 30, height: 30)
+            } else {
+                SpriteView(name: side.name, size: 30)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                if !constant {
+                    Text(role.title)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(role == .attacker ? Palette.attack : Palette.accent)
+                }
+                Text(constant ? Constants.kinds[kind]?.title ?? "" : side.name)
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 

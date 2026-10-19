@@ -562,6 +562,7 @@ struct EnvironmentSegments: View {
         ) { index in
             if keys.indices.contains(index) { onSelect(keys[index]) }
         }
-        .frame(height: 44)
+        .frame(height: 52)
+        .padding(.vertical, 6)
     }
 }
