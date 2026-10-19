@@ -202,7 +202,7 @@ private struct MatchOverview: View {
                                 CategoryIcon(category: move.category, size: 18)
                                     .foregroundStyle(Palette.secondary)
                                 NumberText(first.result?.info?.displayPower.map(String.init) ?? move.powerText)
-                                    .font(.caption.weight(.bold))
+                                    .font(.title3.weight(.bold))
                                     .foregroundStyle(Palette.secondary)
                             }
                         }
@@ -263,6 +263,8 @@ private struct FighterColumn: View {
                 HStack(spacing: 2) {
                     ForEach(types, id: \.self) { type in
                         TypeIcon(type: type, size: 18)
+                            .padding(2)
+                            .background(Color.white, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                 }
             }
@@ -745,7 +747,7 @@ private struct FirepowerCard: View {
     let value: Int
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center) {
             Text("火力指数").sectionTitle()
             Spacer()
             NumberText(value)

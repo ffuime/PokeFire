@@ -31,12 +31,16 @@ struct ConstantPanel: View {
                             .font(.system(size: 30, weight: .bold))
                             .foregroundStyle(tint)
                     }
-                    if !breakdown.parts.isEmpty {
-                        Text(breakdown.parts.map(\.label).joined(separator: "・"))
+                    ScrollView(.horizontal) {
+                        Text(breakdown.parts.isEmpty ? "未選択" : breakdown.parts.map(\.label).joined(separator: "・"))
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Palette.secondary)
+                            .foregroundStyle(Palette.secondary.opacity(breakdown.parts.isEmpty ? 0.45 : 1))
+                            .lineLimit(1)
+                            .fixedSize()
                             .contentTransition(.opacity)
                     }
+                    .scrollIndicators(.hidden)
+                    .frame(height: 18)
                 }
 
                 Picker("区分", selection: Binding(get: { tab.constant.section }, set: { model.setConstantSection($0) })) {

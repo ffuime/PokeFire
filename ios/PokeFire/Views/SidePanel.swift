@@ -130,15 +130,19 @@ struct PokemonHeader: View {
                 .accessibilityLabel(forms.isEmpty ? "ポケモンを選ぶ" : "ほかの姿")
 
                 ZStack(alignment: .leading) {
-                    info(side)
-                        .opacity(showForms ? 0 : 1)
-                        .allowsHitTesting(!showForms)
                     if showForms, !forms.isEmpty {
-                        formsStrip(forms)
-                            .transition(.opacity.combined(with: .move(edge: .leading)))
+                        FormsStrip(forms: forms) { name in
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                                showForms = false
+                            }
+                            model.selectPokemon(role, name, remember: false)
+                        }
+                    } else {
+                        info(side)
+                            .transition(.opacity)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
             }
 
             BaseStatsRow(role: role, present: present)
@@ -162,7 +166,7 @@ struct PokemonHeader: View {
                         .minimumScaleFactor(0.6)
                         .contentTransition(.opacity)
                     Spacer(minLength: 0)
-                    Icon(name: "search", size: 17)
+                    Icon(name: "chevron_down", size: 16)
                         .foregroundStyle(Color(hex: 0xAAAAAA))
                 }
                 .padding(.horizontal, 14)
@@ -201,44 +205,42 @@ struct PokemonHeader: View {
             .accessibilityAddTraits(.isButton)
         }
     }
+}
 
-    private func formsStrip(_ forms: [String]) -> some View {
-        HStack(spacing: 8) {
-            ScrollView(.horizontal) {
-                HStack(spacing: 8) {
-                    ForEach(Array(forms.enumerated()), id: \.element) { index, name in
-                        Button {
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
-                                showForms = false
-                            }
-                            model.selectPokemon(role, name, remember: false)
-                        } label: {
-                            SpriteView(name: name, size: 54)
-                                .frame(width: 66, height: 66)
-                                .background(Palette.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                        }
-                        .buttonStyle(PressableStyle())
-                        .accessibilityLabel(name)
-                        .transition(.scale(scale: 0.5).combined(with: .opacity).animation(.spring(response: 0.4, dampingFraction: 0.7).delay(Double(index) * 0.04)))
+struct FormsStrip: View {
+    let forms: [String]
+    let onSelect: (String) -> Void
+    @State private var shown = 0
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                ForEach(Array(forms.enumerated()), id: \.element) { index, name in
+                    Button {
+                        onSelect(name)
+                    } label: {
+                        SpriteView(name: name, size: 56)
+                            .frame(width: 70, height: 70)
+                            .background(Palette.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
+                    .buttonStyle(PressableStyle())
+                    .scaleEffect(index < shown ? 1 : 0.2)
+                    .opacity(index < shown ? 1 : 0)
+                    .accessibilityLabel(name)
                 }
             }
-            .scrollIndicators(.hidden)
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
-                    showForms = false
-                }
-            } label: {
-                CloseButtonLabel(size: 13)
-                    .foregroundStyle(Palette.secondary)
-                    .frame(width: 30, height: 30)
-                    .background(Circle().fill(Palette.background))
-            }
-            .buttonStyle(PressableStyle())
-            .accessibilityLabel("閉じる")
+            .padding(.vertical, 6)
         }
-        .frame(height: 88)
-        .background(Color.white)
+        .scrollIndicators(.hidden)
+        .task {
+            for index in forms.indices {
+                withAnimation(.spring(response: 0.38, dampingFraction: 0.58)) {
+                    shown = index + 1
+                }
+                Haptics.play(.soft)
+                try? await Task.sleep(for: .milliseconds(70))
+            }
+        }
     }
 }
 
@@ -268,11 +270,6 @@ struct BaseStatsRow: View {
                         present(.speed)
                     } label: {
                         content
-                            .overlay(alignment: .topTrailing) {
-                                Icon(name: "speed", size: 10)
-                                    .foregroundStyle(Palette.stat(.s).opacity(0.7))
-                                    .offset(x: -6)
-                            }
                     }
                     .buttonStyle(PressableStyle())
                     .accessibilityLabel("すばやさ比較")
@@ -308,7 +305,7 @@ struct MoveSection: View {
                 }
             }
 
-            SelectButton(text: side.move) {
+            SelectButton(text: side.move, height: 40, font: .callout) {
                 Haptics.play(.light)
                 present(.move)
             }

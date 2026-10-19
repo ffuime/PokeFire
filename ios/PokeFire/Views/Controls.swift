@@ -271,46 +271,97 @@ struct RankControl: View {
     }
 }
 
+struct LensSelector<Item: Hashable, ItemLabel: View>: View {
+    let items: [Item]
+    let selected: Item
+    var height: CGFloat = 40
+    let tint: (Item) -> Color
+    let onSelect: (Item) -> Void
+    @ViewBuilder let label: (Item, Bool) -> ItemLabel
+
+    @State private var dragX: CGFloat?
+    @State private var hovered: Int?
+
+    private func index(at x: CGFloat, width: CGFloat) -> Int {
+        let segment = width / CGFloat(max(1, items.count))
+        return min(items.count - 1, max(0, Int(x / max(1, segment))))
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let segment = width / CGFloat(max(1, items.count))
+            let selectedIndex = items.firstIndex(of: selected) ?? 0
+            let lensX = dragX.map { min(max(0, $0 - segment / 2), width - segment) } ?? CGFloat(selectedIndex) * segment
+            let activeIndex = dragX.map { index(at: $0, width: width) } ?? selectedIndex
+            let activeTint = tint(items[activeIndex])
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.black.opacity(0.045))
+                Capsule()
+                    .fill(activeTint.opacity(0.14))
+                    .frame(width: segment - 6, height: geometry.size.height - 6)
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .scaleEffect(dragX == nil ? 1 : 1.14)
+                    .offset(x: lensX + 3)
+                HStack(spacing: 0) {
+                    ForEach(items.indices, id: \.self) { position in
+                        label(items[position], position == activeIndex)
+                            .frame(width: segment, height: geometry.size.height)
+                            .accessibilityAddTraits(position == selectedIndex ? .isSelected : [])
+                    }
+                }
+            }
+            .contentShape(Capsule())
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        dragX = value.location.x
+                        let position = index(at: value.location.x, width: width)
+                        if position != hovered {
+                            if hovered != nil { Haptics.play(.selection) }
+                            hovered = position
+                        }
+                    }
+                    .onEnded { value in
+                        let position = index(at: value.location.x, width: width)
+                        let tapped = abs(value.translation.width) < 6 && abs(value.translation.height) < 6
+                        dragX = nil
+                        hovered = nil
+                        if tapped || items[position] != selected {
+                            onSelect(items[position])
+                        }
+                    }
+            )
+            .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.78), value: lensX)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragX == nil)
+        }
+        .frame(height: height)
+    }
+}
+
 struct NatureControl: View {
     let nature: Int
     let onChange: (Int) -> Void
-
-    private let options = [9, 10, 11]
 
     private func color(_ value: Int) -> Color {
         value == 11 ? Palette.rankUp : value == 9 ? Palette.rankDown : Palette.ink
     }
 
     var body: some View {
-        let index = CGFloat(options.firstIndex(of: nature) ?? 1)
-        GeometryReader { geometry in
-            let width = geometry.size.width / CGFloat(options.count)
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(nature == 10 ? Color.black.opacity(0.06) : color(nature).opacity(0.1))
-                    .frame(width: width - 4, height: geometry.size.height - 4)
-                    .offset(x: index * width + 2)
-                HStack(spacing: 0) {
-                    ForEach(options, id: \.self) { value in
-                        let selected = value == nature
-                        Button {
-                            if !selected { onChange(value) }
-                        } label: {
-                            Text(value == 9 ? "×0.9" : value == 11 ? "×1.1" : "×1.0")
-                                .font(.subheadline.weight(selected ? .bold : .regular))
-                                .foregroundStyle(selected ? color(value) : Palette.secondary)
-                                .frame(width: width, height: geometry.size.height)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(PressableStyle())
-                        .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                }
+        LensSelector(
+            items: [9, 10, 11],
+            selected: nature,
+            tint: { $0 == 10 ? Color.gray : color($0) },
+            onSelect: { value in
+                if value != nature { onChange(value) }
             }
+        ) { value, active in
+            Text(value == 9 ? "×0.9" : value == 11 ? "×1.1" : "×1.0")
+                .font(.subheadline.weight(active ? .bold : .regular))
+                .foregroundStyle(active ? color(value) : Palette.secondary)
         }
-        .frame(width: 186, height: 40)
-        .overlay(Capsule().strokeBorder(nature == 10 ? Color(hex: 0xDDDDDD) : color(nature).opacity(0.45), lineWidth: 1))
-        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: nature)
+        .frame(width: 186)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("性格補正")
     }
@@ -421,6 +472,8 @@ struct SelectButton: View {
     let text: String
     var placeholder = "なし"
     var sprite: String?
+    var height: CGFloat = 48
+    var font: Font = .body
     let action: () -> Void
 
     var body: some View {
@@ -434,7 +487,7 @@ struct SelectButton: View {
                         .frame(width: 26)
                 }
                 Text(text.isEmpty ? placeholder : text)
-                    .font(.body)
+                    .font(font)
                     .foregroundStyle(Color.black)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
@@ -444,7 +497,7 @@ struct SelectButton: View {
                     .foregroundStyle(Palette.secondary.opacity(0.6))
             }
             .padding(.horizontal, 14)
-            .frame(height: 48)
+            .frame(height: height)
             .background(UnevenBox().fill(Color.white))
             .overlay(UnevenBox().stroke(Color(hex: 0xDDDDDD), lineWidth: 1))
             .contentShape(UnevenBox())

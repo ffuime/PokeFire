@@ -546,35 +546,17 @@ struct EnvironmentSegments: View {
     let onSelect: (String) -> Void
 
     var body: some View {
-        let index = CGFloat(keys.firstIndex(of: selected) ?? 0)
-        GeometryReader { geometry in
-            let width = geometry.size.width / CGFloat(max(1, keys.count))
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(selected == "none" ? Color.black.opacity(0.06) : Palette.environment(selected).opacity(0.16))
-                    .frame(width: width - 6, height: geometry.size.height - 6)
-                    .offset(x: index * width + 3)
-                HStack(spacing: 0) {
-                    ForEach(keys, id: \.self) { key in
-                        let active = key == selected
-                        Button {
-                            onSelect(key)
-                        } label: {
-                            Icon(name: "\(kind)_\(key)", size: 24)
-                                .foregroundStyle(active ? Palette.environment(key) : Color(hex: 0xB5B5BA))
-                                .scaleEffect(active ? 1.1 : 1)
-                                .frame(width: width, height: geometry.size.height)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(PressableStyle())
-                        .accessibilityLabel(kind == "weather" ? EnvironmentInfo.label(weather: key) : EnvironmentInfo.label(field: key))
-                        .accessibilityAddTraits(active ? .isSelected : [])
-                    }
-                }
-            }
+        LensSelector(
+            items: keys,
+            selected: selected,
+            height: 56,
+            tint: { $0 == "none" ? Color.gray : Palette.environment($0) },
+            onSelect: onSelect
+        ) { key, active in
+            Icon(name: "\(kind)_\(key)", size: 26)
+                .foregroundStyle(active ? Palette.environment(key) : Color(hex: 0xB5B5BA))
+                .scaleEffect(active ? 1.1 : 1)
+                .accessibilityLabel(kind == "weather" ? EnvironmentInfo.label(weather: key) : EnvironmentInfo.label(field: key))
         }
-        .frame(height: 56)
-        .overlay(Capsule().strokeBorder(selected == "none" ? Color(hex: 0xDDDDDD) : Palette.environment(selected).opacity(0.45), lineWidth: 1))
-        .animation(.spring(response: 0.34, dampingFraction: 0.78), value: selected)
     }
 }

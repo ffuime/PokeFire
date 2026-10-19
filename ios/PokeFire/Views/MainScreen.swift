@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum ActiveSheet: Identifiable, Hashable {
     case detail, speed, environment, help
@@ -29,6 +30,8 @@ struct MainScreen: View {
 
     @State private var page: Role? = .attacker
     @State private var sheet: ActiveSheet?
+    @State private var progress: CGFloat = 0
+    @State private var pulled = false
 
     var body: some View {
         ScrollView(.horizontal) {
@@ -44,13 +47,26 @@ struct MainScreen: View {
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $page)
         .scrollIndicators(.hidden)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.x / max(1, geometry.containerSize.width)
+        } action: { _, value in
+            progress = value
+            if value < -0.08, !pulled {
+                pulled = true
+                openDrawer()
+            } else if value >= 0, pulled {
+                pulled = false
+            }
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
-            MainHeader(page: $page, openDrawer: openDrawer, present: { sheet = $0 })
+            MainHeader(page: $page, progress: progress, openDrawer: openDrawer, present: { sheet = $0 })
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             ResultCard(present: { sheet = $0 })
         }
-        .background(Palette.background.ignoresSafeArea())
+        .background {
+            EnvironmentBackdrop(weather: model.weather, field: model.field)
+        }
         .sheet(item: $sheet) { item in
             sheetContent(item)
         }
@@ -84,39 +100,61 @@ struct MainScreen: View {
     }
 }
 
+struct EnvironmentBackdrop: View {
+    let weather: String
+    let field: String
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Palette.background
+                VStack(spacing: 0) {
+                    LinearGradient(
+                        colors: [Palette.environment(weather).opacity(0.42), Palette.background.opacity(0)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: geometry.size.height * 0.45)
+                    .opacity(weather == "none" ? 0 : 1)
+                    Spacer(minLength: 0)
+                    LinearGradient(
+                        colors: [Palette.background.opacity(0), Palette.environment(field).opacity(0.42)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: geometry.size.height * 0.45)
+                    .opacity(field == "none" ? 0 : 1)
+                }
+            }
+        }
+        .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.5), value: weather)
+        .animation(.easeInOut(duration: 0.5), value: field)
+    }
+}
+
 struct MainHeader: View {
     @Environment(AppModel.self) private var model
     @Binding var page: Role?
+    let progress: CGFloat
     let openDrawer: () -> Void
     let present: (ActiveSheet) -> Void
 
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                CircleIconButton(icon: "history", label: "履歴", action: openDrawer)
+                CircleIconButton(icon: "menu", label: "履歴", action: openDrawer)
                 Spacer(minLength: 0)
                 EnvironmentPill { present(.environment) }
                 Spacer(minLength: 0)
-                CircleIconButton(icon: "help", label: "ヘルプ") { present(.help) }
+                Color.clear.frame(width: 44, height: 44)
             }
             TabStrip()
-            SideSwitcher(page: $page)
+            SideSwitcher(page: $page, progress: progress)
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 10)
-        .background {
-            LinearGradient(
-                stops: [
-                    .init(color: Palette.background, location: 0),
-                    .init(color: Palette.background.opacity(0.94), location: 0.75),
-                    .init(color: Palette.background.opacity(0), location: 1),
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea(edges: .top)
-        }
     }
 }
 
@@ -127,12 +165,12 @@ struct EnvironmentPill: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Icon(name: "weather_\(model.weather)", size: 16)
+                Icon(name: "weather_\(model.weather)", size: 22)
                     .foregroundStyle(Palette.environment(model.weather))
                 Text(EnvironmentInfo.label(weather: model.weather))
                 Text("・")
                     .foregroundStyle(Palette.secondary.opacity(0.6))
-                Icon(name: "field_\(model.field)", size: 16)
+                Icon(name: "field_\(model.field)", size: 22)
                     .foregroundStyle(Palette.environment(model.field))
                 Text(EnvironmentInfo.label(field: model.field))
             }
@@ -140,7 +178,7 @@ struct EnvironmentPill: View {
             .foregroundStyle(Palette.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.75)
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .frame(height: 44)
             .contentShape(Capsule())
             .contentTransition(.opacity)
@@ -155,6 +193,7 @@ struct EnvironmentPill: View {
 
 struct TabStrip: View {
     @Environment(AppModel.self) private var model
+    @State private var dragging: Int?
 
     var body: some View {
         HStack(spacing: 8) {
@@ -162,7 +201,7 @@ struct TabStrip: View {
                 ScrollView(.horizontal) {
                     HStack(spacing: 6) {
                         ForEach(Array(model.tabs.enumerated()), id: \.element.id) { index, tab in
-                            TabChip(tab: tab, index: index)
+                            TabChip(tab: tab, index: index, dragging: $dragging)
                                 .id(tab.id)
                                 .transition(.scale(scale: 0.6).combined(with: .opacity))
                         }
@@ -188,7 +227,7 @@ struct TabStrip: View {
                         Label {
                             Text(kind.menuLabel)
                         } icon: {
-                            Image(kind.icon)
+                            tintedImage(kind.icon, Palette.tab(kind))
                         }
                     }
                 }
@@ -204,10 +243,35 @@ struct TabStrip: View {
     }
 }
 
+struct TabDropDelegate: DropDelegate {
+    let target: OrderTab
+    let model: AppModel
+    @Binding var dragging: Int?
+
+    func dropEntered(info: DropInfo) {
+        guard let dragging, dragging != target.id,
+              let from = model.tabs.firstIndex(where: { $0.id == dragging }),
+              let to = model.tabs.firstIndex(where: { $0.id == target.id }) else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            model.reorderTab(from: from, to: to)
+        }
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        dragging = nil
+        return true
+    }
+}
+
 struct TabChip: View {
     @Environment(AppModel.self) private var model
     let tab: OrderTab
     let index: Int
+    @Binding var dragging: Int?
 
     private var isActive: Bool { index == model.active }
 
@@ -217,15 +281,41 @@ struct TabChip: View {
         return name.isEmpty ? tab.kind.shortLabel : name
     }
 
+    private var label: some View {
+        HStack(spacing: 5) {
+            Text("\(index + 1)")
+                .font(.caption.weight(.heavy))
+                .monospacedDigit()
+                .contentTransition(.numericText(value: Double(index)))
+            Icon(name: tab.kind.icon, size: 14)
+                .foregroundStyle(isActive ? Color.white : Palette.tab(tab.kind))
+            Text(title)
+                .font(.footnote.weight(.semibold))
+                .lineLimit(1)
+                .frame(maxWidth: 110)
+        }
+        .foregroundStyle(isActive ? Color.white : Palette.ink)
+        .padding(.horizontal, 12)
+        .frame(height: 34)
+        .contentShape(Capsule())
+    }
+
     var body: some View {
-        Menu {
+        Button {
+            model.activate(index)
+        } label: {
+            label
+        }
+        .buttonStyle(.plain)
+        .glassEffect(isActive ? .regular.tint(Palette.tab(tab.kind)).interactive() : .regular.interactive(), in: Capsule())
+        .contextMenu {
             Button {
                 model.moveTab(index, by: -1)
             } label: {
                 Label {
                     Text("左へ移動")
                 } icon: {
-                    Image("move_left")
+                    tintedImage("move_left", Palette.tab(tab.kind))
                 }
             }
             .disabled(index == 0)
@@ -235,7 +325,7 @@ struct TabChip: View {
                 Label {
                     Text("右へ移動")
                 } icon: {
-                    Image("move_right")
+                    tintedImage("move_right", Palette.tab(tab.kind))
                 }
             }
             .disabled(index >= model.tabs.count - 1)
@@ -246,30 +336,17 @@ struct TabChip: View {
                 Label {
                     Text("削除")
                 } icon: {
-                    Image(systemName: "xmark")
+                    tintedImage("close_circle", Color.red)
                 }
             }
             .disabled(model.tabs.count <= 1)
-        } label: {
-            HStack(spacing: 5) {
-                Text("\(index + 1)")
-                    .font(.caption.weight(.heavy))
-                    .monospacedDigit()
-                    .contentTransition(.numericText(value: Double(index)))
-                Icon(name: tab.kind.icon, size: 14)
-                Text(title)
-                    .font(.footnote.weight(.semibold))
-                    .lineLimit(1)
-                    .frame(maxWidth: 110)
-            }
-            .foregroundStyle(isActive ? Color.white : Palette.ink)
-            .padding(.horizontal, 12)
-            .frame(height: 34)
-            .contentShape(Capsule())
-        } primaryAction: {
-            model.activate(index)
         }
-        .glassEffect(isActive ? .regular.tint(Palette.tab(tab.kind)).interactive() : .regular.interactive(), in: Capsule())
+        .onDrag {
+            dragging = tab.id
+            Haptics.play(.medium)
+            return NSItemProvider(object: String(tab.id) as NSString)
+        }
+        .onDrop(of: [UTType.text], delegate: TabDropDelegate(target: tab, model: model, dragging: $dragging))
         .animation(.snappy(duration: 0.25), value: isActive)
         .accessibilityLabel("\(index + 1)番目 \(tab.kind.menuLabel) \(title)")
         .accessibilityAddTraits(isActive ? .isSelected : [])
@@ -279,79 +356,101 @@ struct TabChip: View {
 struct SideSwitcher: View {
     @Environment(AppModel.self) private var model
     @Binding var page: Role?
+    let progress: CGFloat
     @State private var turns = 0
+    @State private var dragX: CGFloat?
 
     var body: some View {
-        HStack(spacing: 6) {
-            sideButton(.attacker)
-            Button {
-                turns += 1
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
-                    model.swapSides()
-                }
-            } label: {
-                Icon(name: "swap", size: 18)
-                    .foregroundStyle(model.isConstantActive ? Palette.secondary.opacity(0.4) : Palette.accent)
-                    .rotationEffect(.degrees(Double(turns) * 180))
-                    .animation(.spring(response: 0.5, dampingFraction: 0.6), value: turns)
-                    .frame(width: 40, height: 40)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(PressableStyle())
-            .disabled(model.isConstantActive)
-            .accessibilityLabel("攻守交代")
-            sideButton(.defender)
-        }
-        .padding(4)
-        .glassEffect(.regular, in: Capsule())
-    }
-
-    private func sideButton(_ role: Role) -> some View {
-        let selected = (page ?? .attacker) == role
-        let side = model.side(role)
-        let constant = role == .attacker && model.isConstantActive
-        let kind = model.activeTab?.kind ?? .attack
-        return Button {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                page = role
-            }
-        } label: {
-            HStack(spacing: 6) {
-                if constant {
-                    Icon(name: kind.icon, size: 20)
-                        .foregroundStyle(Palette.tab(kind))
-                        .frame(width: 30, height: 30)
-                } else {
-                    SpriteView(name: side.name, size: 30)
-                }
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(role.title)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(role == .attacker ? Palette.attack : Palette.accent)
-                    Text(constant ? Constants.kinds[kind]?.title ?? "" : side.name)
-                        .font(.footnote.weight(.bold))
-                        .foregroundStyle(Palette.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-                Spacer(minLength: 0)
-            }
-            .padding(.leading, 6)
-            .padding(.trailing, 10)
-            .frame(height: 40)
-            .frame(maxWidth: .infinity)
-            .background {
-                if selected {
-                    Capsule()
-                        .fill(Color.white)
-                        .shadow(color: .black.opacity(0.08), radius: 6, y: 2)
+        GeometryReader { geometry in
+            let swapWidth: CGFloat = 44
+            let spacing: CGFloat = 4
+            let side = max(1, (geometry.size.width - swapWidth - spacing * 2) / 2)
+            let travel = side + swapWidth + spacing * 2
+            let settled = min(1, max(0, progress)) * travel
+            let lensX = dragX.map { min(max(0, $0 - side / 2), travel) } ?? settled
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.black.opacity(0.045))
+                Capsule()
+                    .fill(Color.white.opacity(0.55))
+                    .frame(width: side - 4, height: geometry.size.height - 8)
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                    .scaleEffect(dragX == nil ? 1 : 1.08)
+                    .offset(x: lensX + 2)
+                HStack(spacing: spacing) {
+                    sideLabel(.attacker)
+                        .frame(width: side)
+                    Button {
+                        turns += 1
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
+                            model.swapSides()
+                        }
+                    } label: {
+                        Icon(name: "swap", size: 18)
+                            .foregroundStyle(model.isConstantActive ? Palette.secondary.opacity(0.4) : Palette.accent)
+                            .rotationEffect(.degrees(Double(turns) * 180))
+                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: turns)
+                            .frame(width: swapWidth, height: swapWidth)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(PressableStyle())
+                    .disabled(model.isConstantActive)
+                    .accessibilityLabel("攻守交代")
+                    sideLabel(.defender)
+                        .frame(width: side)
                 }
             }
             .contentShape(Capsule())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        dragX = value.location.x
+                    }
+                    .onEnded { value in
+                        let target: Role = value.location.x < geometry.size.width / 2 ? .attacker : .defender
+                        dragX = nil
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            page = target
+                        }
+                    }
+            )
+            .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.8), value: lensX)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragX == nil)
         }
-        .buttonStyle(PressableStyle())
-        .animation(.snappy(duration: 0.25), value: selected)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .frame(height: 50)
+    }
+
+    private func sideLabel(_ role: Role) -> some View {
+        let side = model.side(role)
+        let constant = role == .attacker && model.isConstantActive
+        let kind = model.activeTab?.kind ?? .attack
+        return HStack(spacing: 6) {
+            if constant {
+                Icon(name: kind.icon, size: 20)
+                    .foregroundStyle(Palette.tab(kind))
+                    .frame(width: 30, height: 30)
+            } else {
+                SpriteView(name: side.name, size: 30)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                if !constant {
+                    Text(role.title)
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(role == .attacker ? Palette.attack : Palette.accent)
+                }
+                Text(constant ? Constants.kinds[kind]?.title ?? "" : side.name)
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.leading, 8)
+        .padding(.trailing, 6)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
     }
 }
 

@@ -366,3 +366,10 @@ struct UnevenBox: Shape {
         ).path(in: rect)
     }
 }
+
+func tintedImage(_ name: String, _ color: Color) -> Image {
+    guard let image = UIImage(named: name)?.withTintColor(UIColor(color), renderingMode: .alwaysOriginal) else {
+        return Image(name)
+    }
+    return Image(uiImage: image)
+}

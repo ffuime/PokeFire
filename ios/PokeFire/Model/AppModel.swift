@@ -1000,6 +1000,19 @@ final class AppModel {
         scheduleCalc()
     }
 
+    func reorderTab(from: Int, to: Int) {
+        guard from != to, tabs.indices.contains(from), tabs.indices.contains(to) else { return }
+        let activeID = tabs.indices.contains(active) ? tabs[active].id : nil
+        let tab = tabs.remove(at: from)
+        tabs.insert(tab, at: to)
+        if let activeID, let index = tabs.firstIndex(where: { $0.id == activeID }) {
+            active = index
+        }
+        historyArmed = true
+        Haptics.play(.selection)
+        scheduleCalc()
+    }
+
     func updateConstant(_ body: (inout ConstantState) -> Void) {
         guard tabs.indices.contains(active), tabs[active].kind != .attack else { return }
         body(&tabs[active].constant)

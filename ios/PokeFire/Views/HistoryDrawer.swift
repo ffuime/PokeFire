@@ -11,6 +11,7 @@ struct HistoryDrawer: View {
     @FocusState private var focused: Bool
     @State private var rowFrames: [String: CGRect] = [:]
     @State private var dragAccepted: Bool?
+    @State private var showHelp = false
 
     private struct HistoryGroup: Identifiable {
         var id: String { title }
@@ -65,6 +66,18 @@ struct HistoryDrawer: View {
                     .font(.system(size: 30, weight: .bold))
                     .foregroundStyle(Color.black)
                 Spacer()
+                Button {
+                    Haptics.play(.light)
+                    showHelp = true
+                } label: {
+                    Icon(name: "help", size: 20)
+                        .foregroundStyle(Color.black)
+                        .frame(width: 46, height: 46)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel("ヘルプ")
                 Button {
                     Haptics.play(.light)
                     withAnimation(.snappy) {
@@ -151,9 +164,11 @@ struct HistoryDrawer: View {
             }
         }
         .background(Color.white.ignoresSafeArea())
-        .coordinateSpace(.named("drawer"))
+        .sheet(isPresented: $showHelp) {
+            HelpView()
+        }
         .simultaneousGesture(
-            DragGesture(minimumDistance: 14, coordinateSpace: .named("drawer"))
+            DragGesture(minimumDistance: 14, coordinateSpace: .global)
                 .onChanged { value in
                     if dragAccepted == nil {
                         let horizontal = abs(value.translation.width) > abs(value.translation.height)
@@ -214,7 +229,7 @@ struct HistoryDrawer: View {
         .buttonStyle(.plain)
         .accessibilityLabel("\(entry.title) \(sub)")
         .onGeometryChange(for: CGRect.self) { proxy in
-            proxy.frame(in: .named("drawer"))
+            proxy.frame(in: .global)
         } action: { frame in
             rowFrames[entry.key] = frame
         }
