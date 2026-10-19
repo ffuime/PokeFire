@@ -5,7 +5,6 @@ struct SegmentBar: View {
     let value: Int
     let color: Color
     var height: CGFloat = 32
-    var allowsReselect = false
     let onChange: (Int) -> Void
 
     @State private var dragging = false
@@ -306,6 +305,7 @@ struct NativeSegmented: UIViewRepresentable {
     var selectedColor: UIColor?
     var fontSize: CGFloat = 15
     var height: CGFloat = 32
+    var allowsReselect = false
     let onChange: (Int) -> Void
 
     func makeCoordinator() -> Coordinator {

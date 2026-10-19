@@ -236,6 +236,7 @@ struct SideSwitcher: View {
     let progress: CGFloat
     @State private var turns = 0
     @State private var dragX: CGFloat?
+    @State private var pendingTarget: CGFloat?
 
     var body: some View {
         GeometryReader { geometry in
@@ -243,7 +244,7 @@ struct SideSwitcher: View {
             let spacing: CGFloat = 4
             let side = max(1, (geometry.size.width - swapWidth - spacing * 2) / 2)
             let travel = side + swapWidth + spacing * 2
-            let settled = min(1, max(0, progress)) * travel
+            let settled = min(1, max(0, pendingTarget ?? progress)) * travel
             let lensX = dragX.map { min(max(0, $0 - side / 2), travel) } ?? settled
             ZStack(alignment: .leading) {
                 Capsule()
@@ -285,7 +286,13 @@ struct SideSwitcher: View {
                     }
                     .onEnded { value in
                         let target: Role = value.location.x < geometry.size.width / 2 ? .attacker : .defender
+                        let goal: CGFloat = target == .attacker ? 0 : 1
+                        pendingTarget = abs(progress - goal) < 0.02 ? nil : goal
                         dragX = nil
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(900))
+                            pendingTarget = nil
+                        }
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
                             page = target
                         }
@@ -295,6 +302,11 @@ struct SideSwitcher: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragX == nil)
         }
         .frame(height: 50)
+        .onChange(of: progress) { _, value in
+            if let goal = pendingTarget, abs(value - goal) < 0.02 {
+                pendingTarget = nil
+            }
+        }
     }
 
     private func sideLabel(_ role: Role) -> some View {
