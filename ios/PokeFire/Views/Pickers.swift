@@ -33,10 +33,77 @@ struct CloseToolbarButton: View {
 
     var body: some View {
         Button(action: action) {
-            Icon(name: "xmark", size: 16)
+            CloseButtonLabel()
                 .foregroundStyle(Palette.ink)
         }
         .accessibilityLabel("閉じる")
+    }
+}
+
+struct SearchHeader: View {
+    let title: String
+    var modes: [String] = []
+    @Binding var mode: Int
+    @Binding var query: String
+    var focused: FocusState<Bool>.Binding
+    let prompt: String
+    let onSubmit: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                if modes.isEmpty {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(Palette.ink)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                } else {
+                    Picker(title, selection: $mode) {
+                        ForEach(modes.indices, id: \.self) { index in
+                            Text(modes[index]).tag(index)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+                Button(action: onClose) {
+                    CloseButtonLabel()
+                        .foregroundStyle(Palette.ink)
+                        .frame(width: 40, height: 40)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel("閉じる")
+            }
+            HStack(spacing: 8) {
+                Icon(name: "search", size: 17)
+                    .foregroundStyle(Palette.secondary)
+                TextField(prompt, text: $query)
+                    .focused(focused)
+                    .submitLabel(.search)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .onSubmit(onSubmit)
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(Palette.secondary.opacity(0.6))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("検索文字を消す")
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 44)
+            .background(Color(hex: 0xEEEEF1), in: Capsule())
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+        .padding(.bottom, 10)
     }
 }
 
@@ -47,7 +114,7 @@ struct PokemonPicker: View {
 
     @State private var query = ""
     @State private var mode = 0
-    @State private var searching = false
+    @FocusState private var focused: Bool
 
     private struct Row: Identifiable {
         var id: String { name }
@@ -74,7 +141,17 @@ struct PokemonPicker: View {
     var body: some View {
         let list = rows
         let current = model.side(role).name
-        NavigationStack {
+        VStack(spacing: 0) {
+            SearchHeader(
+                title: "\(role.title)のポケモン",
+                modes: ["使用率", "履歴"],
+                mode: $mode,
+                query: $query,
+                focused: $focused,
+                prompt: "名前・ローマ字・タイプ・とくせい",
+                onSubmit: { if let first = list.first { select(first.name) } },
+                onClose: { dismiss() }
+            )
             List {
                 ForEach(list) { row in
                     Button {
@@ -92,40 +169,23 @@ struct PokemonPicker: View {
                 }
             }
             .listStyle(.plain)
+            .scrollDismissesKeyboard(.immediately)
             .overlay {
                 if list.isEmpty {
                     EmptyResult(text: mode == 1 && Storage.pokemonHistory.isEmpty ? "履歴はまだありません" : "見つかりません")
                 }
             }
-            .searchable(text: $query, isPresented: $searching, placement: .navigationBarDrawer(displayMode: .always), prompt: "名前・ローマ字・タイプ・とくせい")
-            .onSubmit(of: .search) {
-                if let first = list.first { select(first.name) }
-            }
-            .navigationTitle("\(role.title)のポケモン")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Picker("並び", selection: $mode) {
-                        Text("使用率").tag(0)
-                        Text("履歴").tag(1)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 180)
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    CloseToolbarButton { dismiss() }
-                }
-            }
-            .onChange(of: mode) { _, _ in Haptics.play(.selection) }
-            .task {
-                try? await Task.sleep(for: .milliseconds(350))
-                searching = true
-            }
+        }
+        .onChange(of: mode) { _, _ in Haptics.play(.selection) }
+        .task {
+            try? await Task.sleep(for: .milliseconds(300))
+            focused = true
         }
         .presentationDragIndicator(.visible)
     }
 
     private func select(_ name: String) {
+        focused = false
         model.selectPokemon(role, name)
         dismiss()
     }
@@ -184,11 +244,13 @@ enum EntryKind {
         }
     }
 
-    var usageKey: String {
+    var hasHistory: Bool { self != .abilities }
+
+    var history: [String] {
         switch self {
-        case .moves: return "moves"
-        case .abilities: return "abilities"
-        case .items: return "items"
+        case .moves: return Storage.moveHistory
+        case .items: return Storage.itemHistory
+        case .abilities: return []
         }
     }
 }
@@ -200,7 +262,8 @@ struct EntrySearchSheet: View {
     let role: Role
 
     @State private var query = ""
-    @State private var searching = false
+    @State private var mode = 0
+    @FocusState private var focused: Bool
 
     private struct Row: Identifiable {
         var id: String { name }
@@ -213,22 +276,36 @@ struct EntrySearchSheet: View {
         value == value.rounded() ? String(Int(value)) : String(value)
     }
 
+    private func searchText(_ name: String) -> String {
+        let data = model.data
+        switch kind {
+        case .moves: return data.moveSearchText(name)
+        case .abilities: return data.abilities[name].map { data.effectSearchText(kind: "abilities", $0) } ?? ""
+        case .items: return data.items[name].map { data.effectSearchText(kind: "items", $0) } ?? ""
+        }
+    }
+
+    private func effect(_ name: String) -> String {
+        let data = model.data
+        switch kind {
+        case .moves: return data.moves[name]?.effect ?? ""
+        case .abilities: return data.abilities[name]?.effect ?? ""
+        case .items: return data.items[name]?.effect ?? ""
+        }
+    }
+
+    private func exists(_ name: String) -> Bool {
+        let data = model.data
+        switch kind {
+        case .moves: return data.moves[name] != nil
+        case .abilities: return data.abilities[name] != nil
+        case .items: return data.items[name] != nil
+        }
+    }
+
     private var rows: [Row] {
         let data = model.data
         let name = model.side(role).name
-        let names: [String]
-        let texts: [String]
-        switch kind {
-        case .moves:
-            names = data.moveOrder
-            texts = names.map { data.moveSearchText($0) }
-        case .abilities:
-            names = data.abilityOrder
-            texts = names.map { data.abilities[$0].map { data.effectSearchText(kind: "abilities", $0) } ?? "" }
-        case .items:
-            names = data.itemOrder
-            texts = names.map { data.items[$0].map { data.effectSearchText(kind: "items", $0) } ?? "" }
-        }
         var usage: [(String, Double)] = []
         if kind == .abilities, data.usageName(of: name) != name, let first = data.pokemons[name]?.abilities.first {
             usage = [(first, 100)]
@@ -247,24 +324,28 @@ struct EntrySearchSheet: View {
             rankOf[pair.0] = index
             percent[pair.0] = "\(numberText(pair.1))%"
         }
-        let indices = names.indices.sorted { lhs, rhs in
-            let left = rankOf[names[lhs]] ?? (usage.count + lhs)
-            let right = rankOf[names[rhs]] ?? (usage.count + rhs)
-            return left < right
-        }
-        let orderedNames = indices.map { names[$0] }
-        let orderedTexts = indices.map { texts[$0] }
-        let tiers = Search.rank(orderedTexts, query: query)
-        let order = Search.ordered(orderedNames.count, tiers: tiers) { orderedNames[$0] }
-        return order.map { index in
-            let entryName = orderedNames[index]
-            let effect: String
+        let ordered: [String]
+        if mode == 1, kind.hasHistory {
+            ordered = kind.history.filter(exists)
+        } else {
+            let names: [String]
             switch kind {
-            case .moves: effect = data.moves[entryName]?.effect ?? ""
-            case .abilities: effect = data.abilities[entryName]?.effect ?? ""
-            case .items: effect = data.items[entryName]?.effect ?? ""
+            case .moves: names = data.moveOrder
+            case .abilities: names = data.abilityOrder
+            case .items: names = data.itemOrder
             }
-            return Row(name: entryName, effect: effect, usage: percent[entryName])
+            let indices = names.indices.sorted { lhs, rhs in
+                let left = rankOf[names[lhs]] ?? (usage.count + lhs)
+                let right = rankOf[names[rhs]] ?? (usage.count + rhs)
+                return left < right
+            }
+            ordered = indices.map { names[$0] }
+        }
+        let tiers = Search.rank(ordered.map(searchText), query: query)
+        let order = Search.ordered(ordered.count, tiers: tiers) { ordered[$0] }
+        return order.map { index in
+            let entryName = ordered[index]
+            return Row(name: entryName, effect: effect(entryName), usage: percent[entryName])
         }
     }
 
@@ -279,7 +360,17 @@ struct EntrySearchSheet: View {
     var body: some View {
         let list = rows
         let selected = current
-        NavigationStack {
+        VStack(spacing: 0) {
+            SearchHeader(
+                title: "\(kind.title)（\(model.side(role).name)）",
+                modes: kind.hasHistory ? ["使用率", "履歴"] : [],
+                mode: $mode,
+                query: $query,
+                focused: $focused,
+                prompt: "\(kind.title)の名前を検索…",
+                onSubmit: { if let first = list.first { select(first.name) } },
+                onClose: { dismiss() }
+            )
             List {
                 ForEach(list) { row in
                     Button {
@@ -296,33 +387,32 @@ struct EntrySearchSheet: View {
                 }
             }
             .listStyle(.plain)
+            .scrollDismissesKeyboard(.immediately)
             .overlay {
-                if list.isEmpty { EmptyResult(text: "見つかりません") }
-            }
-            .searchable(text: $query, isPresented: $searching, placement: .navigationBarDrawer(displayMode: .always), prompt: "\(kind.title)の名前を検索…")
-            .onSubmit(of: .search) {
-                if let first = list.first { select(first.name) }
-            }
-            .navigationTitle("\(kind.title)（\(model.side(role).name)）")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    CloseToolbarButton { dismiss() }
+                if list.isEmpty {
+                    EmptyResult(text: mode == 1 && kind.history.isEmpty ? "履歴はまだありません" : "見つかりません")
                 }
             }
-            .task {
-                try? await Task.sleep(for: .milliseconds(350))
-                searching = true
-            }
+        }
+        .onChange(of: mode) { _, _ in Haptics.play(.selection) }
+        .task {
+            try? await Task.sleep(for: .milliseconds(300))
+            focused = true
         }
         .presentationDragIndicator(.visible)
     }
 
     private func select(_ name: String) {
+        focused = false
         switch kind {
-        case .moves: model.selectMove(name)
-        case .abilities: model.selectAbility(role, name)
-        case .items: model.selectItem(role, name)
+        case .moves:
+            Storage.rememberMove(name)
+            model.selectMove(name)
+        case .abilities:
+            model.selectAbility(role, name)
+        case .items:
+            Storage.rememberItem(name)
+            model.selectItem(role, name)
         }
         dismiss()
     }
@@ -337,6 +427,9 @@ struct EntryRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
+            if kind == .items {
+                SpriteIcon(name: name, size: 30)
+            }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(name)
@@ -394,16 +487,9 @@ struct TypeSheet: View {
                             model.toggleType(role, type)
                         } label: {
                             VStack(spacing: 4) {
-                                TypeIcon(type: type, size: 40)
-                                    .opacity(selected ? 1 : 0.35)
-                                    .scaleEffect(selected ? 1 : 0.9)
-                                    .overlay {
-                                        if selected {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .strokeBorder(Palette.ink.opacity(0.8), lineWidth: 2)
-                                                .padding(-3)
-                                        }
-                                    }
+                                TypeIcon(type: type, size: 42)
+                                    .opacity(selected ? 1 : 0.3)
+                                    .scaleEffect(selected ? 1 : 0.88)
                                 Text(type)
                                     .font(.system(size: 10, weight: .bold))
                                     .foregroundStyle(selected ? Palette.ink : Palette.secondary)
@@ -425,8 +511,7 @@ struct TypeSheet: View {
                     Button("リセット") { model.resetTypes(role) }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("完了") { dismiss() }
-                        .fontWeight(.semibold)
+                    CloseToolbarButton { dismiss() }
                 }
             }
         }
@@ -439,53 +524,57 @@ struct EnvironmentSheet: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text("天候・フィールド")
-                .font(.headline)
-                .frame(maxWidth: .infinity)
-            row(title: "天候", kind: "weather", items: EnvironmentInfo.weathers.map { ($0.key, $0.label) }, selected: model.weather) { model.setWeather($0) }
-            row(title: "フィールド", kind: "field", items: EnvironmentInfo.fields.map { ($0.key, $0.label) }, selected: model.field) { model.setField($0) }
-            Text("選んでいるものをもう一度タップすると「なし」に戻ります。")
-                .font(.caption)
-                .foregroundStyle(Palette.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            Text("天候").sectionTitle()
+            EnvironmentSegments(kind: "weather", keys: EnvironmentInfo.weathers.map { $0.key }, selected: model.weather) { model.setWeather($0) }
+                .padding(.bottom, 10)
+            Text("フィールド").sectionTitle()
+            EnvironmentSegments(kind: "field", keys: EnvironmentInfo.fields.map { $0.key }, selected: model.field) { model.setField($0) }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 24)
+        .padding(.top, 28)
         .frame(maxHeight: .infinity, alignment: .top)
-        .presentationDetents([.height(380)])
+        .presentationDetents([.height(250)])
         .presentationDragIndicator(.visible)
     }
+}
 
-    private func row(title: String, kind: String, items: [(String, String)], selected: String, onSelect: @escaping (String) -> Void) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title).sectionTitle()
-            GlassEffectContainer(spacing: 8) {
-                HStack(spacing: 8) {
-                    ForEach(items.indices, id: \.self) { index in
-                        let item = items[index]
-                        let active = item.0 == selected
+struct EnvironmentSegments: View {
+    let kind: String
+    let keys: [String]
+    let selected: String
+    let onSelect: (String) -> Void
+
+    var body: some View {
+        let index = CGFloat(keys.firstIndex(of: selected) ?? 0)
+        GeometryReader { geometry in
+            let width = geometry.size.width / CGFloat(max(1, keys.count))
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(selected == "none" ? Color.black.opacity(0.06) : Palette.environment(selected).opacity(0.16))
+                    .frame(width: width - 6, height: geometry.size.height - 6)
+                    .offset(x: index * width + 3)
+                HStack(spacing: 0) {
+                    ForEach(keys, id: \.self) { key in
+                        let active = key == selected
                         Button {
-                            onSelect(item.0)
+                            onSelect(key)
                         } label: {
-                            VStack(spacing: 6) {
-                                Icon(name: "\(kind)_\(item.0)", size: 26)
-                                Text(item.1)
-                                    .font(.system(size: 10, weight: .bold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                            }
-                            .foregroundStyle(active ? Color.white : Palette.environment(item.0))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 74)
-                            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                            Icon(name: "\(kind)_\(key)", size: 24)
+                                .foregroundStyle(active ? Palette.environment(key) : Color(hex: 0xB5B5BA))
+                                .scaleEffect(active ? 1.1 : 1)
+                                .frame(width: width, height: geometry.size.height)
+                                .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        .glassEffect(active ? .regular.tint(Palette.environment(item.0)).interactive() : .regular.interactive(), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-                        .accessibilityLabel(item.1)
+                        .buttonStyle(PressableStyle())
+                        .accessibilityLabel(kind == "weather" ? EnvironmentInfo.label(weather: key) : EnvironmentInfo.label(field: key))
                         .accessibilityAddTraits(active ? .isSelected : [])
                     }
                 }
             }
         }
+        .frame(height: 56)
+        .overlay(Capsule().strokeBorder(selected == "none" ? Color(hex: 0xDDDDDD) : Palette.environment(selected).opacity(0.45), lineWidth: 1))
+        .animation(.spring(response: 0.34, dampingFraction: 0.78), value: selected)
     }
 }

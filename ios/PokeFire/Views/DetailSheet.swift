@@ -56,19 +56,22 @@ struct DetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    if view.constantMode {
-                        ConstantOverview(entry: view.constant)
-                    } else if let first = view.list.first {
-                        MatchOverview(view: view, first: first)
-                    }
+                    VStack(spacing: 18) {
+                        if view.constantMode {
+                            ConstantOverview(entry: view.constant)
+                        } else if let first = view.list.first {
+                            MatchOverview(view: view, first: first)
+                        }
 
-                    FlowList(view: view) { next in
-                        guard next != view.effective else { return }
-                        Haptics.play(next == .sum ? .soft : .light)
-                        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
-                            selection = next
+                        FlowList(view: view) { next in
+                            guard next != view.effective else { return }
+                            Haptics.play(next == .sum ? .soft : .light)
+                            withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+                                selection = next
+                            }
                         }
                     }
+                    .card()
 
                     if !view.constantMode {
                         HPPMSection(list: view.list)
@@ -187,8 +190,6 @@ private struct MatchOverview: View {
                         tint: Palette.attack
                     )
                     VStack(spacing: 6) {
-                        Icon(name: "move_right", size: 18)
-                            .foregroundStyle(Palette.secondary.opacity(0.5))
                         Text(sum ? "合計ダメージ" : atk.move)
                             .font(.subheadline.weight(.bold))
                             .foregroundStyle(Palette.ink)
@@ -237,7 +238,6 @@ private struct MatchOverview: View {
                         .background(Palette.background, in: Capsule())
                 }
             }
-            .card()
 
             LogCard(hp: hp, min: summary.min, max: summary.max, judge: summary.text, rate: summary.rate, heal: false)
         }
@@ -291,17 +291,16 @@ private struct OthersBox: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             if let ability {
-                Label {
+                HStack(spacing: 6) {
+                    SpriteIcon(name: "ability", size: 18)
                     Text(ability).lineLimit(1)
-                } icon: {
-                    Text("特").font(.caption2.weight(.heavy)).foregroundStyle(tint)
                 }
             }
             if let item {
-                Label {
+                HStack(spacing: 6) {
+                    SpriteIcon(name: item, size: 18)
+                        .opacity(item == "なし" ? 0 : 1)
                     Text(item).lineLimit(1)
-                } icon: {
-                    Text("持").font(.caption2.weight(.heavy)).foregroundStyle(tint)
                 }
             }
         }
@@ -361,7 +360,6 @@ private struct LogCard: View {
                 }
             }
         }
-        .card()
     }
 }
 
@@ -390,7 +388,6 @@ private struct ConstantOverview: View {
                 .frame(maxWidth: .infinity)
                 FighterColumn(names: [def.name], types: def.types, title: def.name, stat: statText(def, [.h]), tint: Palette.accent)
             }
-            .card()
             LogCard(
                 hp: output.hp,
                 min: amount,
@@ -437,16 +434,16 @@ private struct FlowList: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         NumberText(Format.percentPair(summary.min, summary.max, output.hp.max))
                             .font(.subheadline.weight(.bold))
-                            .foregroundStyle(Palette.ink)
+                            .foregroundStyle(Palette.boosted)
                         NumberText(Format.pair(summary.min, summary.max))
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Palette.secondary)
+                            .foregroundStyle(Palette.boosted.opacity(0.75))
                     }
                 }
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Palette.card)
+                        .fill(Palette.background)
                         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.accent : Color.clear, lineWidth: 2))
                 )
                 .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -487,10 +484,10 @@ private struct FlowItem: View {
                     VStack(alignment: .trailing, spacing: 2) {
                         NumberText("\(sign)\(Format.fixed1(Double(constant.total) / Double(max(1, output.hp.max)) * 100))%")
                             .font(.subheadline.weight(.bold))
-                            .foregroundStyle(entry.kind == .heel ? Palette.plus : Palette.ink)
+                            .foregroundStyle(entry.kind == .heel ? Palette.plus : Palette.boosted)
                         NumberText("\(sign)\(constant.total)", value: Double(constant.total))
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(Palette.secondary)
+                            .foregroundStyle((entry.kind == .heel ? Palette.plus : Palette.boosted).opacity(0.75))
                     }
                 } else {
                     attackSummary(output: output)
@@ -504,7 +501,7 @@ private struct FlowItem: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Palette.card)
+                .fill(Palette.background)
                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.tab(entry.kind) : Color.clear, lineWidth: 2))
         )
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -541,10 +538,10 @@ private struct FlowItem: View {
                 let range = Calc.useRange(result)
                 NumberText(Format.percentPair(range.min, range.max, output.hp.max))
                     .font(.subheadline.weight(.bold))
-                    .foregroundStyle(Palette.ink)
+                    .foregroundStyle(Palette.boosted)
                 NumberText(Format.pair(range.min, range.max))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(Palette.secondary)
+                    .foregroundStyle(Palette.boosted.opacity(0.75))
             } else {
                 Text(result?.message ?? "-")
                     .font(.caption.weight(.bold))
@@ -623,7 +620,7 @@ private struct AttackBreakdown: View {
                         }
                     }
                     .padding(12)
-                    .background(Palette.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .scrollIndicators(.hidden)
             }

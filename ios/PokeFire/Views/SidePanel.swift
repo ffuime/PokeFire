@@ -1,5 +1,22 @@
 import SwiftUI
 
+struct PanelShape: Shape {
+    let role: Role
+
+    func path(in rect: CGRect) -> Path {
+        let small: CGFloat = 28
+        let large: CGFloat = 56
+        let attacker = role == .attacker
+        return UnevenRoundedRectangle(
+            topLeadingRadius: attacker ? small : large,
+            bottomLeadingRadius: attacker ? small : large,
+            bottomTrailingRadius: attacker ? large : small,
+            topTrailingRadius: attacker ? large : small,
+            style: .continuous
+        ).path(in: rect)
+    }
+}
+
 struct SidePanel: View {
     @Environment(AppModel.self) private var model
     let role: Role
@@ -7,29 +24,44 @@ struct SidePanel: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 26) {
                 if role == .attacker, model.isConstantActive {
                     ConstantPanel()
                         .transition(.opacity.combined(with: .scale(scale: 0.97)))
                 } else {
-                    PokemonCard(role: role, present: present)
+                    PokemonHeader(role: role, present: present)
                     if role == .attacker {
-                        MoveCard(present: present)
+                        MoveSection(present: present)
                     }
                     if model.showsHP(role) {
-                        HPCard(role: role)
+                        HPSection(role: role)
                             .transition(.opacity.combined(with: .move(edge: .top)))
                     }
                     ForEach(model.visibleStats(role), id: \.self) { key in
-                        StatCard(role: role, key: key)
+                        StatSection(role: role, key: key)
                             .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     }
-                    AbilityCard(role: role, present: present)
-                    ItemCard(role: role, present: present)
-                    ConditionCard(role: role)
+                    AbilitySection(role: role, present: present)
+                    ItemSection(role: role, present: present)
+                    ConditionSection(role: role)
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                ZStack(alignment: .topTrailing) {
+                    PanelShape(role: role).fill(Color.white)
+                    Icon(name: role == .attacker ? "watermark_attack" : "watermark_defense", size: 190)
+                        .foregroundStyle(role == .attacker ? Color(hex: 0xD65F5F, opacity: 0.2) : Color(hex: 0x508ACB, opacity: 0.2))
+                        .padding(.top, 6)
+                        .padding(.trailing, role == .attacker ? 24 : 10)
+                }
+                .clipShape(PanelShape(role: role))
+                .shadow(color: .black.opacity(0.1), radius: 18, y: 4)
+            }
+            .padding(.leading, role == .attacker ? 0 : 16)
+            .padding(.trailing, role == .attacker ? 16 : 0)
             .padding(.top, 6)
             .padding(.bottom, 24)
             .animation(.snappy(duration: 0.3), value: model.visibleStats(role))
@@ -45,21 +77,21 @@ struct TypeBadge: View {
     let type: String
 
     var body: some View {
-        HStack(spacing: 4) {
-            TypeIcon(type: type, size: 18)
+        HStack(spacing: 3) {
+            TypeIcon(type: type, size: 20)
             Text(type)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(Palette.typeColor(type))
-                .lineLimit(1)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.white)
+                .fixedSize()
         }
-        .padding(.leading, 3)
-        .padding(.trailing, 8)
-        .frame(height: 24)
-        .background(Palette.typeColor(type).opacity(0.12), in: Capsule())
+        .padding(.leading, 1)
+        .padding(.trailing, 7)
+        .frame(height: 22)
+        .background(Palette.typeColor(type), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 
-struct PokemonCard: View {
+struct PokemonHeader: View {
     @Environment(AppModel.self) private var model
     let role: Role
     let present: (ActiveSheet) -> Void
@@ -69,7 +101,7 @@ struct PokemonCard: View {
     var body: some View {
         let side = model.side(role)
         let forms = model.data.otherForms(of: side.name)
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 Button {
                     guard !forms.isEmpty else {
@@ -78,112 +110,135 @@ struct PokemonCard: View {
                     }
                     spin += 1
                     Haptics.play(.light)
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                         showForms.toggle()
                     }
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
-                        SpriteView(name: side.name, size: 80)
-                            .background(Circle().fill(Palette.background))
+                        SpriteView(name: side.name, size: 84)
                         if !forms.isEmpty {
-                            Icon(name: "forms", size: 13)
+                            Icon(name: "forms", size: 15)
                                 .foregroundStyle(Palette.accent)
                                 .rotationEffect(.degrees(Double(spin) * -360))
                                 .animation(.spring(response: 0.6, dampingFraction: 0.7), value: spin)
-                                .frame(width: 26, height: 26)
-                                .background(Circle().fill(Color.white).shadow(color: .black.opacity(0.1), radius: 3, y: 1))
+                                .frame(width: 30, height: 30)
+                                .background(Circle().fill(Color.white).shadow(color: .black.opacity(0.15), radius: 6, y: 1))
                         }
                     }
                 }
                 .buttonStyle(PressableStyle())
                 .accessibilityLabel(forms.isEmpty ? "ポケモンを選ぶ" : "ほかの姿")
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Button {
-                        Haptics.play(.light)
-                        present(.pokemon(role))
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text(side.name)
-                                .font(.title2.weight(.bold))
-                                .foregroundStyle(Palette.ink)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
-                                .contentTransition(.opacity)
-                            Icon(name: "search", size: 16)
-                                .foregroundStyle(Palette.accent)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityLabel("ポケモン \(side.name)")
-
-                    Button {
-                        Haptics.play(.light)
-                        present(.types(role))
-                    } label: {
-                        HStack(spacing: 6) {
-                            ForEach(side.types, id: \.self) { type in
-                                TypeBadge(type: type)
-                            }
-                            if side.types.isEmpty {
-                                Text("タイプなし")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(Palette.secondary)
-                            }
-                            Icon(name: "edit", size: 14)
-                                .foregroundStyle(Palette.secondary.opacity(0.7))
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PressableStyle())
-                    .accessibilityLabel("タイプ \(side.types.joined(separator: "・"))")
-                }
-                Spacer(minLength: 0)
-            }
-
-            if showForms, !forms.isEmpty {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 10) {
-                        ForEach(Array(forms.enumerated()), id: \.element) { index, name in
-                            Button {
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    showForms = false
-                                }
-                                model.selectPokemon(role, name, remember: false)
-                            } label: {
-                                VStack(spacing: 4) {
-                                    SpriteView(name: name, size: 56)
-                                    Text(name)
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(Palette.ink)
-                                        .lineLimit(1)
-                                        .frame(maxWidth: 84)
-                                }
-                                .padding(8)
-                                .background(Palette.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            }
-                            .buttonStyle(PressableStyle())
-                            .transition(.scale(scale: 0.5).combined(with: .opacity).animation(.spring(response: 0.4, dampingFraction: 0.7).delay(Double(index) * 0.04)))
-                        }
+                ZStack(alignment: .leading) {
+                    info(side)
+                        .opacity(showForms ? 0 : 1)
+                        .allowsHitTesting(!showForms)
+                    if showForms, !forms.isEmpty {
+                        formsStrip(forms)
+                            .transition(.opacity.combined(with: .move(edge: .leading)))
                     }
                 }
-                .scrollIndicators(.hidden)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             BaseStatsRow(role: role, present: present)
         }
-        .card()
-        .overlay(alignment: .topTrailing) {
-            Icon(name: role == .attacker ? "tab_attack" : "shield", size: 70)
-                .foregroundStyle((role == .attacker ? Palette.attack : Palette.accent).opacity(0.07))
-                .padding(12)
-                .allowsHitTesting(false)
-        }
         .onChange(of: side.name) { _, _ in
             showForms = false
         }
+    }
+
+    private func info(_ side: SideState) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                Haptics.play(.light)
+                present(.pokemon(role))
+            } label: {
+                HStack(spacing: 10) {
+                    Text(side.name)
+                        .font(.body)
+                        .foregroundStyle(Color.black)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .contentTransition(.opacity)
+                    Spacer(minLength: 0)
+                    Icon(name: "search", size: 17)
+                        .foregroundStyle(Color(hex: 0xAAAAAA))
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 48)
+                .background(UnevenBox(strong: 28, weak: 6).fill(Color.white))
+                .overlay(UnevenBox(strong: 28, weak: 6).stroke(Color(hex: 0xDADADA), lineWidth: 1))
+                .contentShape(UnevenBox(strong: 28, weak: 6))
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("ポケモン \(side.name)")
+
+            ScrollView(.horizontal) {
+                HStack(spacing: 4) {
+                    ForEach(side.types, id: \.self) { type in
+                        TypeBadge(type: type)
+                    }
+                    if side.types.isEmpty {
+                        Text("タイプなし")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Palette.secondary)
+                            .fixedSize()
+                    }
+                    Icon(name: "edit", size: 16)
+                        .foregroundStyle(Palette.boosted)
+                        .frame(width: 22, height: 22)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    Haptics.play(.light)
+                    present(.types(role))
+                }
+            }
+            .scrollIndicators(.hidden)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("タイプ \(side.types.joined(separator: "・"))")
+            .accessibilityAddTraits(.isButton)
+        }
+    }
+
+    private func formsStrip(_ forms: [String]) -> some View {
+        HStack(spacing: 8) {
+            ScrollView(.horizontal) {
+                HStack(spacing: 8) {
+                    ForEach(Array(forms.enumerated()), id: \.element) { index, name in
+                        Button {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                                showForms = false
+                            }
+                            model.selectPokemon(role, name, remember: false)
+                        } label: {
+                            SpriteView(name: name, size: 54)
+                                .frame(width: 66, height: 66)
+                                .background(Palette.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .buttonStyle(PressableStyle())
+                        .accessibilityLabel(name)
+                        .transition(.scale(scale: 0.5).combined(with: .opacity).animation(.spring(response: 0.4, dampingFraction: 0.7).delay(Double(index) * 0.04)))
+                    }
+                }
+            }
+            .scrollIndicators(.hidden)
+            Button {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                    showForms = false
+                }
+            } label: {
+                CloseButtonLabel(size: 13)
+                    .foregroundStyle(Palette.secondary)
+                    .frame(width: 30, height: 30)
+                    .background(Circle().fill(Palette.background))
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("閉じる")
+        }
+        .frame(height: 88)
+        .background(Color.white)
     }
 }
 
@@ -195,22 +250,18 @@ struct BaseStatsRow: View {
     var body: some View {
         let base = model.side(role).base
         let highlighted = model.highlightedBaseStats(role)
-        HStack(spacing: 6) {
+        HStack(spacing: 0) {
             ForEach(StatKey.baseKeys, id: \.self) { key in
                 let active = highlighted.contains(key)
-                let content = VStack(spacing: 2) {
+                let content = VStack(spacing: 1) {
                     Text(key.letter)
                         .font(.caption2.weight(.heavy))
+                        .opacity(0.7)
                     NumberText(base[key])
                         .font(.subheadline.weight(.bold))
                 }
-                .foregroundStyle(active ? Palette.stat(key) : Palette.secondary)
+                .foregroundStyle(active ? Palette.stat(key) : Color(hex: 0xAAAAAA))
                 .frame(maxWidth: .infinity)
-                .frame(height: 46)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(active ? Palette.stat(key).opacity(0.12) : Palette.background)
-                )
                 if key == .s {
                     Button {
                         Haptics.play(.light)
@@ -220,7 +271,7 @@ struct BaseStatsRow: View {
                             .overlay(alignment: .topTrailing) {
                                 Icon(name: "speed", size: 10)
                                     .foregroundStyle(Palette.stat(.s).opacity(0.7))
-                                    .padding(4)
+                                    .offset(x: -6)
                             }
                     }
                     .buttonStyle(PressableStyle())
@@ -234,7 +285,7 @@ struct BaseStatsRow: View {
     }
 }
 
-struct MoveCard: View {
+struct MoveSection: View {
     @Environment(AppModel.self) private var model
     let present: (ActiveSheet) -> Void
 
@@ -242,16 +293,16 @@ struct MoveCard: View {
         let side = model.attacker
         let move = model.data.moves[side.move]
         let range = model.multiHitRange
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 6) {
                 Text("わざ").sectionTitle()
                 Spacer()
                 if let move {
-                    TypeIcon(type: move.type, size: 22)
-                    CategoryIcon(category: move.category, size: 20)
+                    TypeIcon(type: move.type, size: 24)
+                    CategoryIcon(category: move.category, size: 22)
                         .foregroundStyle(Palette.secondary)
                     NumberText(model.movePowerText, value: Double(model.movePowerText))
-                        .font(.subheadline.weight(.bold))
+                        .font(.title3.weight(.bold))
                         .foregroundStyle(model.movePowerBoosted ? Palette.boosted : Palette.secondary)
                         .animation(.easeInOut(duration: 0.2), value: model.movePowerBoosted)
                 }
@@ -262,56 +313,52 @@ struct MoveCard: View {
                 present(.move)
             }
 
-            if (range == nil && !model.isAxel) || model.showsPowerUp {
-                HStack(spacing: 8) {
+            if (range == nil && !model.isAxel) || model.showsPowerUp || range != nil {
+                FlowLayout(spacing: 6) {
                     if range == nil, !model.isAxel {
-                        ToggleChip(title: "急所", isOn: side.crit || model.critLocked, locked: model.critLocked, tint: Palette.boosted) {
+                        ToggleChip(title: "急所", isOn: side.crit || model.critLocked, locked: model.critLocked) {
                             model.toggleCrit()
                         }
                     }
                     if model.showsPowerUp {
-                        ToggleChip(title: "威力アップ", isOn: side.powerUp, tint: Palette.boosted) {
+                        ToggleChip(title: "威力アップ", isOn: side.powerUp) {
                             model.togglePowerUp()
                         }
                     }
-                    Spacer(minLength: 0)
+                    if let range {
+                        CountPill(title: "ヒット回数", range: range.min...range.max, value: side.hits) { model.setHits($0) }
+                        CountPill(title: "急所回数", range: 0...max(0, side.hits), value: side.crits) { model.setCrits($0) }
+                    }
                 }
             }
 
-            if let range {
-                CountSegments(title: "ヒット回数", range: range.min...range.max, value: side.hits) { model.setHits($0) }
-                CountSegments(title: "急所回数", range: 0...max(0, side.hits), value: side.crits, tint: Palette.boosted) { model.setCrits($0) }
-            }
-
             if model.isAxel {
-                VStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     ForEach(0..<3, id: \.self) { index in
                         let row = index < side.axel.count ? side.axel[index] : AxelRow()
-                        HStack(spacing: 8) {
+                        HStack(spacing: 6) {
                             Text("\(index + 1)回目")
                                 .font(.footnote.weight(.bold))
                                 .foregroundStyle(Palette.secondary)
-                                .frame(width: 44, alignment: .leading)
+                                .frame(width: 48, alignment: .leading)
                             ToggleChip(title: "威力\(Calc.axelPowers[index]) ヒット", isOn: row.hit) {
                                 model.toggleAxelHit(index)
                             }
-                            ToggleChip(title: "急所", isOn: row.crit, tint: Palette.boosted) {
+                            ToggleChip(title: "急所", isOn: row.crit) {
                                 model.toggleAxelCrit(index)
                             }
                             .disabled(!row.hit)
                             .opacity(row.hit ? 1 : 0.4)
-                            Spacer(minLength: 0)
                         }
                     }
                 }
             }
         }
-        .card()
         .animation(.snappy(duration: 0.25), value: side.move)
     }
 }
 
-struct HPCard: View {
+struct HPSection: View {
     @Environment(AppModel.self) private var model
     let role: Role
 
@@ -321,7 +368,7 @@ struct HPCard: View {
         let now = min(max, Swift.max(1, side.hpNow))
         let ratio = max > 0 ? Double(now) / Double(max) : 1
         let percent = Swift.max(1, Int((ratio * 100).rounded(.down)))
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text("のこりHP").sectionTitle()
                 Spacer()
@@ -337,16 +384,26 @@ struct HPCard: View {
             }
             RatioBar(ratio: ratio, color: Palette.hp(ratio)) { model.setHP(role, ratio: $0) }
         }
-        .card()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("のこりHP \(now)/\(max)")
     }
 }
 
-struct StatCard: View {
+struct StatSection: View {
     @Environment(AppModel.self) private var model
     let role: Role
     let key: StatKey
+
+    var body: some View {
+        StatEditor(role: role, key: key)
+    }
+}
+
+struct StatEditor: View {
+    @Environment(AppModel.self) private var model
+    let role: Role
+    let key: StatKey
+    var title: String?
 
     var body: some View {
         let side = model.side(role)
@@ -356,11 +413,7 @@ struct StatCard: View {
         let bonus = role == .defender && key == .b ? model.output.defRankBonus : 0
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Circle()
-                    .fill(color)
-                    .frame(width: 8, height: 8)
-                    .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-                Text(key.title).sectionTitle()
+                Text(title ?? key.title).sectionTitle()
                 if bonus > 0 {
                     Text("じきゅうりょく +\(bonus)")
                         .font(.caption2.weight(.bold))
@@ -396,13 +449,12 @@ struct StatCard: View {
                 }
             }
         }
-        .card()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(key.title)
     }
 }
 
-struct AbilityCard: View {
+struct AbilitySection: View {
     @Environment(AppModel.self) private var model
     let role: Role
     let present: (ActiveSheet) -> Void
@@ -412,22 +464,20 @@ struct AbilityCard: View {
         let candidates = side.pokemon?.abilities ?? []
         let control = model.abilityControl(role)
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 6) {
+            HStack(spacing: 12) {
                 Text("とくせい").sectionTitle()
                 Spacer(minLength: 8)
                 ScrollView(.horizontal) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 12) {
                         ForEach(candidates, id: \.self) { name in
                             let selected = side.ability == name
                             Button {
                                 model.tapAbilityCandidate(role, name)
                             } label: {
                                 Text(name)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(selected ? Color.white : Palette.accent)
-                                    .padding(.horizontal, 10)
-                                    .frame(height: 26)
-                                    .background(selected ? Palette.accent : Palette.accent.opacity(0.08), in: Capsule())
+                                    .font(.footnote.weight(selected ? .bold : .regular))
+                                    .foregroundStyle(selected ? Palette.accent : Color(hex: 0xAAAAAA))
+                                    .fixedSize()
                             }
                             .buttonStyle(PressableStyle())
                         }
@@ -446,8 +496,7 @@ struct AbilityCard: View {
                     ToggleChip(
                         title: control.label,
                         isOn: model.abilityActive(role),
-                        locked: control == .locked,
-                        tint: Palette.accent
+                        locked: control == .locked
                     ) {
                         model.abilityButtonTapped(role)
                     }
@@ -459,11 +508,10 @@ struct AbilityCard: View {
             }
             .animation(.snappy(duration: 0.25), value: control)
         }
-        .card()
     }
 }
 
-struct ItemCard: View {
+struct ItemSection: View {
     @Environment(AppModel.self) private var model
     let role: Role
     let present: (ActiveSheet) -> Void
@@ -472,21 +520,20 @@ struct ItemCard: View {
         let side = model.side(role)
         VStack(alignment: .leading, spacing: 10) {
             Text("もちもの").sectionTitle()
-            SelectButton(text: side.item) {
+            SelectButton(text: side.item, sprite: side.item) {
                 Haptics.play(.light)
                 present(.item(role))
             }
             if role == .attacker, model.showsMetronome {
-                CountSegments(title: "連続攻撃回数", range: 1...6, value: side.metronome, openEnded: true) { model.setMetronome($0) }
+                CountPill(title: "連続攻撃回数", range: 1...6, value: side.metronome, openEnded: true) { model.setMetronome($0) }
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .card()
         .animation(.snappy(duration: 0.25), value: model.showsMetronome)
     }
 }
 
-struct ConditionCard: View {
+struct ConditionSection: View {
     @Environment(AppModel.self) private var model
     let role: Role
 
@@ -494,15 +541,14 @@ struct ConditionCard: View {
         let side = model.side(role)
         VStack(alignment: .leading, spacing: 10) {
             Text("じょうたい").sectionTitle()
-            FlowLayout(spacing: 8) {
+            FlowLayout(spacing: 6) {
                 ForEach(Rules.conditions(role), id: \.self) { name in
                     let locked = role == .attacker && name == "やけど" && model.burnLocked
-                    ToggleChip(title: name, isOn: side.conditions.contains(name), locked: locked, tint: role == .attacker ? Palette.attack : Palette.accent) {
+                    ToggleChip(title: name, isOn: side.conditions.contains(name), locked: locked) {
                         model.toggleCondition(role, name)
                     }
                 }
             }
         }
-        .card()
     }
 }

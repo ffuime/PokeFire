@@ -64,31 +64,30 @@ struct SpeedSheet: View {
                 VStack(spacing: 14) {
                     if data.count == 2 {
                         HStack(spacing: 10) {
-                            speedItem(data[0])
-                            Text(data[0].now > data[1].now ? ">" : data[0].now < data[1].now ? "<" : "=")
-                                .font(.title.weight(.heavy))
-                                .foregroundStyle(Palette.secondary.opacity(0.6))
-                                .contentTransition(.opacity)
-                            speedItem(data[1])
+                            speedItem(data[0], rival: data[1])
+                            speedItem(data[1], rival: data[0])
                         }
-                        Text(data[0].now == data[1].now ? "同速（先攻はランダム）" : "\(data[0].now > data[1].now ? "攻撃側" : "防御側")が先に動きます")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(Palette.secondary)
+                        Text(data[0].now == data[1].now ? "同速" : "\(data[0].now > data[1].now ? data[0].name : data[1].name)が先攻")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Palette.ink)
                             .contentTransition(.opacity)
-                    }
-
-                    if let role = selected {
-                        SpeedEditor(role: role)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    } else {
-                        Text("ポケモンをタップすると、すばやさを調整できます")
-                            .font(.caption)
-                            .foregroundStyle(Palette.secondary)
                     }
 
                     SpeedGraph(columns: data, cursor: $cursor)
                         .frame(height: 460)
                         .card(padding: 12)
+                        .blur(radius: selected == nil ? 0 : 2)
+                        .opacity(selected == nil ? 1 : 0.55)
+                        .overlay(alignment: .top) {
+                            if let role = selected {
+                                SpeedEditor(role: role) {
+                                    selected = nil
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.top, 6)
+                                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                            }
+                        }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -107,59 +106,77 @@ struct SpeedSheet: View {
         .presentationDragIndicator(.visible)
     }
 
-    private func speedItem(_ column: SpeedColumn) -> some View {
+    private func speedItem(_ column: SpeedColumn, rival: SpeedColumn) -> some View {
         let isSelected = selected == column.role
         let tint = column.role == .attacker ? Palette.attack : Palette.accent
+        let faster = column.now > rival.now
+        let tie = column.now == rival.now
         return Button {
             Haptics.play(.light)
             selected = isSelected ? nil : column.role
         } label: {
-            VStack(spacing: 4) {
-                SpriteView(name: column.name, size: 56)
-                Text(column.role.title)
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(tint)
+            VStack(spacing: 2) {
+                SpriteView(name: column.name, size: 64)
+                    .scaleEffect(isSelected ? 1.08 : 1)
                 NumberText(column.now)
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Palette.ink)
+                    .font(.system(size: 30, weight: .bold))
+                    .foregroundStyle(tie ? Palette.ink : faster ? tint : Color(hex: 0xAAAAAA))
+                    .animation(.easeInOut(duration: 0.25), value: faster)
+                Capsule()
+                    .fill(isSelected ? tint : Color.clear)
+                    .frame(width: 28, height: 3)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(Palette.card)
-                    .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(isSelected ? tint : Color.clear, lineWidth: 2))
-            )
+            .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
-        .accessibilityLabel("\(column.role.title) \(column.name) すばやさ\(column.now)")
+        .accessibilityLabel("\(column.name) すばやさ\(column.now)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 
 private struct SpeedEditor: View {
     @Environment(AppModel.self) private var model
     let role: Role
+    let close: () -> Void
 
     var body: some View {
         let side = model.side(role)
-        let tint = role == .attacker ? Palette.attack : Palette.accent
-        VStack(spacing: 10) {
-            StatCard(role: role, key: .s)
-            FlowLayout(spacing: 8) {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text(side.name)
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                Spacer()
+                Button(action: close) {
+                    CloseButtonLabel(size: 13)
+                        .foregroundStyle(Palette.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Palette.background))
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityLabel("閉じる")
+            }
+            StatEditor(role: role, key: .s)
+            FlowLayout(spacing: 6) {
                 if Calc.speedAbilities[side.ability] != nil {
-                    ToggleChip(title: side.ability, isOn: model.speedAbilityActive(role), tint: tint) {
+                    ToggleChip(title: side.ability, isOn: model.speedAbilityActive(role)) {
                         model.toggleSpeedAbility(role)
                     }
                 }
                 ForEach(Rules.speedConditionNames, id: \.self) { name in
-                    ToggleChip(title: name, isOn: model.speedConditions[role]?.contains(name) ?? false, tint: tint) {
+                    ToggleChip(title: name, isOn: model.speedConditions[role]?.contains(name) ?? false) {
                         model.toggleSpeedCondition(role, name)
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .card()
         }
+        .padding(18)
+        .background(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
+        )
     }
 }
 

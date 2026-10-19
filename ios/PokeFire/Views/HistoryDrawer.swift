@@ -3,10 +3,14 @@ import SwiftUI
 struct HistoryDrawer: View {
     @Environment(AppModel.self) private var model
     let close: () -> Void
+    let dragChanged: (CGFloat) -> Void
+    let dragEnded: (CGFloat, CGFloat) -> Void
 
     @State private var query = ""
     @State private var searching = false
     @FocusState private var focused: Bool
+    @State private var rowFrames: [String: CGRect] = [:]
+    @State private var dragAccepted: Bool?
 
     private struct HistoryGroup: Identifiable {
         var id: String { title }
@@ -73,8 +77,14 @@ struct HistoryDrawer: View {
                         focused = false
                     }
                 } label: {
-                    Icon(name: searching ? "xmark" : "search", size: 20)
-                        .foregroundStyle(Color.black)
+                    Group {
+                        if searching {
+                            CloseButtonLabel(size: 17)
+                        } else {
+                            Icon(name: "search", size: 20)
+                        }
+                    }
+                    .foregroundStyle(Color.black)
                         .frame(width: 46, height: 46)
                         .contentShape(Circle())
                 }
@@ -94,6 +104,14 @@ struct HistoryDrawer: View {
                     TextField("ポケモン・わざで検索", text: $query)
                         .focused($focused)
                         .submitLabel(.search)
+                        .onChange(of: focused) { _, value in
+                            if !value, searching {
+                                withAnimation(.snappy) {
+                                    searching = false
+                                    query = ""
+                                }
+                            }
+                        }
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                 }
@@ -128,10 +146,31 @@ struct HistoryDrawer: View {
                 }
                 .listStyle(.plain)
                 .scrollContentBackground(.hidden)
+                .scrollDismissesKeyboard(.immediately)
                 .environment(\.defaultMinListRowHeight, 10)
             }
         }
         .background(Color.white.ignoresSafeArea())
+        .coordinateSpace(.named("drawer"))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 14, coordinateSpace: .named("drawer"))
+                .onChanged { value in
+                    if dragAccepted == nil {
+                        let horizontal = abs(value.translation.width) > abs(value.translation.height)
+                        let onRow = rowFrames.values.contains { $0.contains(value.startLocation) }
+                        dragAccepted = horizontal && value.translation.width < 0 && !onRow
+                    }
+                    if dragAccepted == true {
+                        dragChanged(value.translation.width)
+                    }
+                }
+                .onEnded { value in
+                    if dragAccepted == true {
+                        dragEnded(value.translation.width, value.predictedEndTranslation.width)
+                    }
+                    dragAccepted = nil
+                }
+        )
         .animation(.snappy, value: model.history)
     }
 
@@ -142,28 +181,47 @@ struct HistoryDrawer: View {
             close()
             model.applyHistory(entry)
         } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
-                    if entry.pinned {
-                        Icon(name: "pin", size: 13)
-                            .foregroundStyle(Palette.accent)
+            HStack(spacing: 8) {
+                HStack(spacing: -16) {
+                    ForEach(Array(entry.attackers.prefix(2)), id: \.self) { name in
+                        SpriteView(name: name, size: 46)
                     }
-                    Text(entry.title)
-                        .font(.system(size: 17))
+                }
+                .frame(minWidth: 46, alignment: .leading)
+                VStack(spacing: 3) {
+                    Text(entry.moves.joined(separator: "・"))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.black)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    HStack(spacing: 4) {
+                        if entry.pinned {
+                            Icon(name: "pin", size: 11)
+                                .foregroundStyle(Palette.accent)
+                        }
+                        Text(Self.timeText(entry))
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.secondary)
+                    }
                 }
-                Text(sub)
-                    .font(.footnote)
-                    .foregroundStyle(Palette.secondary)
-                    .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                SpriteView(name: entry.defender, size: 46)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 9)
+            .padding(.vertical, 6)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 16))
+        .accessibilityLabel("\(entry.title) \(sub)")
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .named("drawer"))
+        } action: { frame in
+            rowFrames[entry.key] = frame
+        }
+        .onDisappear {
+            rowFrames[entry.key] = nil
+        }
+                .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -176,6 +234,7 @@ struct HistoryDrawer: View {
                     Image("trash")
                 }
             }
+            .tint(.red)
         }
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
             Button {

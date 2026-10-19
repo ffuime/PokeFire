@@ -47,6 +47,8 @@ enum Storage {
     static let historyKey = "pokefire-history"
     static let usageKey = "pokefire-usage-v3"
     static let sessionKey = "pokefire-session"
+    static let moveHistoryKey = "pokefire-move-history"
+    static let itemHistoryKey = "pokefire-item-history"
     static let historyLimit = 60
 
     private static func read<T: Decodable>(_ type: T.Type, _ key: String) -> T? {
@@ -72,6 +74,25 @@ enum Storage {
 
     static func rememberPokemon(_ name: String) {
         pokemonHistory = Array(([name] + pokemonHistory.filter { $0 != name }).prefix(30))
+    }
+
+    static var moveHistory: [String] {
+        get { read([String].self, moveHistoryKey) ?? [] }
+        set { write(newValue, moveHistoryKey) }
+    }
+
+    static var itemHistory: [String] {
+        get { read([String].self, itemHistoryKey) ?? [] }
+        set { write(newValue, itemHistoryKey) }
+    }
+
+    static func rememberMove(_ name: String) {
+        moveHistory = Array(([name] + moveHistory.filter { $0 != name }).prefix(30))
+    }
+
+    static func rememberItem(_ name: String) {
+        guard name != "なし" else { return }
+        itemHistory = Array(([name] + itemHistory.filter { $0 != name }).prefix(30))
     }
 
     static var history: [HistoryEntry] {

@@ -129,16 +129,17 @@ struct EnvironmentPill: View {
             HStack(spacing: 6) {
                 Icon(name: "weather_\(model.weather)", size: 16)
                     .foregroundStyle(Palette.environment(model.weather))
-                Text(model.weather == "none" ? "天候" : EnvironmentInfo.weathers.first { $0.key == model.weather }?.label ?? "")
+                Text(EnvironmentInfo.label(weather: model.weather))
                 Text("・")
                     .foregroundStyle(Palette.secondary.opacity(0.6))
                 Icon(name: "field_\(model.field)", size: 16)
                     .foregroundStyle(Palette.environment(model.field))
-                Text(model.field == "none" ? "フィールド" : EnvironmentInfo.fields.first { $0.key == model.field }?.label ?? "")
+                Text(EnvironmentInfo.label(field: model.field))
             }
             .font(.footnote.weight(.semibold))
             .foregroundStyle(Palette.ink)
             .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .padding(.horizontal, 16)
             .frame(height: 44)
             .contentShape(Capsule())
@@ -245,7 +246,7 @@ struct TabChip: View {
                 Label {
                     Text("削除")
                 } icon: {
-                    Image("close_circle")
+                    Image(systemName: "xmark")
                 }
             }
             .disabled(model.tabs.count <= 1)

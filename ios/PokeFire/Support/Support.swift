@@ -280,3 +280,101 @@ extension View {
             .foregroundStyle(Palette.secondary)
     }
 }
+
+enum BundleSprite {
+    private static var cache: [String: UIImage] = [:]
+    private static var missing: Set<String> = []
+
+    static func image(_ name: String) -> UIImage? {
+        if let hit = cache[name] { return hit }
+        if missing.contains(name) { return nil }
+        for candidate in [name, name.precomposedStringWithCanonicalMapping, name.decomposedStringWithCanonicalMapping] {
+            if let path = Bundle.main.path(forResource: candidate, ofType: "png", inDirectory: "sprite"),
+               let image = UIImage(contentsOfFile: path) {
+                cache[name] = image
+                return image
+            }
+        }
+        missing.insert(name)
+        return nil
+    }
+}
+
+struct SpriteIcon: View {
+    let name: String
+    var size: CGFloat = 20
+
+    var body: some View {
+        Group {
+            if let image = BundleSprite.image(name) {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+            } else {
+                Circle()
+                    .fill(Palette.track)
+                    .padding(size * 0.2)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+struct HorizontalPan: UIGestureRecognizerRepresentable {
+    var onChanged: (CGPoint) -> Void
+    var onEnded: () -> Void = {}
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let recognizer = UIPanGestureRecognizer()
+        recognizer.delegate = context.coordinator
+        return recognizer
+    }
+
+    func handleUIGestureRecognizerAction(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        switch recognizer.state {
+        case .began, .changed:
+            onChanged(context.converter.localLocation)
+        case .ended, .cancelled, .failed:
+            onEnded()
+        default:
+            break
+        }
+    }
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y)
+        }
+    }
+}
+
+struct CloseButtonLabel: View {
+    var size: CGFloat = 15
+
+    var body: some View {
+        Image(systemName: "xmark")
+            .font(.system(size: size, weight: .semibold))
+    }
+}
+
+struct UnevenBox: Shape {
+    var strong: CGFloat = 24
+    var weak: CGFloat = 6
+
+    func path(in rect: CGRect) -> Path {
+        UnevenRoundedRectangle(
+            topLeadingRadius: strong,
+            bottomLeadingRadius: weak,
+            bottomTrailingRadius: strong,
+            topTrailingRadius: weak,
+            style: .continuous
+        ).path(in: rect)
+    }
+}

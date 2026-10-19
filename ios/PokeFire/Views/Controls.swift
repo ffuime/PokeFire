@@ -52,7 +52,7 @@ struct SegmentBar: View {
 struct RatioBar: View {
     let ratio: Double
     let color: Color
-    var height: CGFloat = 12
+    var height: CGFloat = 26
     let onChange: (Double) -> Void
 
     var body: some View {
@@ -73,7 +73,7 @@ struct RatioBar: View {
                     }
             )
         }
-        .frame(height: 32)
+        .frame(height: height)
         .animation(.snappy(duration: 0.2), value: ratio)
     }
 }
@@ -178,11 +178,11 @@ struct ToggleChip: View {
                     Icon(name: "lock", size: 13)
                 }
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.footnote.weight(.semibold))
                     .lineLimit(1)
             }
-            .padding(.horizontal, 14)
-            .frame(height: 34)
+            .padding(.horizontal, 12)
+            .frame(height: 28)
             .foregroundStyle(isOn ? Color.white : tint)
             .background {
                 Capsule()
@@ -275,14 +275,125 @@ struct NatureControl: View {
     let nature: Int
     let onChange: (Int) -> Void
 
+    private let options = [9, 10, 11]
+
+    private func color(_ value: Int) -> Color {
+        value == 11 ? Palette.rankUp : value == 9 ? Palette.rankDown : Palette.ink
+    }
+
     var body: some View {
-        Picker("性格補正", selection: Binding(get: { nature }, set: { onChange($0) })) {
-            Text("×0.9").tag(9)
-            Text("×1.0").tag(10)
-            Text("×1.1").tag(11)
+        let index = CGFloat(options.firstIndex(of: nature) ?? 1)
+        GeometryReader { geometry in
+            let width = geometry.size.width / CGFloat(options.count)
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(nature == 10 ? Color.black.opacity(0.06) : color(nature).opacity(0.1))
+                    .frame(width: width - 4, height: geometry.size.height - 4)
+                    .offset(x: index * width + 2)
+                HStack(spacing: 0) {
+                    ForEach(options, id: \.self) { value in
+                        let selected = value == nature
+                        Button {
+                            if !selected { onChange(value) }
+                        } label: {
+                            Text(value == 9 ? "×0.9" : value == 11 ? "×1.1" : "×1.0")
+                                .font(.subheadline.weight(selected ? .bold : .regular))
+                                .foregroundStyle(selected ? color(value) : Palette.secondary)
+                                .frame(width: width, height: geometry.size.height)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(PressableStyle())
+                        .accessibilityAddTraits(selected ? .isSelected : [])
+                    }
+                }
+            }
         }
-        .pickerStyle(.segmented)
-        .frame(maxWidth: 190)
+        .frame(width: 186, height: 40)
+        .overlay(Capsule().strokeBorder(nature == 10 ? Color(hex: 0xDDDDDD) : color(nature).opacity(0.45), lineWidth: 1))
+        .animation(.spring(response: 0.32, dampingFraction: 0.78), value: nature)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("性格補正")
+    }
+}
+
+struct CountPill: View {
+    let title: String
+    let range: ClosedRange<Int>
+    let value: Int
+    var openEnded = false
+    let onChange: (Int) -> Void
+
+    @State private var picking = false
+    @State private var width: CGFloat = 1
+
+    private func label(_ number: Int) -> String {
+        openEnded && number == range.upperBound ? "\(number)+" : "\(number)"
+    }
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(title)
+                .foregroundStyle(Palette.accent.opacity(0.65))
+            NumberText(String(value), value: Double(value))
+                .fontWeight(.bold)
+            Text(openEnded && value == range.upperBound ? "回以上" : "回")
+        }
+        .font(.footnote)
+        .foregroundStyle(Palette.accent)
+        .padding(.horizontal, 12)
+        .frame(height: 28)
+        .background(Capsule().fill(Color.white))
+        .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 1))
+        .contentShape(Capsule())
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = max(1, $0) }
+        .onTapGesture {
+            Haptics.play(.light)
+            picking = true
+        }
+        .gesture(HorizontalPan(onChanged: { location in
+            let numbers = Array(range)
+            guard !numbers.isEmpty else { return }
+            let ratio = max(0, min(0.9999, location.x / width))
+            let next = numbers[Int(ratio * Double(numbers.count))]
+            if next != value {
+                Haptics.play(.selection)
+                onChange(next)
+            }
+        }))
+        .popover(isPresented: $picking) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(title)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.secondary)
+                HStack(spacing: 6) {
+                    ForEach(Array(range), id: \.self) { number in
+                        Button {
+                            onChange(number)
+                            picking = false
+                        } label: {
+                            Text(label(number))
+                                .font(.subheadline.weight(.bold))
+                                .monospacedDigit()
+                                .foregroundStyle(number == value ? Color.white : Palette.accent)
+                                .frame(minWidth: 34, minHeight: 34)
+                                .background(Circle().fill(number == value ? Palette.accent : Palette.accent.opacity(0.1)))
+                        }
+                        .buttonStyle(PressableStyle())
+                    }
+                }
+            }
+            .padding(14)
+            .presentationCompactAdaptation(.popover)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue("\(value)回")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: onChange(min(range.upperBound, value + 1))
+            case .decrement: onChange(max(range.lowerBound, value - 1))
+            @unknown default: break
+            }
+        }
     }
 }
 
@@ -309,16 +420,22 @@ struct CircleIconButton: View {
 struct SelectButton: View {
     let text: String
     var placeholder = "なし"
+    var sprite: String?
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Icon(name: "search", size: 18)
-                    .foregroundStyle(Palette.accent)
+                if let sprite, BundleSprite.image(sprite) != nil {
+                    SpriteIcon(name: sprite, size: 26)
+                } else {
+                    Icon(name: "search", size: 18)
+                        .foregroundStyle(Color(hex: 0xAAAAAA))
+                        .frame(width: 26)
+                }
                 Text(text.isEmpty ? placeholder : text)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(Palette.ink)
+                    .font(.body)
+                    .foregroundStyle(Color.black)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .contentTransition(.opacity)
@@ -328,8 +445,9 @@ struct SelectButton: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 48)
-            .background(Palette.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .background(UnevenBox().fill(Color.white))
+            .overlay(UnevenBox().stroke(Color(hex: 0xDDDDDD), lineWidth: 1))
+            .contentShape(UnevenBox())
         }
         .buttonStyle(PressableStyle())
         .animation(.snappy(duration: 0.2), value: text)

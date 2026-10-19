@@ -16,7 +16,17 @@ struct RootView: View {
             ZStack(alignment: .topLeading) {
                 Color.white.ignoresSafeArea()
 
-                HistoryDrawer(close: { setDrawer(false) })
+                HistoryDrawer(
+                    close: { setDrawer(false) },
+                    dragChanged: { dx in
+                        dragging = true
+                        dragX = min(0, dx)
+                    },
+                    dragEnded: { dx, projected in
+                        dragging = false
+                        setDrawer(!(projected < -width * 0.35 || dx < -width * 0.4))
+                    }
+                )
                     .frame(width: width)
                     .offset(x: (progress - 1) * width * 0.3)
                     .opacity(0.4 + 0.6 * progress)

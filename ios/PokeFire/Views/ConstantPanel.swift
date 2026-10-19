@@ -38,7 +38,6 @@ struct ConstantPanel: View {
                             .contentTransition(.opacity)
                     }
                 }
-                .card()
 
                 Picker("区分", selection: Binding(get: { tab.constant.section }, set: { model.setConstantSection($0) })) {
                     ForEach(info.sections.indices, id: \.self) { index in
@@ -81,7 +80,7 @@ struct ConstantPanel: View {
                                 .monospacedDigit()
                                 .padding(.horizontal, 12)
                                 .frame(width: 96, height: 40)
-                                .background(Palette.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 Text(info.unit)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(Palette.secondary)
@@ -132,7 +131,7 @@ struct ConstantPanel: View {
                         }
                     }
                 }
-                .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .background(Palette.background.opacity(0.7), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .animation(.snappy(duration: 0.25), value: tab.constant.inputs.map(\.id))
 
                 Text(tab.kind == .heel ? "回復は減っているHPの分までしか入らず、ひんしになった後は回復しません。" : "防御側の最大HPを基準に計算します。")
@@ -222,7 +221,7 @@ struct ConstantCounter: View {
             .buttonStyle(PressableStyle())
         }
         .foregroundStyle(count > 0 ? tint : Palette.ink)
-        .background(Capsule().fill(count > 0 ? tint.opacity(0.12) : Palette.background))
+        .background(Capsule().fill(count > 0 ? tint.opacity(0.12) : Color.white))
         .accessibilityElement(children: .combine)
         .accessibilityValue("\(count)回")
         .accessibilityAdjustableAction { direction in
