@@ -485,12 +485,18 @@ struct AbilitySection: View {
                             Button {
                                 model.tapAbilityCandidate(role, name)
                             } label: {
-                                Text(name)
-                                    .font(selected ? .subheadline.weight(.bold) : .footnote)
-                                    .foregroundStyle(selected ? Palette.accent : Color(hex: 0xAAAAAA))
-                                    .fixedSize()
-                                    .contentTransition(.interpolate)
-                                    .animation(.spring(response: 0.35, dampingFraction: 0.75), value: selected)
+                                ZStack {
+                                    Text(name)
+                                        .font(.subheadline.weight(.regular))
+                                        .opacity(selected ? 0 : 1)
+                                    Text(name)
+                                        .font(.subheadline.weight(.heavy))
+                                        .opacity(selected ? 1 : 0)
+                                }
+                                .fixedSize()
+                                .foregroundStyle(selected ? Palette.accent : Color(hex: 0xB0B0B0))
+                                .scaleEffect(selected ? 1.06 : 0.84, anchor: .bottom)
+                                .animation(.spring(response: 0.42, dampingFraction: 0.52), value: selected)
                             }
                             .buttonStyle(PressableStyle())
                         }

@@ -13,7 +13,7 @@ enum TabKind: String, Codable, Hashable {
     var shortLabel: String {
         switch self {
         case .attack: return "攻撃"
-        case .damage: return "定数"
+        case .damage: return "ダメージ"
         case .heel: return "回復"
         }
     }

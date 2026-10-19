@@ -534,7 +534,7 @@ struct EnvironmentSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .frame(maxHeight: .infinity, alignment: .top)
-        .presentationDetents([.height(250)])
+        .presentationDetents([.height(290)])
         .presentationDragIndicator(.visible)
     }
 }
@@ -562,7 +562,6 @@ struct EnvironmentSegments: View {
         ) { index in
             if keys.indices.contains(index) { onSelect(keys[index]) }
         }
-        .frame(height: 52)
-        .padding(.vertical, 6)
+        .frame(height: 64)
     }
 }

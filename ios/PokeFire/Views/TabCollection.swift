@@ -34,6 +34,10 @@ struct TabChipLabel: View {
     }
 }
 
+final class TabCell: UICollectionViewCell {
+    var tabID: Int?
+}
+
 struct TabCollection: UIViewRepresentable {
     let items: [TabItem]
     let active: Int
@@ -54,7 +58,7 @@ struct TabCollection: UIViewRepresentable {
         view.backgroundColor = .clear
         view.showsHorizontalScrollIndicator = false
         view.clipsToBounds = false
-        view.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "tab")
+        view.register(TabCell.self, forCellWithReuseIdentifier: "tab")
         view.dataSource = context.coordinator
         view.delegate = context.coordinator
         view.dragDelegate = context.coordinator
@@ -88,9 +92,26 @@ struct TabCollection: UIViewRepresentable {
         var active = 0
         var model: AppModel
         var dragging = false
+        private var previewKey: String?
 
         init(model: AppModel) {
             self.model = model
+        }
+
+        private func configure(_ cell: UICollectionViewCell, item: TabItem, number: Int, active isActive: Bool) {
+            (cell as? TabCell)?.tabID = item.id
+            cell.contentConfiguration = UIHostingConfiguration {
+                TabChipLabel(item: item, index: number, active: isActive)
+            }
+            .margins(.all, 0)
+        }
+
+        private func relabel(_ collectionView: UICollectionView, order: [TabItem]) {
+            let activeID = items.indices.contains(active) ? items[active].id : nil
+            for case let cell as TabCell in collectionView.visibleCells {
+                guard let id = cell.tabID, let position = order.firstIndex(where: { $0.id == id }) else { continue }
+                configure(cell, item: order[position], number: position, active: id == activeID)
+            }
         }
 
         func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -101,12 +122,7 @@ struct TabCollection: UIViewRepresentable {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "tab", for: indexPath)
             let index = indexPath.item
             if items.indices.contains(index) {
-                let item = items[index]
-                let isActive = index == active
-                cell.contentConfiguration = UIHostingConfiguration {
-                    TabChipLabel(item: item, index: index, active: isActive)
-                }
-                .margins(.all, 0)
+                configure(cell, item: items[index], number: index, active: index == active)
             }
             return cell
         }
@@ -167,7 +183,13 @@ struct TabCollection: UIViewRepresentable {
 
         func collectionView(_ collectionView: UICollectionView, dragSessionDidEnd session: UIDragSession) {
             dragging = false
-            collectionView.reloadData()
+            previewKey = nil
+            relabel(collectionView, order: items)
+        }
+
+        func collectionView(_ collectionView: UICollectionView, dropSessionDidExit session: UIDropSession) {
+            previewKey = nil
+            relabel(collectionView, order: items)
         }
 
         func collectionView(_ collectionView: UICollectionView, canHandle session: UIDropSession) -> Bool {
@@ -175,7 +197,21 @@ struct TabCollection: UIViewRepresentable {
         }
 
         func collectionView(_ collectionView: UICollectionView, dropSessionDidUpdate session: UIDropSession, withDestinationIndexPath destinationIndexPath: IndexPath?) -> UICollectionViewDropProposal {
-            guard session.localDragSession != nil else { return UICollectionViewDropProposal(operation: .forbidden) }
+            guard let local = session.localDragSession else { return UICollectionViewDropProposal(operation: .forbidden) }
+            if let id = local.items.first?.localObject as? Int,
+               let from = items.firstIndex(where: { $0.id == id }),
+               let destination = destinationIndexPath, !items.isEmpty {
+                let target = min(items.count - 1, max(0, destination.item))
+                let key = "\(id)>\(target)"
+                if key != previewKey {
+                    previewKey = key
+                    var order = items
+                    let moved = order.remove(at: from)
+                    order.insert(moved, at: target)
+                    relabel(collectionView, order: order)
+                    if target != from { Haptics.play(.selection) }
+                }
+            }
             return UICollectionViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
         }
 
@@ -190,9 +226,10 @@ struct TabCollection: UIViewRepresentable {
             }, completion: nil)
             coordinator.drop(dropItem.dragItem, toItemAt: destination)
             dragging = false
+            previewKey = nil
             model.reorderTab(from: source.item, to: target)
             active = model.active
-            collectionView.reloadData()
+            relabel(collectionView, order: items)
         }
     }
 }
