@@ -795,6 +795,7 @@ const runCalc = () => {
     Object.assign(calcState, { entries, attacks, def, hp, multi, summary });
     fillResult($(".card_result"), "card_result", hp, summary.min, summary.max, summary.text, summary.rate);
     pushNativeState();
+    recordHistory();
     if ($("section.speed.is-open")) renderSpeed();
     refreshConstantPanel();
     if ($("section.detail.is-open")) renderDetail();
@@ -872,7 +873,7 @@ const flowItemHtml = (entry, index) => {
     if (entry.kind !== "attack") {
         const { parts, total } = entry.constant;
         const sign = entry.kind === "damage" ? "" : "+";
-        return `<div class="detail_overview_flow_item is-static ${entry.kind}">
+        return `<div class="detail_overview_flow_item is-constant ${entry.kind}${entry.tab.id === detailSelected ? " selected" : ""}" data-id="${entry.tab.id}">
             <div class="detail_overview_flow_closing">
                 <p class="detail_overview_flow_num">${index + 1}</p>
                 <div class="detail_overview_flow_info">
@@ -964,9 +965,11 @@ const detailQuery = (selector) => $(`section.detail ${selector}`);
 const uniqueJoin = (values, separator = "・") => [...new Set(values.filter(Boolean))].join(separator);
 
 const detailView = () => {
-    const { attacks, multi } = calcState;
+    const { attacks, multi, entries } = calcState;
     const entry = attacks.find((e) => e.tab.id === detailSelected);
     if (entry) return { sum: false, list: [entry] };
+    const constant = entries.find((e) => e.kind !== "attack" && e.tab.id === detailSelected);
+    if (constant) return { sum: false, list: [], constant };
     detailSelected = multi ? "sum" : attacks[0]?.tab.id ?? null;
     return { sum: multi, list: multi ? attacks : attacks.slice(0, 1) };
 };
@@ -976,7 +979,6 @@ const renderHppm = (list) => {
     const q = detailQuery;
     const effects = list.flatMap((e) => hpEffects(e, def));
     q(".detail_hppm").hidden = !effects.length;
-    q(".hr").hidden = !effects.length;
     if (!effects.length) return;
     const totals = [0, 1].map((i) => effects.reduce((sum, e) => sum + e.p[i], 0));
     const lo = Math.min(...totals);
@@ -1009,12 +1011,20 @@ const renderHppm = (list) => {
 
 function renderView() {
     const detail = $("section.detail");
-    const { def, hp, attacks } = calcState;
-    if (!detail || !def || !attacks.length) return;
-    const { sum, list } = detailView();
+    const { def, hp, attacks, entries } = calcState;
+    if (!detail || !def || !entries.length) return;
+    const { sum, list, constant } = detailView();
     const q = detailQuery;
     const first = list[0];
     const [atkItem, defItem] = detail.querySelectorAll(".detail_overview_match_item");
+    detail.classList.toggle("is-constant", !!constant);
+    atkItem.style.visibility = constant ? "hidden" : "";
+    if (constant || !attacks.length) {
+        renderConstantView(constant, defItem);
+        syncDividers(detail);
+        return;
+    }
+    q(".detail_overview_log").classList.remove("is-heal");
     const names = [...new Set(list.map((e) => e.atk.name))];
 
     const single = names.length === 1;
@@ -1072,13 +1082,13 @@ function renderView() {
     const firepower = sum ? null : first.result?.info?.firepower;
     const indexBox = q(".detail_index");
     indexBox.hidden = firepower == null;
-    if (indexBox.previousElementSibling?.classList.contains("hr")) indexBox.previousElementSibling.hidden = indexBox.hidden;
     if (firepower != null) setText(q(".detail_index_num"), String(firepower));
     renderAdjust(sum ? null : first);
     const summary = summarize(sum ? calcState.entries : list, hp, sum);
     fillResult(q(".detail_overview_log"), "detail_overview_log", hp, summary.min, summary.max, summary.text, summary.rate);
     renderHppm(list);
     renderCounter(sum ? null : first);
+    syncDividers(detail);
 }
 
 function renderDetail() {
@@ -1093,11 +1103,12 @@ function renderDetail() {
 
 $(".detail_overview_flow")?.addEventListener("click", (e) => {
     const item = e.target.closest(".detail_overview_flow_item");
-    if (!item || item.classList.contains("is-static")) return;
+    if (!item) return;
     const id = item.dataset.id === "sum" ? "sum" : Number(item.dataset.id);
     const next = id !== "sum" && id === detailSelected && calcState.multi ? "sum" : id;
     if (next === detailSelected) return;
     detailSelected = next;
+    haptic(next === "sum" ? "soft" : "light");
     item.parentElement.querySelectorAll(".detail_overview_flow_item").forEach((other) => {
         const selected = other.dataset.id === String(next);
         if (other.classList.contains("selected") === selected) return;
@@ -1264,4 +1275,48 @@ const renderAdjust = (entry) => {
         </tr>`;
     });
     $(".detail_adjust_table", box).innerHTML = `<tr><th>${STAT_LETTERS[offenseKey]} 確定1発</th><th>H 確定耐え</th><th>${STAT_LETTERS[defenseKey]} 確定耐え</th></tr>${rows.join("")}`;
+};
+
+const syncDividers = (root) => {
+    let seen = false;
+    let pending = null;
+    [...root.children].forEach((el) => {
+        if (el.matches("header, .detail_credit")) return;
+        if (el.classList.contains("hr")) {
+            el.hidden = true;
+            if (seen && !pending) pending = el;
+            return;
+        }
+        if (el.hidden) return;
+        if (pending) {
+            pending.hidden = false;
+            pending = null;
+        }
+        seen = true;
+    });
+};
+
+const renderConstantView = (entry, defItem) => {
+    const q = detailQuery;
+    const { def, hp } = calcState;
+    defItem.querySelector(".detail_overview_match_sprite img").src = spriteOf(calcData.pokemons[def.name]);
+    defItem.querySelector(".detail_overview_match_sprite_types").innerHTML = typesHtml(def.types);
+    setText(defItem.querySelector(".detail_overview_match_name"), def.name);
+    setText(defItem.querySelector(".detail_overview_match_stat"), statText(def, ["h"]));
+    const kind = entry?.kind ?? "damage";
+    const { parts, total } = entry?.constant ?? { parts: [], total: 0 };
+    setText(q(".detail_overview_match_detail_move"), CONSTANT_KINDS[kind].title);
+    q(".detail_overview_match_detail_info").hidden = true;
+    q(".detail_overview_others").hidden = true;
+    q(".detail_overview_environment").hidden = true;
+    const heal = kind === "heel";
+    const amount = heal ? -total : total;
+    const log = q(".detail_overview_log");
+    fillResult(log, "detail_overview_log", hp, amount, amount, parts.map((p) => p.label).join("・") || "なし", null);
+    if (heal) {
+        setText(q(".detail_overview_log_damage_percent"), `+${fixed1((total / Math.max(1, hp.max)) * 100)}%`);
+        setText(q(".detail_overview_log_damage_num_take"), `+${total}`);
+    }
+    log.classList.toggle("is-heal", heal);
+    ["detail_index", "detail_adjust", "detail_hppm", "detail_counter"].forEach((name) => { q(`.${name}`).hidden = true; });
 };

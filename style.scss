@@ -356,6 +356,279 @@ p.toast {
     }
 }
 
+.gohistory {
+    position: absolute;
+    left: 0;
+    top: 0;
+    display: grid;
+    place-items: center;
+    width: 56px;
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 0 0 28px 0;
+    background-color: transparent;
+    cursor: pointer;
+
+    svg {
+        display: block;
+        width: 24px;
+        fill: none;
+        stroke: #aaa;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+}
+
+aside.history {
+    position: fixed;
+    inset: 0;
+    z-index: 130;
+    background-color: #0000;
+    pointer-events: none;
+    transition: background-color .3s ease;
+
+    &.is-open {
+        background-color: #0004;
+        pointer-events: all;
+
+        .history_panel {
+            translate: 0 0;
+        }
+    }
+    .history_panel {
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        width: min(86vw, 360px);
+        padding-top: env(safe-area-inset-top);
+        background-color: #f7f7fa;
+        border-radius: 0 28px 28px 0;
+        box-shadow: 0 0 48px -16px #0006;
+        translate: -105% 0;
+        transition: translate .35s cubic-bezier(.2, .8, .2, 1);
+    }
+    .history_header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-shrink: 0;
+        height: 56px;
+        padding-inline: 1.25rem .5rem;
+
+        p.ttl {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #333;
+        }
+        button.history_close {
+            display: grid;
+            place-items: center;
+            width: 40px;
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 50%;
+            background-color: transparent;
+            cursor: pointer;
+
+            svg {
+                width: 22px;
+                fill: none;
+                stroke: #888;
+                stroke-width: 2.2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+        }
+    }
+    .history_list {
+        flex: 1;
+        padding: 0 .5rem 2rem;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+    p.history_group {
+        margin: 14px .75rem 6px;
+        font-size: .74rem;
+        font-weight: 700;
+        color: #999;
+    }
+    p.history_empty {
+        margin: 32px 1rem;
+        font-size: .86rem;
+        line-height: 1.6;
+        color: #aaa;
+        text-align: center;
+    }
+    .history_item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 6px 8px 10px;
+        border-radius: 16px;
+        cursor: pointer;
+        transition: background-color .15s ease;
+
+        &:active {
+            background-color: #0000000d;
+        }
+        .history_item_sprites {
+            display: flex;
+            align-items: center;
+            flex-shrink: 0;
+            width: 64px;
+            height: 36px;
+            overflow: visible;
+
+            img {
+                width: 36px;
+                height: 36px;
+                object-fit: contain;
+
+                & + img {
+                    margin-left: -12px;
+                }
+            }
+        }
+        .history_item_text {
+            flex: 1;
+            min-width: 0;
+
+            p {
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+            }
+            p.history_item_title {
+                font-size: .86rem;
+                font-weight: 700;
+                color: #333;
+            }
+            p.history_item_sub {
+                margin-top: 2px;
+                font-size: .72rem;
+                color: #999;
+            }
+        }
+        button {
+            display: grid;
+            place-items: center;
+            flex-shrink: 0;
+            width: 32px;
+            aspect-ratio: 1;
+            border: none;
+            border-radius: 50%;
+            background-color: transparent;
+            cursor: pointer;
+
+            svg {
+                width: 17px;
+                fill: none;
+                stroke: #bbb;
+                stroke-width: 2;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+            }
+        }
+        &.is-pinned button.history_item_pin svg {
+            fill: #535ca8;
+            stroke: #535ca8;
+        }
+    }
+}
+
+div.share_loading p.share_loading_text {
+    position: absolute;
+    top: calc(50% + 40px);
+    left: 0;
+    right: 0;
+    font-size: .86rem;
+    line-height: 1.7;
+    color: #555;
+    text-align: center;
+
+    b {
+        display: block;
+        font-size: .8rem;
+        color: #535ca8;
+    }
+}
+
+a.open_in_app {
+    position: fixed;
+    left: 50%;
+    top: calc(env(safe-area-inset-top) + 12px);
+    z-index: 140;
+    padding: 10px 18px;
+    border-radius: 24px;
+    background-color: #535ca8;
+    box-shadow: 0 8px 24px -8px #535ca8aa;
+    font-size: .86rem;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    translate: -50% 0;
+    transition: opacity .3s ease, translate .3s ease;
+
+    &.is-hiding {
+        opacity: 0;
+        translate: -50% -12px;
+        pointer-events: none;
+    }
+}
+
+main .main_pokemon_choose.has-tabs {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: start;
+
+    > * {
+        grid-column: 2;
+    }
+    .main_pokemon_choose_tabs {
+        position: sticky;
+        top: 0;
+        grid-column: 1;
+        grid-row: 1 / span 3;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 10px 0 10px 6px;
+
+        button {
+            padding: 10px 0;
+            border: none;
+            border-radius: 14px;
+            background-color: #0000000a;
+            font-size: .72rem;
+            font-weight: 700;
+            color: #888;
+            writing-mode: vertical-rl;
+            text-orientation: upright;
+            letter-spacing: .1em;
+            cursor: pointer;
+            transition: background-color .2s ease, color .2s ease;
+
+            &.active {
+                background-color: #535ca8;
+                color: #fff;
+            }
+        }
+    }
+    .main_pokemon_choose_list[data-empty]::after {
+        content: attr(data-empty);
+        display: block;
+        padding: 24px 12px;
+        font-size: .82rem;
+        color: #aaa;
+        text-align: center;
+    }
+}
+
+
 section.order_container {
     position: absolute;
     left: 0;
@@ -2914,13 +3187,8 @@ section.detail {
                 &.sum {
                     padding-right: 32px;
                 }
-                &.is-static {
-                    cursor: default;
+                &.is-constant {
                     padding-right: 32px;
-
-                    &:active {
-                        scale: 1;
-                    }
                 }
                 &.selected {
                     border-color: #ffd5d5;
@@ -3935,14 +4203,172 @@ main .main_basestats_item.s {
     cursor: pointer;
 }
 
+@mixin native-gloss {
+    background-color: #eceef6d9 !important;
+    background-image: linear-gradient(180deg, #ffffffe6 0%, #ffffff40 60%, #ffffff00 100%) !important;
+    border: 1px solid #1e28500f !important;
+    box-shadow: inset 0 1px 0 #ffffff, inset 0 -1px 1px #1e28500a, 0 4px 12px -6px #1e28503d !important;
+}
+
+@mixin native-tinted($color) {
+    background-color: $color !important;
+    background-image: linear-gradient(180deg, #ffffff47 0%, #ffffff00 55%) !important;
+    border-color: #ffffff59 !important;
+    box-shadow: inset 0 1px 1px #ffffff80, 0 8px 18px -10px rgba($color, .7) !important;
+    color: #fff !important;
+}
+
+@mixin native-panel($radius: 28px) {
+    background-color: #f8f8fcb3 !important;
+    background-image: linear-gradient(160deg, #ffffffb3, #ffffff33) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid #ffffffcc !important;
+    box-shadow: inset 0 1px 1px #ffffffe6, 0 18px 48px -18px #1e28506b !important;
+    border-radius: $radius !important;
+}
+
+@mixin native-spring {
+    transition: scale .45s cubic-bezier(.3, 1.6, .5, 1), background-color .25s ease, color .25s ease, opacity .25s ease !important;
+
+    &:active:not(:disabled) {
+        scale: 1.07;
+    }
+}
+
 html.is-native {
-    section.order_container, .order_choose_container, .card_result {
-        display: none;
+    section.order_container, .order_choose_container, .card_result, section.modal_environment_container, .gohistory, a.gohelp {
+        display: none !important;
     }
     main {
         margin-block: 104px 248px;
     }
-    a.gohelp {
-        display: none;
+
+    main {
+        button.main_condition_item, button.main_move_weak, button.main_move_powerup, button.main_ability_on, button.main_type_choose_reset,
+        .main_move_axel_row button, label.main_count {
+            @include native-gloss;
+            @include native-spring;
+            border-radius: 999px !important;
+            color: #535ca8;
+
+            &.active {
+                @include native-tinted(#535ca8);
+            }
+        }
+        button.main_move_choose, button.main_ability_choose, button.main_item_choose {
+            @include native-gloss;
+            border-radius: 18px !important;
+            @include native-spring;
+        }
+        .main_evs_ranks select {
+            @include native-gloss;
+            border-radius: 999px !important;
+        }
+        .main_evs_ranks_btn, .main_constant_counter button {
+            @include native-gloss;
+            @include native-spring;
+            border-radius: 50% !important;
+        }
+        .main_evs_nature {
+            border: none !important;
+            background-color: #7676801f;
+            border-radius: 999px !important;
+
+            &::before {
+                top: 2px !important;
+                height: calc(100% - 4px) !important;
+                background-color: #fff !important;
+                box-shadow: 0 3px 8px -2px #0000002e, 0 0 0 .5px #0000000a !important;
+                border-radius: 999px !important;
+                transition: translate .45s cubic-bezier(.3, 1.35, .5, 1) !important;
+            }
+            div:active {
+                scale: .94;
+            }
+        }
+        .main_search_change, .main_search_otherforms_close, button.main_choose_close {
+            @include native-gloss;
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            backdrop-filter: blur(16px) saturate(180%);
+            @include native-spring;
+            border-radius: 50% !important;
+        }
+        .main_search_otherforms.active {
+            @include native-panel(24px);
+        }
+        .main_pokemon_choose, .main_type_choose {
+            @include native-panel(28px);
+
+            .main_pokemon_choose_tabs button {
+                @include native-gloss;
+                @include native-spring;
+                border-radius: 999px !important;
+                color: #535ca8;
+
+                &.active {
+                    @include native-tinted(#535ca8);
+                }
+            }
+        }
+    }
+
+    button.changethem {
+        @include native-panel(32px);
+        @include native-spring;
+    }
+
+    section.detail {
+        header button {
+            @include native-gloss;
+            @include native-spring;
+            border-radius: 50% !important;
+        }
+        .detail_overview_flow_item {
+            @include native-gloss;
+            border-radius: 22px !important;
+
+            &.selected {
+                @include native-panel(22px);
+                border-color: #ffd5d5 !important;
+            }
+        }
+    }
+
+    section.speed {
+        .speed_pokemon_evs {
+            @include native-panel(28px);
+        }
+        button.main_evs_condition_item {
+            @include native-gloss;
+            @include native-spring;
+            border-radius: 999px !important;
+
+            &.active {
+                @include native-tinted(#535ca8);
+            }
+        }
+    }
+
+    aside.history .history_panel {
+        @include native-panel(28px);
+        border-radius: 0 28px 28px 0 !important;
+    }
+
+    .num-roll {
+        animation: num-roll .34s cubic-bezier(.2, .9, .3, 1.15);
+    }
+}
+
+@keyframes num-roll {
+    from {
+        opacity: .15;
+        filter: blur(3px);
+        translate: 0 .32em;
+    }
+    to {
+        opacity: 1;
+        filter: blur(0);
+        translate: 0 0;
     }
 }

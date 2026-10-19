@@ -27,17 +27,26 @@ struct ContentView: View {
             .allowsHitTesting(!barsHidden)
             .animation(.spring(duration: 0.35), value: barsHidden)
         }
-        .overlay(alignment: .topTrailing) {
-            TopMenu(store: store)
-                .padding(.trailing, 12)
+        .overlay(alignment: .top) {
+            TopBar(store: store)
+                .padding(.horizontal, 12)
                 .padding(.top, 4)
         }
         .ignoresSafeArea(.keyboard)
+        .preferredColorScheme(.light)
         .sheet(item: $store.shareItem) { item in
             ActivityView(items: [item.url])
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $store.showEnvironment) {
+            EnvironmentSheet(store: store)
+                .presentationDetents([.height(320)])
+                .presentationDragIndicator(.visible)
+        }
         .sensoryFeedback(.selection, trigger: store.result.judge)
+        .onOpenURL { url in
+            store.open(url)
+        }
     }
 }
 
@@ -61,44 +70,167 @@ struct ActivityView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
-struct TopMenu: View {
+struct IconImage: View {
+    let name: String
+    var size: CGFloat = 20
+
+    var body: some View {
+        Image(name)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+    }
+}
+
+struct GlassCircleButton: View {
+    let icon: String
+    var size: CGFloat = 20
+    var haptic = "light"
+    let action: () -> Void
+
+    var body: some View {
+        Button {
+            Haptics.play(haptic)
+            action()
+        } label: {
+            IconImage(name: icon, size: size)
+                .foregroundStyle(Color(red: 0.33, green: 0.36, blue: 0.5))
+                .frame(width: 42, height: 42)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+    }
+}
+
+enum EnvironmentStyle {
+    static let weathers: [(key: String, label: String)] = [("none", "なし"), ("sun", "にほんばれ"), ("rain", "あめ"), ("sand", "すなあらし"), ("snow", "ゆき")]
+    static let fields: [(key: String, label: String)] = [("none", "なし"), ("electric", "エレキ"), ("grass", "グラス"), ("psycho", "サイコ"), ("mist", "ミスト")]
+
+    static func label(_ kind: String, _ key: String) -> String {
+        if key == "none" { return kind == "weather" ? "天候" : "フィールド" }
+        let list = kind == "weather" ? weathers : fields
+        return list.first(where: { $0.key == key })?.label ?? key
+    }
+
+    static func tint(_ key: String) -> Color {
+        switch key {
+        case "sun": return Color(red: 0.95, green: 0.55, blue: 0.2)
+        case "rain": return Color(red: 0.25, green: 0.5, blue: 0.9)
+        case "sand": return Color(red: 0.72, green: 0.58, blue: 0.36)
+        case "snow": return Color(red: 0.35, green: 0.72, blue: 0.85)
+        case "electric": return Color(red: 0.92, green: 0.72, blue: 0.1)
+        case "grass": return Color(red: 0.3, green: 0.68, blue: 0.35)
+        case "psycho": return Color(red: 0.88, green: 0.36, blue: 0.62)
+        case "mist": return Color(red: 0.62, green: 0.5, blue: 0.85)
+        default: return Color(red: 0.33, green: 0.36, blue: 0.66)
+        }
+    }
+}
+
+struct TopBar: View {
     @ObservedObject var store: WebStore
 
     var body: some View {
-        Group {
+        HStack(spacing: 8) {
             if store.onMainPage {
-                Menu {
-                    Button("共有", systemImage: "square.and.arrow.up") {
-                        store.command("share()")
-                    }
-                    Button("すばやさ比較", systemImage: "figure.run") {
-                        store.command("openSpeed()")
-                    }
-                    Button("ヘルプ", systemImage: "questionmark.circle") {
-                        store.openHelp()
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                GlassCircleButton(icon: "history") {
+                    store.openHistory()
                 }
-                .glassEffect(.regular.interactive(), in: Circle())
-                .opacity(store.covered ? 0 : 1)
-                .allowsHitTesting(!store.covered)
+                Spacer(minLength: 4)
+                EnvironmentPill(store: store)
+                Spacer(minLength: 4)
+                GlassCircleButton(icon: "help") {
+                    store.openHelp()
+                }
             } else {
-                Button {
-                    Haptics.play("light")
+                Spacer()
+                GlassCircleButton(icon: "close", size: 26) {
                     store.goHome()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .bold))
-                        .frame(width: 40, height: 40)
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Circle())
             }
         }
+        .opacity(store.onMainPage && (store.covered || !store.ready) ? 0 : 1)
+        .allowsHitTesting(!(store.onMainPage && (store.covered || !store.ready)))
         .animation(.easeInOut(duration: 0.2), value: store.covered)
+    }
+}
+
+struct EnvironmentPill: View {
+    @ObservedObject var store: WebStore
+
+    var body: some View {
+        let environment = store.environment
+        Button {
+            Haptics.play("light")
+            store.showEnvironment = true
+        } label: {
+            HStack(spacing: 6) {
+                IconImage(name: "weather_\(environment.weather)", size: 16)
+                    .foregroundStyle(EnvironmentStyle.tint(environment.weather))
+                Text(EnvironmentStyle.label("weather", environment.weather))
+                Text("・")
+                    .foregroundStyle(.secondary)
+                IconImage(name: "field_\(environment.field)", size: 16)
+                    .foregroundStyle(EnvironmentStyle.tint(environment.field))
+                Text(EnvironmentStyle.label("field", environment.field))
+            }
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color(red: 0.25, green: 0.27, blue: 0.35))
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .contentTransition(.opacity)
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Capsule())
+        .animation(.snappy, value: environment)
+    }
+}
+
+struct EnvironmentSheet: View {
+    @ObservedObject var store: WebStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            row(title: "天候", kind: "weather", items: EnvironmentStyle.weathers, selected: store.environment.weather)
+            row(title: "フィールド", kind: "field", items: EnvironmentStyle.fields, selected: store.environment.field)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 28)
+        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func row(title: String, kind: String, items: [(key: String, label: String)], selected: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(.secondary)
+            GlassEffectContainer(spacing: 8) {
+                HStack(spacing: 8) {
+                    ForEach(items, id: \.key) { item in
+                        let active = item.key == selected
+                        Button {
+                            Haptics.play("selection")
+                            store.setEnvironment(kind, item.key)
+                        } label: {
+                            VStack(spacing: 6) {
+                                IconImage(name: "\(kind)_\(item.key)", size: 24)
+                                Text(item.label)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                            }
+                            .foregroundStyle(active ? Color.white : EnvironmentStyle.tint(item.key))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 70)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(active ? .regular.tint(EnvironmentStyle.tint(item.key)).interactive() : .regular.interactive(), in: RoundedRectangle(cornerRadius: 20))
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -128,22 +260,28 @@ struct TabStrip: View {
                 }
 
                 Menu {
-                    Button("ポケモンの攻撃", systemImage: TabStyle.symbol("attack")) {
+                    Button {
                         Haptics.play("medium")
                         store.command("add('attack')")
+                    } label: {
+                        Label { Text("ポケモンの攻撃") } icon: { Image("tab_attack") }
                     }
-                    Button("定数ダメージ", systemImage: TabStyle.symbol("damage")) {
+                    Button {
                         Haptics.play("medium")
                         store.command("add('damage')")
+                    } label: {
+                        Label { Text("定数ダメージ") } icon: { Image("tab_damage") }
                     }
-                    Button("定数回復", systemImage: TabStyle.symbol("heel")) {
+                    Button {
                         Haptics.play("medium")
                         store.command("add('heel')")
+                    } label: {
+                        Label { Text("定数回復") } icon: { Image("tab_heel") }
                     }
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 17, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                    IconImage(name: "add", size: 18)
+                        .foregroundStyle(Color(red: 0.25, green: 0.27, blue: 0.35))
+                        .frame(width: 42, height: 42)
                 }
                 .glassEffect(.regular.interactive(), in: Circle())
             }
@@ -152,11 +290,11 @@ struct TabStrip: View {
 }
 
 enum TabStyle {
-    static func symbol(_ kind: String) -> String {
+    static func icon(_ kind: String) -> String {
         switch kind {
-        case "damage": return "heart.slash.fill"
-        case "heel": return "heart.fill"
-        default: return "bolt.fill"
+        case "damage": return "tab_damage"
+        case "heel": return "tab_heel"
+        default: return "tab_attack"
         }
     }
 
@@ -176,44 +314,47 @@ struct TabChip: View {
 
     var body: some View {
         let position = tab.index - 1
-        Button {
-            guard !active else { return }
-            Haptics.play("light")
-            store.command("activate(\(position))")
+        Menu {
+            Button {
+                Haptics.play("light")
+                store.command("move(\(position), -1)")
+            } label: {
+                Label { Text("左へ移動") } icon: { Image("move_left") }
+            }
+            .disabled(position == 0)
+            Button {
+                Haptics.play("light")
+                store.command("move(\(position), 1)")
+            } label: {
+                Label { Text("右へ移動") } icon: { Image("move_right") }
+            }
+            .disabled(position >= store.tabs.count - 1)
+            Divider()
+            Button(role: .destructive) {
+                Haptics.play("medium")
+                store.command("remove(\(position))")
+            } label: {
+                Label { Text("削除") } icon: { Image("close") }
+            }
+            .disabled(store.tabs.count <= 1)
         } label: {
             HStack(spacing: 5) {
                 Text("\(tab.index)")
                     .font(.system(size: 12, weight: .heavy))
                     .monospacedDigit()
-                Image(systemName: TabStyle.symbol(tab.kind))
-                    .font(.system(size: 12, weight: .semibold))
+                IconImage(name: TabStyle.icon(tab.kind), size: 14)
                 Text(tab.label)
                     .font(.system(size: 14, weight: .semibold))
             }
-            .foregroundStyle(active ? Color.white : Color.primary)
+            .foregroundStyle(active ? Color.white : Color(red: 0.25, green: 0.27, blue: 0.35))
             .padding(.horizontal, 12)
             .frame(height: 34)
+        } primaryAction: {
+            guard !active else { return }
+            Haptics.play("light")
+            store.command("activate(\(position))")
         }
-        .buttonStyle(.plain)
         .glassEffect(active ? .regular.tint(TabStyle.tint(tab.kind)).interactive() : .regular.interactive(), in: Capsule())
-        .contextMenu {
-            Button("左へ移動", systemImage: "arrow.left") {
-                Haptics.play("light")
-                store.command("move(\(position), -1)")
-            }
-            .disabled(position == 0)
-            Button("右へ移動", systemImage: "arrow.right") {
-                Haptics.play("light")
-                store.command("move(\(position), 1)")
-            }
-            .disabled(position >= store.tabs.count - 1)
-            Divider()
-            Button("削除", systemImage: "trash", role: .destructive) {
-                Haptics.play("medium")
-                store.command("remove(\(position))")
-            }
-            .disabled(store.tabs.count <= 1)
-        }
     }
 }
 
@@ -232,6 +373,7 @@ struct ResultCard: View {
                 Text(result.damage)
                     .font(.system(size: 15, weight: .semibold))
                     .monospacedDigit()
+                    .contentTransition(.numericText())
                 Text("/ \(result.hp)")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
@@ -244,8 +386,8 @@ struct ResultCard: View {
                     Haptics.play("light")
                     store.command("openSpeed()")
                 } label: {
-                    Image(systemName: "figure.run")
-                        .font(.system(size: 15, weight: .semibold))
+                    IconImage(name: "speed", size: 19)
+                        .foregroundStyle(Color(red: 0.22, green: 0.4, blue: 0.65))
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(.plain)
@@ -256,11 +398,13 @@ struct ResultCard: View {
                 Text(result.judge)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundStyle(Color(red: 0.22, green: 0.4, blue: 0.65))
+                    .contentTransition(.numericText())
                 if !result.rate.isEmpty {
                     Text(result.rate)
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.secondary)
                         .monospacedDigit()
+                        .contentTransition(.numericText())
                 }
             }
         }

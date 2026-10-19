@@ -13,6 +13,14 @@ targets:
         type: folder
         buildPhase: resources
     scheme: {}
+    info:
+      path: PokeFire/Info.plist
+      properties:
+        UIUserInterfaceStyle: Light
+        CFBundleURLTypes:
+          - CFBundleURLName: me.ffui.pokefire
+            CFBundleURLSchemes:
+              - pokefire
     settings:
       base:
         PRODUCT_NAME: PokeFire

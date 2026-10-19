@@ -3,7 +3,16 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const nativeBridge = window.webkit?.messageHandlers?.pokefire;
 const isNative = !!nativeBridge;
 const postNative = (message) => nativeBridge?.postMessage(message);
-const haptic = (style = "light") => postNative({ type: "haptic", style });
+let lastSelectionHaptic = 0;
+const haptic = (style = "light") => {
+    if (!nativeBridge) return;
+    if (style === "selection") {
+        const now = performance.now();
+        if (now - lastSelectionHaptic < 35) return;
+        lastSelectionHaptic = now;
+    }
+    postNative({ type: "haptic", style });
+};
 if (isNative) document.documentElement.classList.add("is-native");
 
 const jsonCache = {};
@@ -353,7 +362,10 @@ $$(".main_hpleft_range").forEach((range) => {
     const side = range.closest("main");
     bindDrag(range, (ratio) => {
         const max = parseInt(side.querySelector(".main_evs_h .main_evs_header_value")?.textContent, 10) || 1;
+        const box = side.querySelector(".main_hpleft");
+        const before = box?.dataset.now;
         syncHpLeft(side, Math.ceil(ratio * max));
+        if (box?.dataset.now !== before) haptic("selection");
     });
 });
 
@@ -764,6 +776,21 @@ chooseOverlays.forEach((overlay) => {
     overlay.addEventListener("mousedown", (e) => e.preventDefault());
 });
 
+const POKEMON_HISTORY_KEY = "pokefire-pokemon-history";
+const loadPokemonHistory = () => {
+    try {
+        return JSON.parse(localStorage.getItem(POKEMON_HISTORY_KEY)) ?? [];
+    } catch {
+        return [];
+    }
+};
+const rememberPokemon = (name) => {
+    const list = [name, ...loadPokemonHistory().filter((other) => other !== name)].slice(0, 30);
+    try {
+        localStorage.setItem(POKEMON_HISTORY_KEY, JSON.stringify(list));
+    } catch {}
+};
+
 function setupPokemonSearch(side) {
     const pokemonSearch = side.querySelector(".main_search_info input");
     const pokemonChoose = side.querySelector(".main_pokemon_choose");
@@ -787,6 +814,8 @@ function setupPokemonSearch(side) {
     };
 
     let pokemonBaseOrder = [];
+    let chooseMode = "usage";
+    let lastQuery = "";
     const renderPokemonList = () => {
         pokemonChooseList.innerHTML = sortWithMegaTree().map(([name, pokemon]) => `
             <div class="main_pokemon_choose_item" data-name="${name}" data-search="${searchTiers(searchTextOf("pokemons", name), toArray(pokemon.types), toArray(pokemon.abilities))}" data-parent="${megaParent(name, pokemon) ?? ""}">
@@ -803,9 +832,23 @@ function setupPokemonSearch(side) {
     };
 
     const filterPokemonList = (query, { resetScroll = false } = {}) => {
-        const items = pokemonBaseOrder.length ? pokemonBaseOrder : [...pokemonChooseList.querySelectorAll(".main_pokemon_choose_item")];
+        lastQuery = query;
+        const base = pokemonBaseOrder.length ? pokemonBaseOrder : [...pokemonChooseList.querySelectorAll(".main_pokemon_choose_item")];
+        let items = base;
+        if (chooseMode === "history") {
+            const history = loadPokemonHistory();
+            const byName = new Map(base.map((item) => [item.dataset.name, item]));
+            items = history.map((name) => byName.get(name)).filter(Boolean);
+            const picked = new Set(items);
+            base.forEach((item) => { if (!picked.has(item)) item.hidden = true; });
+        }
         const tiers = filterBySearch(items, (item) => item.dataset.search, query);
-        pokemonChooseList.append(...sortByTier(items, tiers, (item) => item.dataset.parent || item.dataset.name));
+        const ordered = sortByTier(items, tiers, chooseMode === "history" ? (item) => item.dataset.name : (item) => item.dataset.parent || item.dataset.name);
+        pokemonChooseList.append(...ordered);
+        if (chooseMode === "history") pokemonChooseList.append(...base.filter((item) => item.hidden));
+        const empty = !ordered.some((item) => !item.hidden);
+        if (empty) pokemonChooseList.dataset.empty = chooseMode === "history" && !items.length ? "履歴はまだありません" : "見つかりません";
+        else delete pokemonChooseList.dataset.empty;
         updateMegaTree();
         if (resetScroll) pokemonChoose.scrollTop = 0;
     };
@@ -957,8 +1000,23 @@ function setupPokemonSearch(side) {
             if (first) {
                 selectPokemon(first.dataset.name);
                 applyUsageDefaults(side, first.dataset.name);
+                rememberPokemon(first.dataset.name);
             }
             closePokemonChoose();
+        });
+
+        const chooseTabs = document.createElement("div");
+        chooseTabs.className = "main_pokemon_choose_tabs";
+        chooseTabs.innerHTML = '<button type="button" data-mode="usage" class="active">使用率</button><button type="button" data-mode="history">履歴</button>';
+        pokemonChoose.prepend(chooseTabs);
+        pokemonChoose.classList.add("has-tabs");
+        chooseTabs.addEventListener("click", (e) => {
+            const button = e.target.closest("button");
+            if (!button || button.dataset.mode === chooseMode) return;
+            chooseMode = button.dataset.mode;
+            chooseTabs.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === button));
+            haptic("selection");
+            filterPokemonList(lastQuery, { resetScroll: true });
         });
 
         pokemonChoose.addEventListener("mousedown", (e) => e.preventDefault());
@@ -971,6 +1029,8 @@ function setupPokemonSearch(side) {
             if (!item) return;
             selectPokemon(item.dataset.name);
             applyUsageDefaults(side, item.dataset.name);
+            rememberPokemon(item.dataset.name);
+            haptic("light");
             closePokemonChoose();
         });
 
@@ -1433,7 +1493,7 @@ document.addEventListener("click", (e) => {
     document.body.scrollTo({ left: toDefender ? document.body.scrollWidth : 0, behavior: "smooth" });
 });
 
-const modalSections = $$("section.modal_searchmove, section.modal_searchability, section.modal_searchitem, section.modal_environment_container, section.detail, section.speed");
+const modalSections = $$("section.modal_searchmove, section.modal_searchability, section.modal_searchitem, section.modal_environment_container, section.detail, section.speed, aside.history");
 const syncScrollLock = () => {
     const locked = [...modalSections].some((section) => section.classList.contains("is-open"));
     document.documentElement.classList.toggle("is-scroll-locked", locked);
@@ -1445,7 +1505,7 @@ syncScrollLock();
 
 document.addEventListener("touchmove", (e) => {
     if (!document.documentElement.classList.contains("is-scroll-locked")) return;
-    const scrollable = e.target.closest("section.modal_searchmove, section.modal_searchability, section.modal_searchitem, section.detail, section.speed");
+    const scrollable = e.target.closest("section.modal_searchmove, section.modal_searchability, section.modal_searchitem, section.detail, section.speed, aside.history");
     if (scrollable?.classList.contains("is-open")) return;
     e.preventDefault();
 }, { passive: false });
@@ -1567,6 +1627,7 @@ if (environment && environmentPanel) {
         pull = null;
     };
     const pullMode = (target) => {
+        if (isNative) return null;
         if (environment.classList.contains("is-open")) return "close";
         if (window.scrollY > 0) return null;
         if (document.body.classList.contains("is-choose-open")) return null;
@@ -1702,13 +1763,21 @@ const snapshotSide = (side) => {
     return state;
 };
 
-const restoreSide = (side, slot, defaults) => {
+const restoreSideStages = (side, slot, defaults) => {
     const role = sideRole(side);
     const get = (key) => slot[key] ?? defaults[key];
     const search = searchOf(side);
-    if (search && slot.pokemon?.name) search.setPokemon(slot.pokemon);
-
-    side.querySelectorAll(".main_evs").forEach((section) => {
+    const pokemonStage = () => {
+        if (search && slot.pokemon?.name) search.setPokemon(slot.pokemon);
+    };
+    const moveStage = () => {
+        side.querySelector("button.main_move_weak")?.classList.toggle("active", !!get("attacker:weak"));
+        const move = get("attacker:move");
+        if (move && movesData[move]) selectMove(move, movesData[move]);
+        const powerUp = side.querySelector("button.main_move_powerup");
+        if (powerUp && !powerUp.hidden) powerUp.classList.toggle("active", !!get("attacker:powerup"));
+    };
+    const evsStage = () => side.querySelectorAll(".main_evs").forEach((section) => {
         const key = evsKeyOf(section);
         const value = key && get(`evs:${key}`);
         if (!value) return;
@@ -1724,51 +1793,60 @@ const restoreSide = (side, slot, defaults) => {
             select.dispatchEvent(new Event("change", { bubbles: true }));
         }
     });
-
-    const ability = get("ability");
-    if (ability?.name) {
-        const label = side.querySelector("button.main_ability_choose p");
-        if (label) label.textContent = ability.name;
-        side.querySelectorAll(".main_ability_header_ex span").forEach((span) => {
-            span.classList.toggle("selected", span.textContent.trim() === ability.name);
-        });
-        side.querySelector("button.main_ability_on")?.classList.toggle("active", !!ability.on);
-        syncAbilityButton(side, { reset: !ability.toggleable });
-    }
-    const item = get("item");
-    const itemLabel = side.querySelector("button.main_item_choose p");
-    if (item && itemLabel) itemLabel.textContent = item;
-
-    const conditions = get(`${role}:conditions`) ?? [];
-    side.querySelectorAll("button.main_condition_item").forEach((button) => {
-        button.classList.toggle("active", conditions.includes(button.textContent.trim()));
-    });
-    if (role === "attacker") {
-        side.querySelector("button.main_move_weak")?.classList.toggle("active", !!get("attacker:weak"));
-        const move = get("attacker:move");
-        if (move && movesData[move]) selectMove(move, movesData[move]);
-        const powerUp = side.querySelector("button.main_move_powerup");
-        if (powerUp && !powerUp.hidden) powerUp.classList.toggle("active", !!get("attacker:powerup"));
-        syncBurnLock(side);
-        const counts = slot["attacker:counts"];
-        if (counts && countUi) {
-            if (counts.hits !== null && !countUi.hits.hidden) countUi.hits.set(counts.hits);
-            if (counts.crits !== null && !countUi.crits.hidden) countUi.crits.set(counts.crits);
-            $$(".main_move_axel_row", countUi.axel).forEach((row, i) => {
-                $(".hit", row).classList.toggle("active", counts.axel[i]?.[0] ?? true);
-                $(".crit", row).classList.toggle("active", counts.axel[i]?.[1] ?? false);
+    const abilityStage = () => {
+        const ability = get("ability");
+        if (ability?.name) {
+            const label = side.querySelector("button.main_ability_choose p");
+            if (label) label.textContent = ability.name;
+            side.querySelectorAll(".main_ability_header_ex span").forEach((span) => {
+                span.classList.toggle("selected", span.textContent.trim() === ability.name);
             });
-            countUi.metronome.set(counts.metronome);
+            side.querySelector("button.main_ability_on")?.classList.toggle("active", !!ability.on);
+            syncAbilityButton(side, { reset: !ability.toggleable });
         }
-    }
-    const hp = get("hp");
-    const hpBox = side.querySelector(".main_hpleft");
-    if (hp && hpBox) {
-        hpBox.dataset.now = hp.now;
-        hpBox.dataset.max = hp.max;
-    }
-    updateRealStatsIn(side);
+    };
+    const itemStage = () => {
+        const item = get("item");
+        const itemLabel = side.querySelector("button.main_item_choose p");
+        if (item && itemLabel) itemLabel.textContent = item;
+    };
+    const conditionStage = () => {
+        const conditions = get(`${role}:conditions`) ?? [];
+        side.querySelectorAll("button.main_condition_item").forEach((button) => {
+            button.classList.toggle("active", conditions.includes(button.textContent.trim()));
+        });
+        if (role === "attacker") {
+            syncBurnLock(side);
+            const counts = slot["attacker:counts"];
+            if (counts && countUi) {
+                if (counts.hits !== null && !countUi.hits.hidden) countUi.hits.set(counts.hits);
+                if (counts.crits !== null && !countUi.crits.hidden) countUi.crits.set(counts.crits);
+                $$(".main_move_axel_row", countUi.axel).forEach((row, i) => {
+                    $(".hit", row).classList.toggle("active", counts.axel[i]?.[0] ?? true);
+                    $(".crit", row).classList.toggle("active", counts.axel[i]?.[1] ?? false);
+                });
+                countUi.metronome.set(counts.metronome);
+            }
+        }
+        const hp = get("hp");
+        const hpBox = side.querySelector(".main_hpleft");
+        if (hp && hpBox) {
+            hpBox.dataset.now = hp.now;
+            hpBox.dataset.max = hp.max;
+        }
+        updateRealStatsIn(side);
+    };
+    return [
+        ["ポケモン", pokemonStage],
+        ...(role === "attacker" ? [["わざ", moveStage]] : []),
+        ["のうりょくポイント", evsStage],
+        ["とくせい", abilityStage],
+        ["もちもの", itemStage],
+        ["じょうたい", conditionStage],
+    ];
 };
+
+const restoreSide = (side, slot, defaults) => restoreSideStages(side, slot, defaults).forEach(([, run]) => run());
 
 const sharedPokemon = {};
 
@@ -1913,15 +1991,21 @@ const saveActiveTab = () => {
     rememberShared(tab.snapshot, tab.calcInput?.atk);
 };
 
-const loadTab = (tab) => {
+const loadTabStages = (tab) => {
     const attacker = $("main.attacker");
-    if (!tab || tab.kind !== "attack" || !tab.snapshot || !attacker) return;
-    restoreSide(attacker, withShared(tab.snapshot), roleDefaults.attacker);
-    if (tab.defRanks) writeDefRanks(tab.defRanks);
-    restoreEnvironment(tab.environment);
-    const move = attacker.querySelector("button.main_move_choose p")?.textContent.trim();
-    if (movesData[move]) applyMoveStats(move, movesData[move]);
+    if (!tab || tab.kind !== "attack" || !tab.snapshot || !attacker) return [];
+    return [
+        ...restoreSideStages(attacker, withShared(tab.snapshot), roleDefaults.attacker),
+        ["天候・フィールド", () => {
+            if (tab.defRanks) writeDefRanks(tab.defRanks);
+            restoreEnvironment(tab.environment);
+            const move = attacker.querySelector("button.main_move_choose p")?.textContent.trim();
+            if (movesData[move]) applyMoveStats(move, movesData[move]);
+        }],
+    ];
 };
+
+const loadTab = (tab) => loadTabStages(tab).forEach(([, run]) => run());
 
 let orderTabSeq = 0;
 const newOrderTab = (kind) => ({ kind, id: ++orderTabSeq });
@@ -2338,51 +2422,103 @@ const expandShare = (data) => {
     };
 };
 
-const applyShare = (raw) => {
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)));
+
+const applyShare = async (raw, report = null) => {
     const data = expandShare(raw);
-    if (data?.v !== 1 || !data.tabs?.length) return;
+    if (data?.v !== 1 || !data.tabs?.length) return false;
+    const step = async (title, label, run) => {
+        if (report) {
+            report(title, label);
+            await nextFrame();
+        }
+        run();
+    };
     closeOtherSidesChoose();
-    restoreSide($("main.defender"), data.defender, roleDefaults.defender);
+    for (const [label, run] of restoreSideStages($("main.defender"), data.defender, roleDefaults.defender)) {
+        await step("防御側", `${label}を読み込み中…`, run);
+    }
     orderTabs.length = 0;
     data.tabs.forEach((tab) => orderTabs.push({ ...newOrderTab(tab.kind), snapshot: tab.snapshot, environment: tab.environment, constant: tab.constant, defRanks: tab.defRanks }));
-    orderTabs.forEach((tab, i) => {
-        if (tab.kind !== "attack" || !tab.snapshot) return;
+    for (const [i, tab] of orderTabs.entries()) {
+        const title = `タブ ${i + 1}/${orderTabs.length}`;
+        if (tab.kind !== "attack" || !tab.snapshot) {
+            await step(title, `${CONSTANT_KINDS[tab.kind]?.title ?? "定数"}を読み込み中…`, () => {});
+            continue;
+        }
         orderActive = i;
-        loadTab(tab);
+        for (const [label, run] of loadTabStages(tab)) {
+            await step(title, `${label}を読み込み中…`, run);
+        }
         saveActiveTab();
+    }
+    await step("", "ダメージ計算中…", () => {
+        orderActive = Math.min(Math.max(0, data.active ?? 0), orderTabs.length - 1);
+        if (orderTabs[orderActive].kind === "attack") loadTab(orderTabs[orderActive]);
+        else restoreEnvironment(data.environment);
+        renderOrderTabs();
     });
-    orderActive = Math.min(Math.max(0, data.active ?? 0), orderTabs.length - 1);
-    if (orderTabs[orderActive].kind === "attack") loadTab(orderTabs[orderActive]);
-    else restoreEnvironment(data.environment);
-    renderOrderTabs();
+    if (report) {
+        await nextFrame();
+        await nextFrame();
+    }
+    return true;
 };
 
 let resolveMoves;
 const movesReady = new Promise((resolve) => { resolveMoves = resolve; });
-const shareCode = new URLSearchParams(location.hash.slice(1)).get("s");
-if (shareCode) {
+const domReady = new Promise((resolve) => {
+    if (document.readyState !== "loading") resolve();
+    else document.addEventListener("DOMContentLoaded", resolve, { once: true });
+});
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+const showOpenInApp = (code) => {
+    if (isNative || !isIOS) return;
+    const link = document.createElement("a");
+    link.className = "open_in_app";
+    link.href = `pokefire://open?s=${code}`;
+    link.textContent = "アプリで開く";
+    document.body.appendChild(link);
+    setTimeout(() => link.classList.add("is-hiding"), 6000);
+    setTimeout(() => link.remove(), 6400);
+};
+
+let shareLoading = false;
+const loadShareCode = async (code) => {
+    if (!code || shareLoading) return;
+    shareLoading = true;
     const loading = document.createElement("div");
     loading.className = "share_loading";
     loading.setAttribute("role", "status");
-    loading.setAttribute("aria-label", "読み込み中");
-    loading.innerHTML = "<span></span>";
+    loading.innerHTML = '<span></span><p class="share_loading_text"><b></b>読み込み中…</p>';
     document.body.appendChild(loading);
-    const ready = new Promise((resolve) => document.addEventListener("DOMContentLoaded", resolve, { once: true }))
-        .then(() => Promise.all([pokemonsReady, movesReady, calcReady]));
-    Promise.all([decodeShare(shareCode), ready])
-        .then(([data]) => {
-            applyShare(data);
-            history.replaceState(null, "", location.pathname + location.search);
-        })
-        .catch((err) => {
-            console.error("共有URLを読み込めませんでした", err);
-            showToast("共有URLを読み込めませんでした");
-        })
-        .finally(() => {
-            requestAnimationFrame(() => loading.classList.add("is-hiding"));
-            setTimeout(() => loading.remove(), 400);
-        });
-}
+    const text = $(".share_loading_text", loading);
+    const report = (title, label) => {
+        text.innerHTML = `<b>${title || "&nbsp;"}</b>${label}`;
+    };
+    report("", "データを読み込み中…");
+    try {
+        const ready = domReady.then(() => Promise.all([pokemonsReady, movesReady, calcReady]));
+        const [data] = await Promise.all([decodeShare(code), ready]);
+        historyMuted = true;
+        await applyShare(data, report);
+        if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+        haptic("success");
+        showOpenInApp(code);
+    } catch (err) {
+        console.error("共有URLを読み込めませんでした", err);
+        showToast("共有URLを読み込めませんでした");
+    } finally {
+        historyMuted = false;
+        shareLoading = false;
+        requestAnimationFrame(() => loading.classList.add("is-hiding"));
+        setTimeout(() => loading.remove(), 400);
+    }
+};
+
+const shareCode = new URLSearchParams(location.hash.slice(1)).get("s");
+if (shareCode) loadShareCode(shareCode);
 
 const SHARE_BASE = "https://ffui.me/poke/fire/";
 const shareUrl = async () => `${isNative ? SHARE_BASE : `${location.origin}${location.pathname}`}#s=${await encodeShare(collectShare())}`;
@@ -2453,7 +2589,9 @@ const renderSpeedCursor = (clientY) => {
         const rect = area.getBoundingClientRect();
         const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
         line.style.top = `${ratio * 100}%`;
-        speedCursor = Math.round(hi - ratio * (hi - lo));
+        const next = Math.round(hi - ratio * (hi - lo));
+        if (next !== speedCursor) haptic("selection");
+        speedCursor = next;
     } else if (speedCursor !== null) {
         line.style.top = `${((hi - speedCursor) / (hi - lo)) * 100}%`;
     }
@@ -2722,6 +2860,7 @@ function pushNativeState() {
         tabs: orderTabs.map((tab, i) => ({ id: tab.id, kind: tab.kind, label: NATIVE_TAB_LABELS[tab.kind] ?? "", index: i + 1 })),
         active: orderActive,
         covered: document.documentElement.classList.contains("is-scroll-locked"),
+        environment: Object.fromEntries(["weather", "field"].map((kind, i) => [kind, readEnvironment()[i]?.split("_").pop() ?? "none"])),
     };
     const json = JSON.stringify(state);
     if (json === nativeStateText) return;
@@ -2740,8 +2879,230 @@ window.PokeFireNative = {
     openDetail: () => $(".card_result")?.click(),
     openSpeed: () => $(".card_speed")?.click(),
     share: async () => postNative({ type: "share", url: await shareUrl() }),
+    openShare: (code) => loadShareCode(code),
+    setEnvironment: (kind, key) => {
+        const button = $(`.modal_environment_${kind}_select_${key}`);
+        if (button && !button.classList.contains("selected")) button.click();
+    },
+    openHistory: () => openHistory(),
     sync: () => {
         nativeStateText = "";
         pushNativeState();
     },
 };
+
+const HISTORY_KEY = "pokefire-history";
+const HISTORY_LIMIT = 60;
+const historyAside = $("aside.history");
+const historyList = historyAside && $(".history_list", historyAside);
+let historyArmed = false;
+let historyMuted = false;
+let historyTimer = 0;
+
+const loadHistory = () => {
+    try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY)) ?? [];
+    } catch {
+        return [];
+    }
+};
+const saveHistory = (list) => {
+    const pinned = list.filter((entry) => entry.pinned);
+    const rest = list.filter((entry) => !entry.pinned).slice(0, Math.max(0, HISTORY_LIMIT - pinned.length));
+    try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify([...pinned, ...rest].sort((a, b) => b.time - a.time)));
+    } catch {}
+};
+
+["pointerdown", "keydown"].forEach((type) => document.addEventListener(type, (e) => {
+    if (!e.target.closest?.("aside.history, .gohistory")) historyArmed = true;
+}, { capture: true, passive: true }));
+
+const historyEntry = () => {
+    const { attacks, def, summary } = calcState;
+    if (!def?.name || !attacks.length) return null;
+    const attackers = [...new Set(attacks.map((e) => e.atk.name))];
+    const moves = [...new Set(attacks.map((e) => e.atk.move))];
+    return {
+        key: `${attackers.join("+")}>${def.name}`,
+        attackers,
+        defender: def.name,
+        moves,
+        judge: summary?.text ?? "",
+        rate: summary?.rate ?? "",
+        data: collectShare(),
+        time: Date.now(),
+    };
+};
+
+function recordHistory() {
+    if (!historyAside || !historyArmed || historyMuted || shareLoading) return;
+    clearTimeout(historyTimer);
+    historyTimer = setTimeout(() => {
+        if (historyMuted || shareLoading) return;
+        const entry = historyEntry();
+        if (!entry) return;
+        const list = loadHistory();
+        entry.pinned = !!list.find((h) => h.key === entry.key)?.pinned;
+        saveHistory([entry, ...list.filter((h) => h.key !== entry.key)]);
+        if (historyAside.classList.contains("is-open")) renderHistory();
+    }, 1200);
+}
+
+const escapeHtml = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+const historyGroupOf = (time) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const day = 86400000;
+    if (time >= today.getTime()) return "今日";
+    if (time >= today.getTime() - day) return "昨日";
+    if (time >= today.getTime() - day * 7) return "過去7日間";
+    return "それ以前";
+};
+
+const historyTime = (time) => {
+    const date = new Date(time);
+    const pad = (n) => String(n).padStart(2, "0");
+    return historyGroupOf(time) === "今日" || historyGroupOf(time) === "昨日"
+        ? `${pad(date.getHours())}:${pad(date.getMinutes())}`
+        : `${date.getMonth() + 1}/${date.getDate()}`;
+};
+
+const PIN_ICON = '<svg viewBox="0 0 24 24"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>';
+const TRASH_ICON = '<svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>';
+
+const historyItemHtml = (entry) => `<div class="history_item${entry.pinned ? " is-pinned" : ""}" data-key="${escapeHtml(entry.key)}">
+    <div class="history_item_sprites">${[...entry.attackers.slice(0, 2), entry.defender].map((name) => `<img src="${spriteOf(pokemons[name])}" alt="" loading="lazy">`).join("")}</div>
+    <div class="history_item_text">
+        <p class="history_item_title">${escapeHtml(entry.attackers.join("・"))} → ${escapeHtml(entry.defender)}</p>
+        <p class="history_item_sub">${escapeHtml([historyTime(entry.time), entry.moves.join("・"), entry.judge && `${entry.judge}${entry.rate ? `（${entry.rate}）` : ""}`].filter(Boolean).join(" ・ "))}</p>
+    </div>
+    <button class="history_item_pin" aria-label="ピン留め">${PIN_ICON}</button>
+    <button class="history_item_delete" aria-label="削除">${TRASH_ICON}</button>
+</div>`;
+
+function renderHistory() {
+    if (!historyList) return;
+    const list = loadHistory();
+    if (!list.length) {
+        historyList.innerHTML = '<p class="history_empty">計算した対面が<br>ここに自動で残ります</p>';
+        return;
+    }
+    const groups = [];
+    const pinned = list.filter((entry) => entry.pinned);
+    if (pinned.length) groups.push(["ピン留め", pinned]);
+    list.filter((entry) => !entry.pinned).forEach((entry) => {
+        const label = historyGroupOf(entry.time);
+        const last = groups[groups.length - 1];
+        if (!last || last[0] !== label) groups.push([label, [entry]]);
+        else last[1].push(entry);
+    });
+    historyList.innerHTML = groups.map(([label, entries]) => `<p class="history_group">${label}</p>${entries.map(historyItemHtml).join("")}`).join("");
+}
+
+function openHistory() {
+    if (!historyAside) return;
+    closeOtherSidesChoose();
+    renderHistory();
+    historyAside.classList.add("is-open");
+    haptic("light");
+}
+const closeHistory = () => historyAside?.classList.remove("is-open");
+
+if (historyAside) {
+    $(".gohistory")?.addEventListener("click", openHistory);
+    $(".history_close", historyAside).addEventListener("click", closeHistory);
+    historyAside.addEventListener("click", async (e) => {
+        if (e.target === historyAside) {
+            closeHistory();
+            return;
+        }
+        const item = e.target.closest(".history_item");
+        if (!item) return;
+        const list = loadHistory();
+        const entry = list.find((h) => h.key === item.dataset.key);
+        if (!entry) return;
+        if (e.target.closest(".history_item_pin")) {
+            entry.pinned = !entry.pinned;
+            saveHistory(list);
+            renderHistory();
+            haptic("light");
+            return;
+        }
+        if (e.target.closest(".history_item_delete")) {
+            saveHistory(list.filter((h) => h !== entry));
+            renderHistory();
+            haptic("medium");
+            return;
+        }
+        closeHistory();
+        haptic("medium");
+        historyMuted = true;
+        try {
+            await applyShare(entry.data);
+        } finally {
+            setTimeout(() => { historyMuted = false; }, 300);
+        }
+    });
+
+    let drawerSwipe = null;
+    historyAside.addEventListener("touchstart", (e) => {
+        drawerSwipe = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    }, { passive: true });
+    historyAside.addEventListener("touchmove", (e) => {
+        if (!drawerSwipe) return;
+        const dx = e.touches[0].clientX - drawerSwipe.x;
+        const dy = e.touches[0].clientY - drawerSwipe.y;
+        if (dx < -60 && Math.abs(dy) < -dx * 0.6) {
+            drawerSwipe = null;
+            closeHistory();
+        } else if (Math.abs(dy) > 40) {
+            drawerSwipe = null;
+        }
+    }, { passive: true });
+
+    let edgeSwipe = null;
+    const SWIPE_IGNORE = ".main_evs_range, .main_hpleft_range, .main_count, select, input, .order_main, .main_search_otherforms, .main_pokemon_choose, .main_type_choose, section, aside";
+    document.addEventListener("touchstart", (e) => {
+        const blocked = e.touches.length !== 1 || document.body.scrollLeft > 4 || $("section.is-open") || e.target.closest(SWIPE_IGNORE);
+        edgeSwipe = blocked ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }, { passive: true });
+    document.addEventListener("touchmove", (e) => {
+        if (!edgeSwipe) return;
+        const dx = e.touches[0].clientX - edgeSwipe.x;
+        const dy = e.touches[0].clientY - edgeSwipe.y;
+        if (dx > 64 && Math.abs(dy) < dx * 0.5) {
+            edgeSwipe = null;
+            openHistory();
+        } else if (dx < -12 || Math.abs(dy) > 32) {
+            edgeSwipe = null;
+        }
+    }, { passive: true });
+}
+
+if (isNative) {
+    const ROLL_SELECTOR = ".main_evs_header_value, .main_evs_range_num, .main_basestats_item p, .main_move_header_info_power, .main_hpleft_header_value .percent, .main_hpleft_header_value .now, .speed_pokemon_item_num, .main_count .value, .detail_overview_log_damage_percent, .detail_overview_log_damage_num_take, .detail_index_num, .detail_hppm_header_num";
+    const rollTexts = new WeakMap();
+    new MutationObserver((records) => {
+        const targets = new Set();
+        records.forEach((record) => {
+            const node = record.target.nodeType === Node.TEXT_NODE ? record.target.parentElement : record.target;
+            const el = node?.closest?.(ROLL_SELECTOR);
+            if (el) targets.add(el);
+        });
+        targets.forEach((el) => {
+            const text = el.textContent;
+            const before = rollTexts.get(el);
+            rollTexts.set(el, text);
+            if (before === undefined || before === text) return;
+            el.classList.remove("num-roll");
+            void el.offsetWidth;
+            el.classList.add("num-roll");
+        });
+    }).observe(document.body, { subtree: true, childList: true, characterData: true });
+    document.addEventListener("animationend", (e) => {
+        if (e.animationName === "num-roll") e.target.classList.remove("num-roll");
+    });
+    window.addEventListener("load", () => $$(ROLL_SELECTOR).forEach((el) => rollTexts.set(el, el.textContent)));
+}

@@ -25,11 +25,17 @@ struct NativeTab: Decodable, Equatable, Identifiable {
     let index: Int
 }
 
+struct NativeEnvironment: Decodable, Equatable {
+    var weather: String = "none"
+    var field: String = "none"
+}
+
 struct NativeState: Decodable {
     let result: NativeResult
     let tabs: [NativeTab]
     let active: Int
     let covered: Bool
+    let environment: NativeEnvironment
 }
 
 struct ShareItem: Identifiable {
@@ -125,7 +131,10 @@ final class WebStore: NSObject, ObservableObject, WKNavigationDelegate, WKUIDele
     @Published var onMainPage = true
     @Published var ready = false
     @Published var shareItem: ShareItem?
+    @Published var environment = NativeEnvironment()
+    @Published var showEnvironment = false
 
+    private var pendingShare: String?
     let webView: WKWebView
 
     override init() {
@@ -153,6 +162,29 @@ final class WebStore: NSObject, ObservableObject, WKNavigationDelegate, WKUIDele
 
     func command(_ call: String) {
         webView.evaluateJavaScript("window.PokeFireNative && void window.PokeFireNative.\(call)", completionHandler: nil)
+    }
+
+    func setEnvironment(_ kind: String, _ key: String) {
+        command("setEnvironment('\(kind)', '\(key)')")
+    }
+
+    func openHistory() {
+        command("openHistory()")
+    }
+
+    func open(_ url: URL) {
+        guard
+            url.scheme == "pokefire",
+            let code = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "s" })?.value,
+            !code.isEmpty,
+            code.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) && $0.isASCII || $0 == "-" || $0 == "_" })
+        else { return }
+        if ready && onMainPage {
+            command("openShare('\(code)')")
+        } else {
+            pendingShare = code
+            if !onMainPage { goHome() }
+        }
     }
 
     func openHelp() {
@@ -185,7 +217,14 @@ final class WebStore: NSObject, ObservableObject, WKNavigationDelegate, WKUIDele
             if tabs != state.tabs { tabs = state.tabs }
             if active != state.active { active = state.active }
             if covered != state.covered { covered = state.covered }
-            if !ready { ready = true }
+            if environment != state.environment { environment = state.environment }
+            if !ready {
+                ready = true
+                if let code = pendingShare {
+                    pendingShare = nil
+                    command("openShare('\(code)')")
+                }
+            }
         default:
             break
         }
@@ -206,6 +245,10 @@ final class WebStore: NSObject, ObservableObject, WKNavigationDelegate, WKUIDele
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         onMainPage = !(webView.url?.path.contains("/help") ?? false)
         command("sync()")
+        if onMainPage, ready, let code = pendingShare {
+            pendingShare = nil
+            command("openShare('\(code)')")
+        }
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration, for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
