@@ -69,7 +69,6 @@ final class AppModel {
     var toast: ToastMessage?
     var history: [HistoryEntry] = Storage.history
     var isLoadingShare = false
-    var rankBoostEditing = false
 
     @ObservationIgnored private var shared: [String: SharedBuild] = [:]
     @ObservationIgnored private var swapSlots: [SideSnapshot] = [SideSnapshot(), SideSnapshot()]

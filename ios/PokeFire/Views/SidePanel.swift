@@ -310,6 +310,7 @@ struct BaseStatsRow: View {
 struct MoveSection: View {
     @Environment(AppModel.self) private var model
     let present: (ActiveSheet) -> Void
+    @State private var editingBoost = false
 
     var body: some View {
         let side = model.attacker
@@ -345,13 +346,15 @@ struct MoveSection: View {
                     if model.showsRankBoost {
                         Button {
                             Haptics.play(.light)
-                            withAnimation(.spring(response: 0.36, dampingFraction: 0.8)) {
-                                model.rankBoostEditing = true
-                            }
+                            editingBoost = true
                         } label: {
                             PillLabel(title: "ランク上昇", value: "×\(model.rankBoostTotal)")
                         }
                         .buttonStyle(PressableStyle())
+                        .popover(isPresented: $editingBoost, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                            RankBoostPanel()
+                                .presentationCompactAdaptation(.popover)
+                        }
                     }
                     if model.showsPowerUp {
                         ToggleChip(title: "威力アップ", isOn: side.powerUp) {

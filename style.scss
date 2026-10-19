@@ -2568,49 +2568,42 @@ button.main_move_boost, label.main_move_fling {
     position: fixed;
     inset: 0;
     z-index: 200;
-    display: grid;
-    place-items: center;
-    padding: 20px;
-    background-color: #0000;
-    transition: background-color .2s ease;
 
     .boost_popup_panel {
-        width: min(440px, 100%);
-        padding: 20px;
-        border-radius: 28px;
+        position: fixed;
+        padding: 16px;
+        border-radius: 22px;
         background-color: #fff;
-        box-shadow: 0 16px 48px -12px #0005;
+        box-shadow: 0 12px 40px -10px #0004, 0 0 0 .5px #0001;
         opacity: 0;
-        scale: .88;
-        transition: opacity .2s ease, scale .3s cubic-bezier(.34, 1.4, .64, 1);
-    }
-    &.is-open {
-        background-color: #0003;
+        scale: .6;
+        transform-origin: var(--arrow, 24px) -10px;
+        transition: opacity .2s ease, scale .32s cubic-bezier(.34, 1.4, .64, 1);
 
-        .boost_popup_panel {
-            opacity: 1;
-            scale: 1;
+        &::before {
+            content: '';
+            position: absolute;
+            top: -7px;
+            left: calc(var(--arrow, 24px) - 8px);
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            background-color: #fff;
+            rotate: 45deg;
         }
     }
-    .boost_popup_header, .boost_popup_footer {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
+    &.is-open .boost_popup_panel {
+        opacity: 1;
+        scale: 1;
     }
-    .ttl {
-        font-weight: 700;
-        color: #777;
-    }
-    .boost_popup_value {
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #535ca8;
+    &.is-closing .boost_popup_panel {
+        transition: opacity .18s ease, scale .22s ease-in;
     }
     .boost_popup_range {
+        position: relative;
         display: flex;
         gap: 1.5px;
         height: 32px;
-        margin-block: 14px 10px;
         touch-action: none;
         cursor: pointer;
 
@@ -2627,10 +2620,15 @@ button.main_move_boost, label.main_move_fling {
             }
         }
     }
-    .boost_popup_footer p {
-        font-size: .8rem;
+    .boost_popup_note {
+        margin-top: 10px;
+        font-size: .78rem;
         font-weight: 700;
         color: #777;
+
+        &[hidden] {
+            display: none;
+        }
     }
 }
 label.main_item_metronome {

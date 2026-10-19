@@ -1298,13 +1298,20 @@ function syncBoostLabel() {
     if (popup) renderBoostPopup(popup);
 }
 
+const BOOST_STAT_NAMES = { a: "こうげき", c: "とくこう", b: "ぼうぎょ", d: "とくぼう", s: "すばやさ" };
+
 const renderBoostPopup = (popup) => {
     const boost = countUi.boost;
     const auto = attackerRankSum();
     const total = Math.min(CALC_RANK_BOOST_LIMIT, auto + (Number(boost.dataset.extra) || 0));
-    $(".boost_popup_value", popup).textContent = `×${total}`;
-    $(".boost_popup_power", popup).textContent = `威力 ${20 + 20 * total}`;
-    $(".boost_popup_note", popup).textContent = auto > 0 ? `ランク補正の+${auto}段階を含みます` : "なぞって上昇した段階数を指定";
+    const notes = ["a", "c", "b", "d", "s"].map((key) => {
+        const select = attackerSide && $(`.main_evs_${key} .main_evs_ranks select`, attackerSide);
+        const rank = select ? 6 - select.selectedIndex : 0;
+        return rank > 0 ? `${BOOST_STAT_NAMES[key]}ランク上昇+${rank}` : "";
+    }).filter(Boolean);
+    const note = $(".boost_popup_note", popup);
+    note.textContent = notes.length ? `${notes.join("・")}を含む` : "";
+    note.hidden = !notes.length;
     $$(".boost_popup_range span", popup).forEach((span, i) => {
         span.classList.toggle("auto", i < auto);
         span.classList.toggle("active", i >= auto && i < total);
@@ -1313,23 +1320,30 @@ const renderBoostPopup = (popup) => {
 
 function openBoostPopup() {
     if ($(".boost_popup")) return;
+    const button = countUi.boost;
+    const rect = button.getBoundingClientRect();
     const popup = document.createElement("div");
     popup.className = "boost_popup";
-    popup.innerHTML = `<div class="boost_popup_panel">
-        <div class="boost_popup_header"><p class="ttl">ランク上昇</p><p class="boost_popup_value">×0</p></div>
+    const width = Math.min(320, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+    popup.innerHTML = `<div class="boost_popup_panel" style="left: ${left}px; top: ${rect.bottom + 10}px; width: ${width}px; --arrow: ${rect.left + rect.width / 2 - left}px">
         <div class="boost_popup_range">${"<span></span>".repeat(CALC_RANK_BOOST_LIMIT)}</div>
-        <div class="boost_popup_footer"><p class="boost_popup_note"></p><p class="boost_popup_power"></p></div>
+        <p class="boost_popup_note" hidden></p>
     </div>`;
     document.body.appendChild(popup);
     renderBoostPopup(popup);
     requestAnimationFrame(() => popup.classList.add("is-open"));
     const close = () => {
+        if (!popup.isConnected || popup.classList.contains("is-closing")) return;
+        popup.classList.add("is-closing");
         popup.classList.remove("is-open");
-        setTimeout(() => popup.remove(), 220);
+        window.removeEventListener("scroll", close, true);
+        setTimeout(() => popup.remove(), 240);
     };
     popup.addEventListener("pointerdown", (e) => {
         if (!e.target.closest(".boost_popup_panel")) close();
     });
+    window.addEventListener("scroll", close, true);
     bindDrag($(".boost_popup_range", popup), (ratio) => {
         const auto = attackerRankSum();
         const total = Math.max(auto, Math.min(CALC_RANK_BOOST_LIMIT, Math.round(ratio * CALC_RANK_BOOST_LIMIT)));
