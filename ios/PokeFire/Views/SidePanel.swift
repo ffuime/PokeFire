@@ -21,6 +21,7 @@ struct SidePanel: View {
     @Environment(AppModel.self) private var model
     let role: Role
     let present: (ActiveSheet) -> Void
+    @State private var pulled = false
 
     var body: some View {
         ScrollView {
@@ -70,6 +71,17 @@ struct SidePanel: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top
+        } action: { _, value in
+            if value < -72, !pulled {
+                pulled = true
+                Haptics.play(.medium)
+                present(.environment)
+            } else if value >= -4, pulled {
+                pulled = false
+            }
+        }
     }
 }
 
@@ -96,6 +108,7 @@ struct PokemonHeader: View {
     let role: Role
     let present: (ActiveSheet) -> Void
     @State private var showForms = false
+    @State private var formsOpenCount = 0
     @State private var spin = 0
 
     var body: some View {
@@ -112,6 +125,7 @@ struct PokemonHeader: View {
                     Haptics.play(.light)
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                         showForms.toggle()
+                        if showForms { formsOpenCount += 1 }
                     }
                 } label: {
                     ZStack(alignment: .bottomTrailing) {
@@ -131,7 +145,7 @@ struct PokemonHeader: View {
 
                 ZStack(alignment: .leading) {
                     if showForms, !forms.isEmpty {
-                        FormsStrip(forms: forms) { name in
+                        FormsStrip(forms: forms, openCount: formsOpenCount) { name in
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                                 showForms = false
                             }
@@ -214,6 +228,7 @@ struct PokemonHeader: View {
 
 struct FormsStrip: View {
     let forms: [String]
+    var openCount = 0
     let onSelect: (String) -> Void
     @State private var shown = 0
 
@@ -251,7 +266,9 @@ struct FormsStrip: View {
                 endPoint: .trailing
             )
         )
-        .task {
+        .task(id: openCount) {
+            shown = 0
+            try? await Task.sleep(for: .milliseconds(40))
             for index in forms.indices {
                 withAnimation(.spring(response: 0.38, dampingFraction: 0.58)) {
                     shown = index + 1

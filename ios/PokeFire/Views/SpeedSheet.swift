@@ -96,18 +96,30 @@ struct SpeedSheet: View {
             .scrollDisabled(selected != nil)
             .overlay(alignment: .top) {
                 if let role = selected {
-                    ZStack(alignment: .top) {
-                        Color.black.opacity(0.06)
-                            .ignoresSafeArea()
-                            .contentShape(Rectangle())
-                            .onTapGesture { selected = nil }
-                        SpeedEditor(role: role) {
-                            selected = nil
+                    GeometryReader { geometry in
+                        ZStack(alignment: .top) {
+                            Color.black.opacity(0.06)
+                                .ignoresSafeArea()
+                                .contentShape(Rectangle())
+                                .onTapGesture { location in
+                                    if location.y < 104 {
+                                        let tapped: Role = location.x < geometry.size.width / 2 ? .attacker : .defender
+                                        Haptics.play(.light)
+                                        selected = tapped == role ? nil : tapped
+                                    } else {
+                                        selected = nil
+                                    }
+                                }
+                            SpeedEditor(role: role) {
+                                selected = nil
+                            }
+                            .id(role)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 108)
+                            .transition(.move(edge: .top).combined(with: .opacity))
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 108)
-                        .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: role == .attacker ? .topLeading : .topTrailing)))
                     }
+                    .transition(.opacity)
                 }
             }
             .animation(.spring(response: 0.38, dampingFraction: 0.86), value: selected)

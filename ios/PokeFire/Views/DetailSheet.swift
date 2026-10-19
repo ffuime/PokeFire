@@ -449,8 +449,9 @@ private struct FlowList: View {
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(Palette.background)
-                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.accent : Color.clear, lineWidth: 2))
+                        .fill(selected ? Color.white : Palette.background)
+                        .shadow(color: selected ? Palette.accent.opacity(0.22) : .clear, radius: 12, y: 4)
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.accent.opacity(0.45) : Color.clear, lineWidth: 0.75))
                 )
                 .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                 .onTapGesture { onSelect(.sum) }
@@ -507,8 +508,9 @@ private struct FlowItem: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Palette.background)
-                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.tab(entry.kind) : Color.clear, lineWidth: 2))
+                .fill(selected ? Color.white : Palette.background)
+                .shadow(color: selected ? Palette.tab(entry.kind).opacity(0.22) : .clear, radius: 12, y: 4)
+                .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.tab(entry.kind).opacity(0.45) : Color.clear, lineWidth: 0.75))
         )
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
@@ -525,6 +527,7 @@ private struct FlowItem: View {
             plan.map { "\($0.count)回" },
             atk.crit || crits > 0 ? "急所\(crits > 0 ? "\(crits)回" : "")" : nil,
             atk.powerUp ? "威力アップ" : nil,
+            result?.info?.failed == true ? "失敗" : nil,
         ]
         let flags = flagParts.compactMap { $0 }.joined(separator: "・")
         VStack(alignment: .leading, spacing: 2) {

@@ -120,6 +120,7 @@ struct CalcInfo {
     var defenseKey: StatKey?
     var firepower: Int?
     var plan: [PlanRow]?
+    var failed = false
 }
 
 enum CalcStatus {
@@ -571,16 +572,17 @@ enum Calc {
         let priorityText = remarks.first(where: { $0.hasPrefix("優先度") })?.replacingOccurrences(of: "優先度", with: "") ?? "0"
         let priority = Int(priorityText) ?? 0
         if terrain == "サイコ", defGrounded, priority > 0 { return .fail(.immune, "フィールドにより無効") }
-        if atk.move == "アイアンローラー", terrain.isEmpty { return .fail(.immune, "うまく決まらなかった") }
-        if atk.move == "ポルターガイスト", defItem.isEmpty { return .fail(.immune, "うまく決まらなかった") }
+        let failed = (atk.move == "アイアンローラー" && terrain.isEmpty) || (atk.move == "ポルターガイスト" && defItem.isEmpty)
 
         let defHP = hpOf(def)
         let atkHP = hpOf(atk)
         var info = CalcInfo(moveType: moveType, category: move.category, isContact: isContact)
+        info.failed = failed
 
-        func fixed(_ damage: Int, _ message: String) -> CalcResult {
+        func fixed(_ damage: Int, _ message: String, failing: Bool = false) -> CalcResult {
             var fixedInfo = info
             fixedInfo.displayPower = move.power
+            if failing { fixedInfo.failed = true }
             return CalcResult(status: .ok, message: message, hits: [Array(repeating: max(1, damage), count: 16)], info: fixedInfo, fixed: true)
         }
         if ohkoMoves.contains(atk.move) {
@@ -591,7 +593,7 @@ enum Calc {
         if atk.move == "いかりのまえば" { return fixed(defHP.now / 2, "相手のHPの半分") }
         if atk.move == "いのちがけ" { return fixed(atkHP.now, "自分のHP分") }
         if atk.move == "がむしゃら" {
-            if defHP.now <= atkHP.now { return .fail(.immune, "うまく決まらなかった") }
+            if defHP.now <= atkHP.now { return fixed(1, "相手と自分のHPの差", failing: true) }
             return fixed(defHP.now - atkHP.now, "相手と自分のHPの差")
         }
 
@@ -914,8 +916,9 @@ enum Calc {
         }
         let low = pathDamage[0]
         let high = pathDamage[1]
+        let suffix = ok.contains { $0.result?.info?.failed == true } ? "（失敗）" : ""
         if multi {
-            return Summary(text: "ひんし率\(Format.fixed1((remain[0] ?? 0) * 100))%", rate: nil, min: low, max: high)
+            return Summary(text: "ひんし率\(Format.fixed1((remain[0] ?? 0) * 100))%\(suffix)", rate: nil, min: low, max: high)
         }
         let only = ok[0]
         let dist: Distribution
@@ -927,10 +930,10 @@ enum Calc {
             dist = [0: 1]
         }
         guard let ko = knockOut(dist, hp.now), ko.hits != Int.max else {
-            return Summary(text: "10発以上", rate: nil, min: low, max: high)
+            return Summary(text: "10発以上\(suffix)", rate: nil, min: low, max: high)
         }
-        if ko.rate >= 1 - 1e-9 { return Summary(text: "確定\(ko.hits)発", rate: nil, min: low, max: high) }
-        return Summary(text: "乱数\(ko.hits)発", rate: "\(Format.fixed2(ko.rate * 100))%", min: low, max: high)
+        if ko.rate >= 1 - 1e-9 { return Summary(text: "確定\(ko.hits)発\(suffix)", rate: nil, min: low, max: high) }
+        return Summary(text: "乱数\(ko.hits)発\(suffix)", rate: "\(Format.fixed2(ko.rate * 100))%", min: low, max: high)
     }
 
     static func hpEffects(_ entry: CalcEntry, def: Fighter) -> [HPEffect] {
