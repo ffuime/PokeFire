@@ -655,7 +655,17 @@ final class AppModel {
     var showsFling: Bool { attacker.move == "なげつける" }
 
     func setRankBoostTotal(_ total: Int) {
-        let extra = max(0, min(Calc.rankBoostLimit, total) - rankBoostAuto)
+        let value = max(0, min(Calc.rankBoostLimit, total))
+        let auto = rankBoostAuto
+        if value < auto {
+            let key = Calc.rankBoostKey(attacker.move)
+            update(.attacker) { side in
+                side.evs[key, default: EVState(points: 0)].rank = value
+                side.rankBoost = 0
+            }
+            return
+        }
+        let extra = value - auto
         guard extra != attacker.rankBoost else { return }
         update(.attacker) { $0.rankBoost = extra }
     }

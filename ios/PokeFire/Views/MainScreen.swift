@@ -169,26 +169,9 @@ struct EnvironmentPanel: View {
 struct RankBoostPanel: View {
     @Environment(AppModel.self) private var model
 
-    private var note: String? {
-        let atk = model.liveFighter(.attacker)
-        let parts = [StatKey.a, .c, .b, .d, .s].compactMap { key -> String? in
-            let rank = atk.evs[key]?.rank ?? 0
-            guard rank > 0 else { return nil }
-            return "\(Rules.rankStatNames[key] ?? key.statName)ランク上昇+\(rank)"
-        }
-        return parts.isEmpty ? nil : parts.joined(separator: "・") + "を含む"
-    }
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SegmentBar(count: Calc.rankBoostLimit, value: model.rankBoostTotal, color: Palette.accent, minimum: model.rankBoostAuto) {
-                model.setRankBoostTotal($0)
-            }
-            if let note {
-                Text(note)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Palette.secondary)
-            }
+        SegmentBar(count: Calc.rankBoostLimit, value: model.rankBoostTotal, color: Palette.accent) {
+            model.setRankBoostTotal($0)
         }
         .padding(16)
         .frame(width: 320)

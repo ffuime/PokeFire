@@ -391,8 +391,12 @@ enum Calc {
     static let rankBoostMoves: Set<String> = ["アシストパワー", "つけあがる"]
     static let rankBoostLimit = 42
 
+    static func rankBoostKey(_ move: String) -> StatKey {
+        GameData.shared.moves[move]?.category == "物理" ? .a : .c
+    }
+
     static func rankSum(_ atk: Fighter) -> Int {
-        [StatKey.a, .b, .c, .d, .s].reduce(0) { $0 + max(0, atk.evs[$1]?.rank ?? 0) }
+        max(0, atk.evs[rankBoostKey(atk.move)]?.rank ?? 0)
     }
 
     static func hitPlan(_ atk: Fighter) -> [PlanRow]? {

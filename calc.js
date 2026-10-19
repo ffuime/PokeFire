@@ -62,7 +62,8 @@ const CALC_VARIABLE_MULTI_HIT = new Set(["スイープビンタ", "スケイル�
 
 const CALC_OHKO_MOVES = new Set(["じわれ", "ぜったいれいど", "つのドリル", "ハサミギロチン"]);
 const CALC_UNSUPPORTED_MOVES = new Set(["カウンター", "ほうふく", "ミラーコート", "メタルバースト", "はきだす", "ふくろだたき"]);
-const rankSumOf = (p) => ["a", "b", "c", "d", "s"].reduce((sum, key) => sum + Math.max(0, p.evs[key]?.rank ?? 0), 0);
+const rankBoostKeyOf = (move) => (calcData.moves[move]?.category === "物理" ? "a" : "c");
+const rankSumOf = (p) => Math.max(0, p.evs[rankBoostKeyOf(p.move)]?.rank ?? 0);
 const CALC_ALWAYS_CRIT_MOVES = new Set(["こおりのいぶき", "トリックフラワー", "やまあらし"]);
 const CALC_SCREEN_BREAK_MOVES = new Set(["かわらわり", "サイコファング", "レイジングブル"]);
 

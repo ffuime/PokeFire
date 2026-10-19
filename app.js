@@ -1282,10 +1282,15 @@ if (attackerSide) {
     countUi = { hits, crits, axel, metronome, boost, faint, fling };
 }
 
-const attackerRankSum = () => ["a", "b", "c", "d", "s"].reduce((sum, key) => {
-    const select = attackerSide && $(`.main_evs_${key} .main_evs_ranks select`, attackerSide);
-    return sum + (select ? Math.max(0, 6 - select.selectedIndex) : 0);
-}, 0);
+const boostRankSelect = () => {
+    const move = $("button.main_move_choose p", attackerSide)?.textContent.trim() ?? "";
+    const key = movesData[move]?.category === "物理" ? "a" : "c";
+    return attackerSide && $(`.main_evs_${key} .main_evs_ranks select`, attackerSide);
+};
+const attackerRankSum = () => {
+    const select = boostRankSelect();
+    return select ? Math.max(0, 6 - select.selectedIndex) : 0;
+};
 
 function syncBoostLabel() {
     const boost = countUi?.boost;
@@ -1298,23 +1303,13 @@ function syncBoostLabel() {
     if (popup) renderBoostPopup(popup);
 }
 
-const BOOST_STAT_NAMES = { a: "こうげき", c: "とくこう", b: "ぼうぎょ", d: "とくぼう", s: "すばやさ" };
 
 const renderBoostPopup = (popup) => {
     const boost = countUi.boost;
     const auto = attackerRankSum();
     const total = Math.min(CALC_RANK_BOOST_LIMIT, auto + (Number(boost.dataset.extra) || 0));
-    const notes = ["a", "c", "b", "d", "s"].map((key) => {
-        const select = attackerSide && $(`.main_evs_${key} .main_evs_ranks select`, attackerSide);
-        const rank = select ? 6 - select.selectedIndex : 0;
-        return rank > 0 ? `${BOOST_STAT_NAMES[key]}ランク上昇+${rank}` : "";
-    }).filter(Boolean);
-    const note = $(".boost_popup_note", popup);
-    note.textContent = notes.length ? `${notes.join("・")}を含む` : "";
-    note.hidden = !notes.length;
     $$(".boost_popup_range span", popup).forEach((span, i) => {
-        span.classList.toggle("auto", i < auto);
-        span.classList.toggle("active", i >= auto && i < total);
+        span.classList.toggle("active", i < total);
     });
 };
 
@@ -1328,7 +1323,6 @@ function openBoostPopup() {
     const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
     popup.innerHTML = `<div class="boost_popup_panel" style="left: ${left}px; top: ${rect.bottom + 10}px; width: ${width}px; --arrow: ${rect.left + rect.width / 2 - left}px">
         <div class="boost_popup_range">${"<span></span>".repeat(CALC_RANK_BOOST_LIMIT)}</div>
-        <p class="boost_popup_note" hidden></p>
     </div>`;
     document.body.appendChild(popup);
     renderBoostPopup(popup);
@@ -1346,10 +1340,19 @@ function openBoostPopup() {
     window.addEventListener("scroll", close, true);
     bindDrag($(".boost_popup_range", popup), (ratio) => {
         const auto = attackerRankSum();
-        const total = Math.max(auto, Math.min(CALC_RANK_BOOST_LIMIT, Math.round(ratio * CALC_RANK_BOOST_LIMIT)));
-        const extra = String(total - auto);
-        if (countUi.boost.dataset.extra === extra) return;
-        countUi.boost.dataset.extra = extra;
+        const total = Math.max(0, Math.min(CALC_RANK_BOOST_LIMIT, Math.round(ratio * CALC_RANK_BOOST_LIMIT)));
+        if (total < auto) {
+            const select = boostRankSelect();
+            countUi.boost.dataset.extra = "0";
+            if (select) {
+                select.selectedIndex = 6 - total;
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+        } else {
+            const extra = String(total - auto);
+            if (countUi.boost.dataset.extra === extra) return;
+            countUi.boost.dataset.extra = extra;
+        }
         renderBoostPopup(popup);
         syncBoostLabel();
         scheduleCalc();
