@@ -67,10 +67,21 @@ struct SpeedSheet: View {
                             speedItem(data[0], rival: data[1])
                             speedItem(data[1], rival: data[0])
                         }
-                        Text(data[0].now == data[1].now ? "同速" : "\(data[0].now > data[1].now ? data[0].name : data[1].name)が先攻")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(Palette.ink)
+                        if data[0].now == data[1].now {
+                            Text("同速")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Palette.ink)
+                        } else {
+                            let faster = data[0].now > data[1].now ? data[0] : data[1]
+                            HStack(spacing: 6) {
+                                Icon(name: faster.role == .attacker ? "tab_attack" : "shield", size: 17)
+                                    .foregroundStyle(faster.role == .attacker ? Palette.attack : Palette.accent)
+                                Text("\(faster.name)が先攻")
+                                    .font(.subheadline.weight(.bold))
+                                    .foregroundStyle(Palette.ink)
+                            }
                             .contentTransition(.opacity)
+                        }
                     }
 
                     SpeedGraph(columns: data, cursor: $cursor)
@@ -78,21 +89,28 @@ struct SpeedSheet: View {
                         .card(padding: 12)
                         .blur(radius: selected == nil ? 0 : 2)
                         .opacity(selected == nil ? 1 : 0.55)
-                        .overlay(alignment: .top) {
-                            if let role = selected {
-                                SpeedEditor(role: role) {
-                                    selected = nil
-                                }
-                                .padding(.horizontal, 6)
-                                .padding(.top, 6)
-                                .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
-                            }
-                        }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
-                .animation(.spring(response: 0.38, dampingFraction: 0.86), value: selected)
             }
+            .scrollDisabled(selected != nil)
+            .overlay(alignment: .top) {
+                if let role = selected {
+                    ZStack(alignment: .top) {
+                        Color.black.opacity(0.06)
+                            .ignoresSafeArea()
+                            .contentShape(Rectangle())
+                            .onTapGesture { selected = nil }
+                        SpeedEditor(role: role) {
+                            selected = nil
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 108)
+                        .transition(.opacity.combined(with: .scale(scale: 0.94, anchor: role == .attacker ? .topLeading : .topTrailing)))
+                    }
+                }
+            }
+            .animation(.spring(response: 0.38, dampingFraction: 0.86), value: selected)
             .background(Palette.background)
             .navigationTitle("すばやさ比較")
             .navigationBarTitleDisplayMode(.inline)
@@ -135,6 +153,22 @@ struct SpeedSheet: View {
     }
 }
 
+private struct BubbleShape: Shape {
+    let tailRatio: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        var path = RoundedRectangle(cornerRadius: 26, style: .continuous).path(in: rect)
+        let x = rect.minX + rect.width * tailRatio
+        var tail = Path()
+        tail.move(to: CGPoint(x: x - 12, y: rect.minY + 1))
+        tail.addLine(to: CGPoint(x: x, y: rect.minY - 12))
+        tail.addLine(to: CGPoint(x: x + 12, y: rect.minY + 1))
+        tail.closeSubpath()
+        path.addPath(tail)
+        return path
+    }
+}
+
 private struct SpeedEditor: View {
     @Environment(AppModel.self) private var model
     let role: Role
@@ -142,8 +176,11 @@ private struct SpeedEditor: View {
 
     var body: some View {
         let side = model.side(role)
+        let tint = role == .attacker ? Palette.attack : Palette.accent
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
+            HStack(spacing: 6) {
+                Icon(name: role == .attacker ? "tab_attack" : "shield", size: 18)
+                    .foregroundStyle(tint)
                 Text(side.name)
                     .font(.headline)
                     .foregroundStyle(Palette.ink)
@@ -173,10 +210,12 @@ private struct SpeedEditor: View {
         }
         .padding(18)
         .background(
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            BubbleShape(tailRatio: role == .attacker ? 0.25 : 0.75)
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
         )
+        .contentShape(Rectangle())
+        .onTapGesture {}
     }
 }
 

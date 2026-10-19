@@ -181,11 +181,11 @@ struct ToggleChip: View {
                     Icon(name: "lock", size: 13)
                 }
                 Text(title)
-                    .font(.footnote.weight(.semibold))
+                    .font(.subheadline.weight(.semibold))
                     .lineLimit(1)
             }
-            .padding(.horizontal, 12)
-            .frame(height: 28)
+            .padding(.horizontal, 13)
+            .frame(height: 30)
             .foregroundStyle(isOn ? Color.white : tint)
             .background {
                 Capsule()
@@ -423,10 +423,10 @@ struct CountPill: View {
                 .fontWeight(.bold)
             Text(openEnded && value == range.upperBound ? "回以上" : "回")
         }
-        .font(.footnote)
+        .font(.subheadline)
         .foregroundStyle(Palette.accent)
-        .padding(.horizontal, 12)
-        .frame(height: 28)
+        .padding(.horizontal, 13)
+        .frame(height: 30)
         .background(Capsule().fill(Color.white))
         .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 1))
         .contentShape(Capsule())
