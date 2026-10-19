@@ -1,0 +1,282 @@
+import SwiftUI
+import UIKit
+
+enum Haptics {
+    private static let selectionGenerator = UISelectionFeedbackGenerator()
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
+    private static var lastSelection = Date.distantPast
+
+    enum Style {
+        case selection, light, medium, heavy, soft, rigid, success, warning, error
+    }
+
+    static func play(_ style: Style) {
+        switch style {
+        case .selection:
+            let now = Date()
+            if now.timeIntervalSince(lastSelection) < 0.035 { return }
+            lastSelection = now
+            selectionGenerator.selectionChanged()
+            selectionGenerator.prepare()
+        case .light:
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        case .medium:
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        case .heavy:
+            UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+        case .soft:
+            UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+        case .rigid:
+            UIImpactFeedbackGenerator(style: .rigid).impactOccurred()
+        case .success:
+            notificationGenerator.notificationOccurred(.success)
+        case .warning:
+            notificationGenerator.notificationOccurred(.warning)
+        case .error:
+            notificationGenerator.notificationOccurred(.error)
+        }
+    }
+}
+
+@MainActor
+final class SpriteCache {
+    static let shared = SpriteCache()
+
+    private let memory = NSCache<NSURL, UIImage>()
+    private var tasks: [URL: Task<UIImage?, Never>] = [:]
+    private let directory: URL? = {
+        guard let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else { return nil }
+        let dir = caches.appendingPathComponent("sprites", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }()
+
+    func cached(_ url: URL) -> UIImage? {
+        if let image = memory.object(forKey: url as NSURL) { return image }
+        guard let file = directory?.appendingPathComponent(url.lastPathComponent),
+              let data = try? Data(contentsOf: file),
+              let image = UIImage(data: data) else { return nil }
+        memory.setObject(image, forKey: url as NSURL)
+        return image
+    }
+
+    func image(_ url: URL) async -> UIImage? {
+        if let image = cached(url) { return image }
+        if let task = tasks[url] { return await task.value }
+        let file = directory?.appendingPathComponent(url.lastPathComponent)
+        let task = Task<UIImage?, Never> {
+            guard let loaded = try? await URLSession.shared.data(from: url) else { return nil }
+            let data = loaded.0
+            let status = (loaded.1 as? HTTPURLResponse)?.statusCode ?? 200
+            guard status < 300, let image = UIImage(data: data) else { return nil }
+            if let file { try? data.write(to: file) }
+            return image
+        }
+        tasks[url] = task
+        let image = await task.value
+        tasks[url] = nil
+        if let image { memory.setObject(image, forKey: url as NSURL) }
+        return image
+    }
+}
+
+struct SpriteView: View {
+    let name: String
+    var size: CGFloat = 48
+
+    @State private var image: UIImage?
+    @State private var loadedURL: URL?
+
+    private var url: URL? { GameData.shared.pokemons[name]?.spriteURL }
+
+    var body: some View {
+        ZStack {
+            if let image, loadedURL == url {
+                Image(uiImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .transition(.scale(scale: 0.4).combined(with: .opacity))
+            } else {
+                Circle()
+                    .fill(Palette.track)
+                    .frame(width: size * 0.5, height: size * 0.5)
+            }
+        }
+        .frame(width: size, height: size)
+        .animation(.spring(response: 0.35, dampingFraction: 0.62), value: loadedURL)
+        .task(id: url) {
+            guard let url else { return }
+            if let hit = SpriteCache.shared.cached(url) {
+                image = hit
+                loadedURL = url
+                return
+            }
+            if let fetched = await SpriteCache.shared.image(url) {
+                image = fetched
+                loadedURL = url
+            }
+        }
+    }
+}
+
+enum Palette {
+    static let background = Color(hex: 0xF0F0F0)
+    static let card = Color.white
+    static let accent = Color(hex: 0x535CA8)
+    static let ink = Color(hex: 0x2E3140)
+    static let secondary = Color(hex: 0x777777)
+    static let track = Color(hex: 0xE5E5EA)
+    static let plus = Color(hex: 0x27845A)
+    static let minus = Color(hex: 0xB64646)
+    static let rankUp = Color(hex: 0xC74747)
+    static let rankDown = Color(hex: 0x3475B8)
+    static let boosted = Color(hex: 0xD94F4F)
+    static let attack = Color(hex: 0xD6546A)
+    static let damage = Color(hex: 0x6B4FC4)
+    static let heal = Color(hex: 0x33A86B)
+
+    static func hp(_ ratio: Double) -> Color {
+        ratio >= 0.5 ? Color(hex: 0x00C950) : ratio >= 0.25 ? Color(hex: 0xFF8904) : Color(hex: 0xFB2C36)
+    }
+
+    static func stat(_ key: StatKey) -> Color {
+        switch key {
+        case .h: return Color(hex: 0x43A66B)
+        case .a: return Color(hex: 0xE07845)
+        case .vsa: return Color(hex: 0xB65F78)
+        case .c: return Color(hex: 0x4A90E2)
+        case .b: return Color(hex: 0x7B789E)
+        case .d: return Color(hex: 0x9B78B8)
+        case .s: return Color(hex: 0x20A6A6)
+        }
+    }
+
+    static func tab(_ kind: TabKind) -> Color {
+        switch kind {
+        case .attack: return attack
+        case .damage: return damage
+        case .heel: return heal
+        }
+    }
+
+    static func environment(_ key: String) -> Color {
+        switch key {
+        case "sun": return Color(hex: 0xF08C33)
+        case "rain": return Color(hex: 0x4080E6)
+        case "sand": return Color(hex: 0xB8945C)
+        case "snow": return Color(hex: 0x59B8D9)
+        case "electric": return Color(hex: 0xEBB81A)
+        case "grass": return Color(hex: 0x4DAD59)
+        case "psycho": return Color(hex: 0xE05C9E)
+        case "mist": return Color(hex: 0x9E80D9)
+        default: return Color(hex: 0x8A8FA8)
+        }
+    }
+
+    static let types: [String: (id: String, color: UInt32)] = [
+        "ノーマル": ("normal", 0x949495), "ほのお": ("fire", 0xE56C3E), "みず": ("water", 0x5185C5), "くさ": ("grass", 0x66A945),
+        "でんき": ("electric", 0xF6D851), "こおり": ("ice", 0x6DC8EB), "かくとう": ("fighting", 0xE09C40), "どく": ("poison", 0x735198),
+        "じめん": ("ground", 0x9C7743), "ひこう": ("flying", 0x81B9EF), "エスパー": ("psychic", 0xDD6B7B), "むし": ("bug", 0x9FA244),
+        "いわ": ("rock", 0xBFB889), "ゴースト": ("ghost", 0x684870), "ドラゴン": ("dragon", 0x535CA8), "あく": ("dark", 0x4C4948),
+        "はがね": ("steel", 0x69A9C7), "フェアリー": ("fairy", 0xDAB4D4),
+    ]
+
+    static let typeOrder = ["ノーマル", "ほのお", "みず", "くさ", "でんき", "こおり", "かくとう", "どく", "じめん", "ひこう", "エスパー", "むし", "いわ", "ゴースト", "ドラゴン", "あく", "はがね", "フェアリー"]
+
+    static func typeColor(_ type: String) -> Color {
+        Color(hex: types[type]?.color ?? 0x999999)
+    }
+}
+
+extension Color {
+    init(hex: UInt32, opacity: Double = 1) {
+        self.init(
+            .sRGB,
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255,
+            opacity: opacity
+        )
+    }
+}
+
+struct Icon: View {
+    let name: String
+    var size: CGFloat = 20
+
+    var body: some View {
+        Image(name)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+    }
+}
+
+struct TypeIcon: View {
+    let type: String
+    var size: CGFloat = 20
+
+    var body: some View {
+        Group {
+            if let id = Palette.types[type]?.id {
+                Image("type_\(id)")
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                RoundedRectangle(cornerRadius: size * 0.1)
+                    .fill(Palette.track)
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityLabel(type)
+    }
+}
+
+struct CategoryIcon: View {
+    let category: String
+    var size: CGFloat = 18
+
+    var body: some View {
+        Icon(name: category == "物理" ? "category_physical" : "category_special", size: size)
+            .accessibilityLabel(category)
+    }
+}
+
+struct NumberText: View {
+    let text: String
+    var value: Double?
+
+    init(_ text: String, value: Double? = nil) {
+        self.text = text
+        self.value = value
+    }
+
+    init(_ number: Int) {
+        self.text = String(number)
+        self.value = Double(number)
+    }
+
+    var body: some View {
+        Text(text)
+            .monospacedDigit()
+            .contentTransition(value.map { ContentTransition.numericText(value: $0) } ?? ContentTransition.numericText())
+            .animation(.snappy(duration: 0.32), value: text)
+    }
+}
+
+extension View {
+    func card(padding: CGFloat = 16) -> some View {
+        self
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    func sectionTitle() -> some View {
+        self
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(Palette.secondary)
+    }
+}

@@ -9,8 +9,23 @@ targets:
     platform: iOS
     sources:
       - path: PokeFire
-      - path: web
-        type: folder
+      - path: ../pokemons.json
+        group: Data
+        buildPhase: resources
+      - path: ../moves.json
+        group: Data
+        buildPhase: resources
+      - path: ../abilities.json
+        group: Data
+        buildPhase: resources
+      - path: ../items.json
+        group: Data
+        buildPhase: resources
+      - path: ../aliases.json
+        group: Data
+        buildPhase: resources
+      - path: ../usage_names.json
+        group: Data
         buildPhase: resources
     scheme: {}
     info:

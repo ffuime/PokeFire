@@ -2,8 +2,11 @@ name: iOS
 
 on:
   push:
-    branches: [main]
+    branches: [main, native-app]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -11,22 +14,6 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Build web
-        run: node build.mjs
-
-      - name: Bundle web files
-        run: |
-          rm -rf ios/web
-          mkdir -p ios/web
-          cp index.html style.css app.min.js site.webmanifest ios/web/
-          cp pokemons.json moves.json abilities.json items.json aliases.json usage_names.json ios/web/
-          cp -R sprite favicon help ios/web/
-          rm -f ios/web/help/style.scss
 
       - name: Select Xcode
         run: |
@@ -45,6 +32,7 @@ jobs:
       - name: Build app
         run: |
           cd ios
+          set -o pipefail
           xcodebuild \
             -project PokeFire.xcodeproj \
             -scheme PokeFire \
@@ -55,7 +43,23 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build 2>&1 | tee build.log
+
+      - name: Publish build log
+        if: always() && github.ref != 'refs/heads/main'
+        run: |
+          mkdir -p /tmp/ci-log
+          if [ -f ios/build.log ]; then
+            grep -E "error:|warning:|BUILD (SUCCEEDED|FAILED)" ios/build.log | sort -u > /tmp/ci-log/errors.txt || true
+            tail -n 400 ios/build.log > /tmp/ci-log/tail.txt
+          fi
+          echo "${{ github.sha }} ${{ job.status }}" > /tmp/ci-log/status.txt
+          cd /tmp/ci-log
+          git init -q
+          git checkout -q -b ci-log
+          git add .
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "build log ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-log
 
       - name: Package IPA
         run: |

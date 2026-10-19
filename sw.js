@@ -1,4 +1,4 @@
-const CACHE = "pokefire-20261019064347";
+const CACHE = "pokefire-20261019083137";
 const CORE = [
     "./",
     "./index.html",

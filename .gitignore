@@ -1,6 +1,5 @@
 node_modules/
 app.bundle.js
-ios/web/
 ios/PokeFire/Info.plist
 ios/build/
 ios/Payload/
@@ -8,3 +7,4 @@ ios/*.xcodeproj/
 *.ipa
 .DS_Store
 i.tmp
+ios/build.log

@@ -794,7 +794,6 @@ const runCalc = () => {
     const summary = summarize(entries, hp, multi);
     Object.assign(calcState, { entries, attacks, def, hp, multi, summary });
     fillResult($(".card_result"), "card_result", hp, summary.min, summary.max, summary.text, summary.rate);
-    pushNativeState();
     recordHistory();
     if ($("section.speed.is-open")) renderSpeed();
     refreshConstantPanel();
@@ -1108,7 +1107,6 @@ $(".detail_overview_flow")?.addEventListener("click", (e) => {
     const next = id !== "sum" && id === detailSelected && calcState.multi ? "sum" : id;
     if (next === detailSelected) return;
     detailSelected = next;
-    haptic(next === "sum" ? "soft" : "light");
     item.parentElement.querySelectorAll(".detail_overview_flow_item").forEach((other) => {
         const selected = other.dataset.id === String(next);
         if (other.classList.contains("selected") === selected) return;

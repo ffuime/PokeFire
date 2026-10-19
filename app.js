@@ -1,19 +1,5 @@
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-const nativeBridge = window.webkit?.messageHandlers?.pokefire;
-const isNative = !!nativeBridge;
-const postNative = (message) => nativeBridge?.postMessage(message);
-let lastSelectionHaptic = 0;
-const haptic = (style = "light") => {
-    if (!nativeBridge) return;
-    if (style === "selection") {
-        const now = performance.now();
-        if (now - lastSelectionHaptic < 35) return;
-        lastSelectionHaptic = now;
-    }
-    postNative({ type: "haptic", style });
-};
-if (isNative) document.documentElement.classList.add("is-native");
 
 const jsonCache = {};
 const loadJson = (file) => (jsonCache[file] ??= fetch(file).then((res) => (res.ok ? res.json() : Promise.reject(new Error(file)))));
@@ -64,7 +50,6 @@ $$("button.main_move_weak, button.main_move_powerup, button.main_ability_on, but
     button.addEventListener("click", () => {
         if (button.dataset.action) return;
         button.classList.toggle("active");
-        haptic("light");
     });
 });
 
@@ -157,7 +142,6 @@ const applyRankAbility = (side) => {
         select.dispatchEvent(new Event("change", { bubbles: true }));
     });
     const text = [...totals].filter(([, v]) => v).map(([id, v]) => `${id}${v > 0 ? "+" : ""}${v}`).join("・");
-    haptic(text ? "medium" : "warning");
     showToast(`${ability}：${text || "変化なし"}`);
 };
 
@@ -365,7 +349,6 @@ $$(".main_hpleft_range").forEach((range) => {
         const box = side.querySelector(".main_hpleft");
         const before = box?.dataset.now;
         syncHpLeft(side, Math.ceil(ratio * max));
-        if (box?.dataset.now !== before) haptic("selection");
     });
 });
 
@@ -373,7 +356,6 @@ $$(".main_evs_nature").forEach((nature) => {
     const items = nature.querySelectorAll(":scope > div");
     items.forEach((item) => {
         item.addEventListener("click", () => {
-            if (!item.classList.contains("selected")) haptic("light");
             items.forEach((other) => other.classList.remove("selected"));
             item.classList.add("selected");
             updateRealStats();
@@ -396,7 +378,6 @@ $$(".main_evs_range").forEach((range) => {
     range.setEvsValue = setValue;
     bindDrag(range, (ratio) => {
         const next = Math.max(0, Math.min(EVS_MAX, Math.round(ratio * EVS_MAX)));
-        if (String(next) !== num?.textContent) haptic("selection");
         setValue(next);
         saveAdjustments(range.closest("main"));
     });
@@ -424,7 +405,6 @@ $$(".main_evs_ranks_btn").forEach((button) => {
         const step = button.classList.contains("up") ? -1 : 1;
         const index = Math.max(0, Math.min(select.options.length - 1, select.selectedIndex + step));
         if (index === select.selectedIndex) return;
-        haptic("light");
 
         select.selectedIndex = index;
         select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -1015,7 +995,6 @@ function setupPokemonSearch(side) {
             if (!button || button.dataset.mode === chooseMode) return;
             chooseMode = button.dataset.mode;
             chooseTabs.querySelectorAll("button").forEach((b) => b.classList.toggle("active", b === button));
-            haptic("selection");
             filterPokemonList(lastQuery, { resetScroll: true });
         });
 
@@ -1030,7 +1009,6 @@ function setupPokemonSearch(side) {
             selectPokemon(item.dataset.name);
             applyUsageDefaults(side, item.dataset.name);
             rememberPokemon(item.dataset.name);
-            haptic("light");
             closePokemonChoose();
         });
 
@@ -1209,7 +1187,6 @@ const createCount = (className, title) => {
         const rect = label.getBoundingClientRect();
         const count = range[1] - range[0] + 1;
         const next = range[0] + Math.min(count - 1, Math.max(0, Math.floor(((x - rect.left) / rect.width) * count)));
-        if (next !== label.get()) haptic("selection");
         label.set(next);
     };
     select.addEventListener("change", () => label.set(Number(select.value)));
@@ -1497,7 +1474,6 @@ const modalSections = $$("section.modal_searchmove, section.modal_searchability,
 const syncScrollLock = () => {
     const locked = [...modalSections].some((section) => section.classList.contains("is-open"));
     document.documentElement.classList.toggle("is-scroll-locked", locked);
-    pushNativeState();
 };
 const scrollLockObserver = new MutationObserver(syncScrollLock);
 modalSections.forEach((section) => scrollLockObserver.observe(section, { attributes: true, attributeFilter: ["class"] }));
@@ -1627,7 +1603,6 @@ if (environment && environmentPanel) {
         pull = null;
     };
     const pullMode = (target) => {
-        if (isNative) return null;
         if (environment.classList.contains("is-open")) return "close";
         if (window.scrollY > 0) return null;
         if (document.body.classList.contains("is-choose-open")) return null;
@@ -2220,7 +2195,6 @@ constantPanel.addEventListener("click", (e) => {
         return;
     }
     const counter = e.target.closest(".main_constant_counter");
-    if (counter && e.target.closest("button")) haptic("light");
     const step = e.target.closest(".plus") ? 1 : e.target.closest(".minus") ? -1 : 0;
     if (!counter || !step) return;
     const { kind, key } = counter.dataset;
@@ -2474,7 +2448,7 @@ const domReady = new Promise((resolve) => {
 const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 const showOpenInApp = (code) => {
-    if (isNative || !isIOS) return;
+    if (!isIOS) return;
     const link = document.createElement("a");
     link.className = "open_in_app";
     link.href = `pokefire://open?s=${code}`;
@@ -2504,7 +2478,6 @@ const loadShareCode = async (code) => {
         historyMuted = true;
         await applyShare(data, report);
         if (location.hash) history.replaceState(null, "", location.pathname + location.search);
-        haptic("success");
         showOpenInApp(code);
     } catch (err) {
         console.error("共有URLを読み込めませんでした", err);
@@ -2520,8 +2493,7 @@ const loadShareCode = async (code) => {
 const shareCode = new URLSearchParams(location.hash.slice(1)).get("s");
 if (shareCode) loadShareCode(shareCode);
 
-const SHARE_BASE = "https://ffui.me/poke/fire/";
-const shareUrl = async () => `${isNative ? SHARE_BASE : `${location.origin}${location.pathname}`}#s=${await encodeShare(collectShare())}`;
+const shareUrl = async () => `${location.origin}${location.pathname}#s=${await encodeShare(collectShare())}`;
 
 const showToast = (text) => {
     const toast = document.createElement("p");
@@ -2536,10 +2508,6 @@ $(".detail_share")?.addEventListener("click", async (e) => {
     e.stopPropagation();
     try {
         const url = await shareUrl();
-        if (isNative) {
-            postNative({ type: "share", url });
-            return;
-        }
         if (navigator.share) {
             await navigator.share({ title: document.title, url }).catch(() => {});
             return;
@@ -2590,7 +2558,6 @@ const renderSpeedCursor = (clientY) => {
         const ratio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
         line.style.top = `${ratio * 100}%`;
         const next = Math.round(hi - ratio * (hi - lo));
-        if (next !== speedCursor) haptic("selection");
         speedCursor = next;
     } else if (speedCursor !== null) {
         line.style.top = `${((hi - speedCursor) / (hi - lo)) * 100}%`;
@@ -2831,65 +2798,9 @@ if (speedSection && speedGraph && speedPanel) {
     ["pointerup", "pointercancel"].forEach((type) => speedGraph.addEventListener(type, () => { graphDrag = false; }));
 }
 
-if (!isNative && "serviceWorker" in navigator && location.protocol !== "file:") {
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
-
-const NATIVE_TAB_LABELS = { attack: "攻撃", damage: "定数", heel: "回復" };
-let nativeStateText = "";
-function pushNativeState() {
-    if (!isNative || !window.calcLoaded) return;
-    const card = $(".card_result");
-    const text = (selector) => $(selector, card)?.textContent.trim() ?? "";
-    const bar = (selector) => {
-        const el = $(selector, card);
-        return { width: parseFloat(el?.style.width) / 100 || 0, color: el?.style.backgroundColor || "" };
-    };
-    const rate = $(".card_result_judge_percent", card);
-    const state = {
-        type: "state",
-        result: {
-            percent: text(".card_result_damage_percent"),
-            damage: text(".card_result_damage_num_take"),
-            hp: text(".card_result_damage_num_max"),
-            judge: text(".card_result_judgement"),
-            rate: rate && !rate.hidden ? rate.textContent.trim() : "",
-            sure: bar(".card_result_hpbar_kaku"),
-            maybe: bar(".card_result_hpbar_ran"),
-        },
-        tabs: orderTabs.map((tab, i) => ({ id: tab.id, kind: tab.kind, label: NATIVE_TAB_LABELS[tab.kind] ?? "", index: i + 1 })),
-        active: orderActive,
-        covered: document.documentElement.classList.contains("is-scroll-locked"),
-        environment: Object.fromEntries(["weather", "field"].map((kind, i) => [kind, readEnvironment()[i]?.split("_").pop() ?? "none"])),
-    };
-    const json = JSON.stringify(state);
-    if (json === nativeStateText) return;
-    nativeStateText = json;
-    postNative(state);
-}
-
-window.PokeFireNative = {
-    activate: (index) => activateTab(index),
-    add: (kind) => addTab(kind),
-    remove: (index) => removeTab(index),
-    move: (index, step) => {
-        if (index !== orderActive) activateTab(index);
-        moveActiveTab(step);
-    },
-    openDetail: () => $(".card_result")?.click(),
-    openSpeed: () => $(".card_speed")?.click(),
-    share: async () => postNative({ type: "share", url: await shareUrl() }),
-    openShare: (code) => loadShareCode(code),
-    setEnvironment: (kind, key) => {
-        const button = $(`.modal_environment_${kind}_select_${key}`);
-        if (button && !button.classList.contains("selected")) button.click();
-    },
-    openHistory: () => openHistory(),
-    sync: () => {
-        nativeStateText = "";
-        pushNativeState();
-    },
-};
 
 const HISTORY_KEY = "pokefire-history";
 const HISTORY_LIMIT = 60;
@@ -3006,7 +2917,6 @@ function openHistory() {
     closeOtherSidesChoose();
     renderHistory();
     historyAside.classList.add("is-open");
-    haptic("light");
 }
 const closeHistory = () => historyAside?.classList.remove("is-open");
 
@@ -3027,17 +2937,14 @@ if (historyAside) {
             entry.pinned = !entry.pinned;
             saveHistory(list);
             renderHistory();
-            haptic("light");
             return;
         }
         if (e.target.closest(".history_item_delete")) {
             saveHistory(list.filter((h) => h !== entry));
             renderHistory();
-            haptic("medium");
             return;
         }
         closeHistory();
-        haptic("medium");
         historyMuted = true;
         try {
             await applyShare(entry.data);
@@ -3079,30 +2986,4 @@ if (historyAside) {
             edgeSwipe = null;
         }
     }, { passive: true });
-}
-
-if (isNative) {
-    const ROLL_SELECTOR = ".main_evs_header_value, .main_evs_range_num, .main_basestats_item p, .main_move_header_info_power, .main_hpleft_header_value .percent, .main_hpleft_header_value .now, .speed_pokemon_item_num, .main_count .value, .detail_overview_log_damage_percent, .detail_overview_log_damage_num_take, .detail_index_num, .detail_hppm_header_num";
-    const rollTexts = new WeakMap();
-    new MutationObserver((records) => {
-        const targets = new Set();
-        records.forEach((record) => {
-            const node = record.target.nodeType === Node.TEXT_NODE ? record.target.parentElement : record.target;
-            const el = node?.closest?.(ROLL_SELECTOR);
-            if (el) targets.add(el);
-        });
-        targets.forEach((el) => {
-            const text = el.textContent;
-            const before = rollTexts.get(el);
-            rollTexts.set(el, text);
-            if (before === undefined || before === text) return;
-            el.classList.remove("num-roll");
-            void el.offsetWidth;
-            el.classList.add("num-roll");
-        });
-    }).observe(document.body, { subtree: true, childList: true, characterData: true });
-    document.addEventListener("animationend", (e) => {
-        if (e.animationName === "num-roll") e.target.classList.remove("num-roll");
-    });
-    window.addEventListener("load", () => $$(ROLL_SELECTOR).forEach((el) => rollTexts.set(el, el.textContent)));
 }
