@@ -221,7 +221,8 @@ struct FormsStrip: View {
                     } label: {
                         SpriteView(name: name, size: 56)
                             .frame(width: 70, height: 70)
-                            .background(Palette.background, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Color.black.opacity(0.07), lineWidth: 1))
                     }
                     .buttonStyle(PressableStyle())
                     .scaleEffect(index < shown ? 1 : 0.2)
@@ -229,9 +230,22 @@ struct FormsStrip: View {
                     .accessibilityLabel(name)
                 }
             }
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 10)
         }
         .scrollIndicators(.hidden)
+        .mask(
+            LinearGradient(
+                stops: [
+                    .init(color: .clear, location: 0),
+                    .init(color: .black, location: 0.06),
+                    .init(color: .black, location: 0.94),
+                    .init(color: .clear, location: 1),
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
         .task {
             for index in forms.indices {
                 withAnimation(.spring(response: 0.38, dampingFraction: 0.58)) {
@@ -305,7 +319,7 @@ struct MoveSection: View {
                 }
             }
 
-            SelectButton(text: side.move, height: 40, font: .callout) {
+            SelectButton(text: side.move, height: 40, font: .callout, translucent: true) {
                 Haptics.play(.light)
                 present(.move)
             }
@@ -472,7 +486,7 @@ struct AbilitySection: View {
                                 model.tapAbilityCandidate(role, name)
                             } label: {
                                 Text(name)
-                                    .font(.footnote.weight(selected ? .bold : .regular))
+                                    .font(selected ? .subheadline.weight(.bold) : .footnote)
                                     .foregroundStyle(selected ? Palette.accent : Color(hex: 0xAAAAAA))
                                     .fixedSize()
                             }
@@ -484,7 +498,7 @@ struct AbilitySection: View {
                 .fixedSize(horizontal: candidates.count <= 2, vertical: false)
             }
 
-            HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
                 SelectButton(text: side.ability) {
                     Haptics.play(.light)
                     present(.ability(role))

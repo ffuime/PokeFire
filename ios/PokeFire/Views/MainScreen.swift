@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 enum ActiveSheet: Identifiable, Hashable {
     case detail, speed, environment, help
@@ -30,42 +29,86 @@ struct MainScreen: View {
 
     @State private var page: Role? = .attacker
     @State private var sheet: ActiveSheet?
-    @State private var progress: CGFloat = 0
     @State private var pulled = false
+    @State private var turns = 0
+
+    private var sideTitles: [String] {
+        let kind = model.activeTab?.kind ?? .attack
+        let attacker = model.isConstantActive ? (Constants.kinds[kind]?.title ?? "") : model.attacker.name
+        return [attacker, model.defender.name]
+    }
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 0) {
-                ForEach(Role.allCases, id: \.self) { role in
-                    SidePanel(role: role, present: { sheet = $0 })
-                        .containerRelativeFrame(.horizontal)
-                        .id(role)
+        NavigationStack {
+            ScrollView(.horizontal) {
+                HStack(spacing: 0) {
+                    ForEach(Role.allCases, id: \.self) { role in
+                        SidePanel(role: role, present: { sheet = $0 })
+                            .containerRelativeFrame(.horizontal)
+                            .id(role)
+                    }
+                }
+                .scrollTargetLayout()
+            }
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: $page)
+            .scrollIndicators(.hidden)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.x / max(1, geometry.containerSize.width)
+            } action: { _, value in
+                if value < -0.08, !pulled {
+                    pulled = true
+                    openDrawer()
+                } else if value >= 0, pulled {
+                    pulled = false
                 }
             }
-            .scrollTargetLayout()
-        }
-        .scrollTargetBehavior(.paging)
-        .scrollPosition(id: $page)
-        .scrollIndicators(.hidden)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.contentOffset.x / max(1, geometry.containerSize.width)
-        } action: { _, value in
-            progress = value
-            if value < -0.08, !pulled {
-                pulled = true
-                openDrawer()
-            } else if value >= 0, pulled {
-                pulled = false
+            .safeAreaInset(edge: .top, spacing: 0) {
+                MainHeader(present: { sheet = $0 })
             }
-        }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            MainHeader(page: $page, progress: progress, openDrawer: openDrawer, present: { sheet = $0 })
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            ResultCard(present: { sheet = $0 })
-        }
-        .background {
-            EnvironmentBackdrop(weather: model.weather, field: model.field)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                ResultCard(present: { sheet = $0 })
+            }
+            .background {
+                EnvironmentBackdrop(weather: model.weather, field: model.field)
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: openDrawer) {
+                        Image("menu")
+                            .renderingMode(.template)
+                    }
+                    .accessibilityLabel("履歴")
+                }
+                ToolbarItem(placement: .principal) {
+                    NativeSegmented(
+                        segments: sideTitles.map { .text($0) },
+                        selected: (page ?? .attacker) == .attacker ? 0 : 1,
+                        fontSize: 13
+                    ) { index in
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            page = index == 0 ? .attacker : .defender
+                        }
+                    }
+                    .frame(width: 236, height: 34)
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        turns += 1
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
+                            model.swapSides()
+                        }
+                    } label: {
+                        Image("swap")
+                            .renderingMode(.template)
+                            .rotationEffect(.degrees(Double(turns) * 180))
+                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: turns)
+                    }
+                    .disabled(model.isConstantActive)
+                    .accessibilityLabel("攻守交代")
+                }
+            }
         }
         .sheet(item: $sheet) { item in
             sheetContent(item)
@@ -134,27 +177,16 @@ struct EnvironmentBackdrop: View {
 }
 
 struct MainHeader: View {
-    @Environment(AppModel.self) private var model
-    @Binding var page: Role?
-    let progress: CGFloat
-    let openDrawer: () -> Void
     let present: (ActiveSheet) -> Void
 
     var body: some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 10) {
-                CircleIconButton(icon: "menu", label: "履歴", action: openDrawer)
-                Spacer(minLength: 0)
-                EnvironmentPill { present(.environment) }
-                Spacer(minLength: 0)
-                Color.clear.frame(width: 44, height: 44)
-            }
+        VStack(spacing: 8) {
+            EnvironmentPill { present(.environment) }
             TabStrip()
-            SideSwitcher(page: $page, progress: progress)
         }
         .padding(.horizontal, 16)
-        .padding(.top, 4)
-        .padding(.bottom, 10)
+        .padding(.top, 2)
+        .padding(.bottom, 8)
     }
 }
 
@@ -179,7 +211,7 @@ struct EnvironmentPill: View {
             .lineLimit(1)
             .minimumScaleFactor(0.75)
             .padding(.horizontal, 14)
-            .frame(height: 44)
+            .frame(height: 42)
             .contentShape(Capsule())
             .contentTransition(.opacity)
         }
@@ -193,31 +225,19 @@ struct EnvironmentPill: View {
 
 struct TabStrip: View {
     @Environment(AppModel.self) private var model
-    @State private var dragging: Int?
+
+    private var items: [TabItem] {
+        model.tabs.enumerated().map { index, tab in
+            let name = index == model.active ? model.attacker.name : tab.snapshot?.name ?? model.attacker.name
+            let title = tab.kind == .attack && !name.isEmpty ? name : tab.kind.shortLabel
+            return TabItem(id: tab.id, kind: tab.kind, title: title)
+        }
+    }
 
     var body: some View {
         HStack(spacing: 8) {
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal) {
-                    HStack(spacing: 6) {
-                        ForEach(Array(model.tabs.enumerated()), id: \.element.id) { index, tab in
-                            TabChip(tab: tab, index: index, dragging: $dragging)
-                                .id(tab.id)
-                                .transition(.scale(scale: 0.6).combined(with: .opacity))
-                        }
-                    }
-                    .padding(.vertical, 4)
-                    .padding(.horizontal, 2)
-                    .animation(.spring(response: 0.35, dampingFraction: 0.8), value: model.tabs.map(\.id))
-                }
-                .scrollIndicators(.hidden)
-                .onChange(of: model.active) { _, value in
-                    guard model.tabs.indices.contains(value) else { return }
-                    withAnimation(.snappy) {
-                        proxy.scrollTo(model.tabs[value].id, anchor: .center)
-                    }
-                }
-            }
+            TabCollection(items: items, active: model.active, model: model)
+                .frame(height: 44)
 
             Menu {
                 ForEach([TabKind.attack, .damage, .heel], id: \.self) { kind in
@@ -240,217 +260,6 @@ struct TabStrip: View {
             .glassEffect(.regular.interactive(), in: Circle())
             .accessibilityLabel("タブを追加")
         }
-    }
-}
-
-struct TabDropDelegate: DropDelegate {
-    let target: OrderTab
-    let model: AppModel
-    @Binding var dragging: Int?
-
-    func dropEntered(info: DropInfo) {
-        guard let dragging, dragging != target.id,
-              let from = model.tabs.firstIndex(where: { $0.id == dragging }),
-              let to = model.tabs.firstIndex(where: { $0.id == target.id }) else { return }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-            model.reorderTab(from: from, to: to)
-        }
-    }
-
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    func performDrop(info: DropInfo) -> Bool {
-        dragging = nil
-        return true
-    }
-}
-
-struct TabChip: View {
-    @Environment(AppModel.self) private var model
-    let tab: OrderTab
-    let index: Int
-    @Binding var dragging: Int?
-
-    private var isActive: Bool { index == model.active }
-
-    private var title: String {
-        guard tab.kind == .attack else { return tab.kind.shortLabel }
-        let name = isActive ? model.attacker.name : tab.snapshot?.name ?? model.attacker.name
-        return name.isEmpty ? tab.kind.shortLabel : name
-    }
-
-    private var label: some View {
-        HStack(spacing: 5) {
-            Text("\(index + 1)")
-                .font(.caption.weight(.heavy))
-                .monospacedDigit()
-                .contentTransition(.numericText(value: Double(index)))
-            Icon(name: tab.kind.icon, size: 14)
-                .foregroundStyle(isActive ? Color.white : Palette.tab(tab.kind))
-            Text(title)
-                .font(.footnote.weight(.semibold))
-                .lineLimit(1)
-                .frame(maxWidth: 110)
-        }
-        .foregroundStyle(isActive ? Color.white : Palette.ink)
-        .padding(.horizontal, 12)
-        .frame(height: 34)
-        .contentShape(Capsule())
-    }
-
-    var body: some View {
-        Button {
-            model.activate(index)
-        } label: {
-            label
-        }
-        .buttonStyle(.plain)
-        .glassEffect(isActive ? .regular.tint(Palette.tab(tab.kind)).interactive() : .regular.interactive(), in: Capsule())
-        .contextMenu {
-            Button {
-                model.moveTab(index, by: -1)
-            } label: {
-                Label {
-                    Text("左へ移動")
-                } icon: {
-                    tintedImage("move_left", Palette.tab(tab.kind))
-                }
-            }
-            .disabled(index == 0)
-            Button {
-                model.moveTab(index, by: 1)
-            } label: {
-                Label {
-                    Text("右へ移動")
-                } icon: {
-                    tintedImage("move_right", Palette.tab(tab.kind))
-                }
-            }
-            .disabled(index >= model.tabs.count - 1)
-            Divider()
-            Button(role: .destructive) {
-                model.removeTab(index)
-            } label: {
-                Label {
-                    Text("削除")
-                } icon: {
-                    tintedImage("close_circle", Color.red)
-                }
-            }
-            .disabled(model.tabs.count <= 1)
-        }
-        .onDrag {
-            dragging = tab.id
-            Haptics.play(.medium)
-            return NSItemProvider(object: String(tab.id) as NSString)
-        }
-        .onDrop(of: [UTType.text], delegate: TabDropDelegate(target: tab, model: model, dragging: $dragging))
-        .animation(.snappy(duration: 0.25), value: isActive)
-        .accessibilityLabel("\(index + 1)番目 \(tab.kind.menuLabel) \(title)")
-        .accessibilityAddTraits(isActive ? .isSelected : [])
-    }
-}
-
-struct SideSwitcher: View {
-    @Environment(AppModel.self) private var model
-    @Binding var page: Role?
-    let progress: CGFloat
-    @State private var turns = 0
-    @State private var dragX: CGFloat?
-
-    var body: some View {
-        GeometryReader { geometry in
-            let swapWidth: CGFloat = 44
-            let spacing: CGFloat = 4
-            let side = max(1, (geometry.size.width - swapWidth - spacing * 2) / 2)
-            let travel = side + swapWidth + spacing * 2
-            let settled = min(1, max(0, progress)) * travel
-            let lensX = dragX.map { min(max(0, $0 - side / 2), travel) } ?? settled
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.black.opacity(0.045))
-                Capsule()
-                    .fill(Color.white.opacity(0.55))
-                    .frame(width: side - 4, height: geometry.size.height - 8)
-                    .glassEffect(.regular.interactive(), in: Capsule())
-                    .scaleEffect(dragX == nil ? 1 : 1.08)
-                    .offset(x: lensX + 2)
-                HStack(spacing: spacing) {
-                    sideLabel(.attacker)
-                        .frame(width: side)
-                    Button {
-                        turns += 1
-                        withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
-                            model.swapSides()
-                        }
-                    } label: {
-                        Icon(name: "swap", size: 18)
-                            .foregroundStyle(model.isConstantActive ? Palette.secondary.opacity(0.4) : Palette.accent)
-                            .rotationEffect(.degrees(Double(turns) * 180))
-                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: turns)
-                            .frame(width: swapWidth, height: swapWidth)
-                            .contentShape(Circle())
-                    }
-                    .buttonStyle(PressableStyle())
-                    .disabled(model.isConstantActive)
-                    .accessibilityLabel("攻守交代")
-                    sideLabel(.defender)
-                        .frame(width: side)
-                }
-            }
-            .contentShape(Capsule())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        dragX = value.location.x
-                    }
-                    .onEnded { value in
-                        let target: Role = value.location.x < geometry.size.width / 2 ? .attacker : .defender
-                        dragX = nil
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            page = target
-                        }
-                    }
-            )
-            .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.8), value: lensX)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragX == nil)
-        }
-        .frame(height: 50)
-    }
-
-    private func sideLabel(_ role: Role) -> some View {
-        let side = model.side(role)
-        let constant = role == .attacker && model.isConstantActive
-        let kind = model.activeTab?.kind ?? .attack
-        return HStack(spacing: 6) {
-            if constant {
-                Icon(name: kind.icon, size: 20)
-                    .foregroundStyle(Palette.tab(kind))
-                    .frame(width: 30, height: 30)
-            } else {
-                SpriteView(name: side.name, size: 30)
-            }
-            VStack(alignment: .leading, spacing: 0) {
-                if !constant {
-                    Text(role.title)
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(role == .attacker ? Palette.attack : Palette.accent)
-                }
-                Text(constant ? Constants.kinds[kind]?.title ?? "" : side.name)
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(Palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.leading, 8)
-        .padding(.trailing, 6)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
     }
 }
 

@@ -545,18 +545,23 @@ struct EnvironmentSegments: View {
     let selected: String
     let onSelect: (String) -> Void
 
-    var body: some View {
-        LensSelector(
-            items: keys,
-            selected: selected,
-            height: 56,
-            tint: { $0 == "none" ? Color.gray : Palette.environment($0) },
-            onSelect: onSelect
-        ) { key, active in
-            Icon(name: "\(kind)_\(key)", size: 26)
-                .foregroundStyle(active ? Palette.environment(key) : Color(hex: 0xB5B5BA))
-                .scaleEffect(active ? 1.1 : 1)
-                .accessibilityLabel(kind == "weather" ? EnvironmentInfo.label(weather: key) : EnvironmentInfo.label(field: key))
+    private func image(_ key: String) -> UIImage {
+        let base = UIImage(named: "\(kind)_\(key)") ?? UIImage()
+        let size = CGSize(width: 24, height: 24)
+        let resized = UIGraphicsImageRenderer(size: size).image { _ in
+            base.draw(in: CGRect(origin: .zero, size: size))
         }
+        let color = key == "none" ? UIColor.systemGray : UIColor(Palette.environment(key))
+        return resized.withTintColor(color, renderingMode: .alwaysOriginal)
+    }
+
+    var body: some View {
+        NativeSegmented(
+            segments: keys.map { .image(image($0)) },
+            selected: keys.firstIndex(of: selected) ?? 0
+        ) { index in
+            if keys.indices.contains(index) { onSelect(keys[index]) }
+        }
+        .frame(height: 44)
     }
 }

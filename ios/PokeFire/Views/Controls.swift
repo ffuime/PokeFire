@@ -4,14 +4,14 @@ struct SegmentBar: View {
     let count: Int
     let value: Int
     let color: Color
-    var height: CGFloat = 26
+    var height: CGFloat = 32
     let onChange: (Int) -> Void
 
     @State private var dragging = false
 
     var body: some View {
         GeometryReader { geometry in
-            HStack(spacing: 2) {
+            HStack(spacing: 1.5) {
                 ForEach(0..<count, id: \.self) { index in
                     Capsule()
                         .fill(index < value ? color : Palette.track)
@@ -61,6 +61,9 @@ struct RatioBar: View {
                 Capsule().fill(Palette.track)
                 Capsule()
                     .fill(color)
+                    .overlay(
+                        Capsule().fill(LinearGradient(colors: [Color.black.opacity(0.28), Color.black.opacity(0)], startPoint: .leading, endPoint: .trailing))
+                    )
                     .frame(width: max(height, geometry.size.width * min(1, max(0, ratio))))
             }
             .frame(height: height)
@@ -271,72 +274,77 @@ struct RankControl: View {
     }
 }
 
-struct LensSelector<Item: Hashable, ItemLabel: View>: View {
-    let items: [Item]
-    let selected: Item
-    var height: CGFloat = 40
-    let tint: (Item) -> Color
-    let onSelect: (Item) -> Void
-    @ViewBuilder let label: (Item, Bool) -> ItemLabel
-
-    @State private var dragX: CGFloat?
-    @State private var hovered: Int?
-
-    private func index(at x: CGFloat, width: CGFloat) -> Int {
-        let segment = width / CGFloat(max(1, items.count))
-        return min(items.count - 1, max(0, Int(x / max(1, segment))))
+struct NativeSegmented: UIViewRepresentable {
+    enum Segment {
+        case text(String)
+        case image(UIImage)
     }
 
-    var body: some View {
-        GeometryReader { geometry in
-            let width = geometry.size.width
-            let segment = width / CGFloat(max(1, items.count))
-            let selectedIndex = items.firstIndex(of: selected) ?? 0
-            let lensX = dragX.map { min(max(0, $0 - segment / 2), width - segment) } ?? CGFloat(selectedIndex) * segment
-            let activeIndex = dragX.map { index(at: $0, width: width) } ?? selectedIndex
-            let activeTint = tint(items[activeIndex])
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color.black.opacity(0.045))
-                Capsule()
-                    .fill(activeTint.opacity(0.14))
-                    .frame(width: segment - 6, height: geometry.size.height - 6)
-                    .glassEffect(.regular.interactive(), in: Capsule())
-                    .scaleEffect(dragX == nil ? 1 : 1.14)
-                    .offset(x: lensX + 3)
-                HStack(spacing: 0) {
-                    ForEach(items.indices, id: \.self) { position in
-                        label(items[position], position == activeIndex)
-                            .frame(width: segment, height: geometry.size.height)
-                            .accessibilityAddTraits(position == selectedIndex ? .isSelected : [])
-                    }
-                }
+    let segments: [Segment]
+    let selected: Int
+    var selectedColor: UIColor?
+    var fontSize: CGFloat = 15
+    let onChange: (Int) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onChange: onChange)
+    }
+
+    func makeUIView(context: Context) -> UISegmentedControl {
+        let control = UISegmentedControl()
+        for (index, segment) in segments.enumerated() {
+            switch segment {
+            case .text(let title):
+                control.insertSegment(withTitle: title, at: index, animated: false)
+            case .image(let image):
+                control.insertSegment(with: image, at: index, animated: false)
             }
-            .contentShape(Capsule())
-            .highPriorityGesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        dragX = value.location.x
-                        let position = index(at: value.location.x, width: width)
-                        if position != hovered {
-                            if hovered != nil { Haptics.play(.selection) }
-                            hovered = position
-                        }
-                    }
-                    .onEnded { value in
-                        let position = index(at: value.location.x, width: width)
-                        let tapped = abs(value.translation.width) < 6 && abs(value.translation.height) < 6
-                        dragX = nil
-                        hovered = nil
-                        if tapped || items[position] != selected {
-                            onSelect(items[position])
-                        }
-                    }
-            )
-            .animation(.interactiveSpring(response: 0.28, dampingFraction: 0.78), value: lensX)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragX == nil)
         }
-        .frame(height: height)
+        control.selectedSegmentIndex = selected
+        control.addTarget(context.coordinator, action: #selector(Coordinator.changed(_:)), for: .valueChanged)
+        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        control.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        style(control)
+        return control
+    }
+
+    func updateUIView(_ control: UISegmentedControl, context: Context) {
+        context.coordinator.onChange = onChange
+        for (index, segment) in segments.enumerated() where index < control.numberOfSegments {
+            switch segment {
+            case .text(let title):
+                if control.titleForSegment(at: index) != title {
+                    control.setTitle(title, forSegmentAt: index)
+                }
+            case .image(let image):
+                control.setImage(image, forSegmentAt: index)
+            }
+        }
+        if control.selectedSegmentIndex != selected {
+            control.selectedSegmentIndex = selected
+        }
+        style(control)
+    }
+
+    private func style(_ control: UISegmentedControl) {
+        var selectedAttributes: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: fontSize, weight: .bold)]
+        if let selectedColor { selectedAttributes[.foregroundColor] = selectedColor }
+        control.setTitleTextAttributes(selectedAttributes, for: .selected)
+        control.setTitleTextAttributes([.font: UIFont.systemFont(ofSize: fontSize, weight: .regular), .foregroundColor: UIColor.secondaryLabel], for: .normal)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var onChange: (Int) -> Void
+
+        init(onChange: @escaping (Int) -> Void) {
+            self.onChange = onChange
+        }
+
+        @objc func changed(_ sender: UISegmentedControl) {
+            Haptics.play(.selection)
+            onChange(sender.selectedSegmentIndex)
+        }
     }
 }
 
@@ -344,25 +352,22 @@ struct NatureControl: View {
     let nature: Int
     let onChange: (Int) -> Void
 
+    private let options = [9, 10, 11]
+
     private func color(_ value: Int) -> Color {
         value == 11 ? Palette.rankUp : value == 9 ? Palette.rankDown : Palette.ink
     }
 
     var body: some View {
-        LensSelector(
-            items: [9, 10, 11],
-            selected: nature,
-            tint: { $0 == 10 ? Color.gray : color($0) },
-            onSelect: { value in
-                if value != nature { onChange(value) }
-            }
-        ) { value, active in
-            Text(value == 9 ? "×0.9" : value == 11 ? "×1.1" : "×1.0")
-                .font(.subheadline.weight(active ? .bold : .regular))
-                .foregroundStyle(active ? color(value) : Palette.secondary)
+        NativeSegmented(
+            segments: [.text("×0.9"), .text("×1.0"), .text("×1.1")],
+            selected: options.firstIndex(of: nature) ?? 1,
+            selectedColor: UIColor(color(nature))
+        ) { index in
+            let value = options[max(0, min(options.count - 1, index))]
+            if value != nature { onChange(value) }
         }
-        .frame(width: 186)
-        .accessibilityElement(children: .contain)
+        .frame(width: 186, height: 36)
         .accessibilityLabel("性格補正")
     }
 }
@@ -474,6 +479,7 @@ struct SelectButton: View {
     var sprite: String?
     var height: CGFloat = 48
     var font: Font = .body
+    var translucent = false
     let action: () -> Void
 
     var body: some View {
@@ -498,8 +504,14 @@ struct SelectButton: View {
             }
             .padding(.horizontal, 14)
             .frame(height: height)
-            .background(UnevenBox().fill(Color.white))
-            .overlay(UnevenBox().stroke(Color(hex: 0xDDDDDD), lineWidth: 1))
+            .background {
+                if translucent {
+                    UnevenBox().fill(.ultraThinMaterial)
+                } else {
+                    UnevenBox().fill(Color.white)
+                }
+            }
+            .overlay(UnevenBox().stroke(Color(hex: 0xDDDDDD).opacity(translucent ? 0.7 : 1), lineWidth: 1))
             .contentShape(UnevenBox())
         }
         .buttonStyle(PressableStyle())
