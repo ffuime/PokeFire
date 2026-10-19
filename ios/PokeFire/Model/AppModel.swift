@@ -90,7 +90,7 @@ final class AppModel {
         selectAbilityIfCandidate(.attacker, "さめはだ")
         selectPokemonCore(.defender, "メガリザードンX")
         selectAbilityIfCandidate(.defender, "かたいツメ")
-        selectMoveCore("じしん")
+        selectMoveCore("げきりん")
         tabs = [newTab(.attack)]
         if let session = Storage.session, let json = try? JSON.parse(session) {
             historyMuted = true
@@ -1069,6 +1069,27 @@ final class AppModel {
     }
 
     func constantMaxHP() -> Int { defender.maxHP }
+
+    // MARK: - Reset
+
+    func resetAll() {
+        historyTask?.cancel()
+        speedConditions = [.attacker: [], .defender: []]
+        speedOverride = [:]
+        weather = "none"
+        field = "none"
+        shared = [:]
+        swapSlots = [SideSnapshot(), SideSnapshot()]
+        slotOfRole = [.attacker: 0, .defender: 1]
+        attacker = normalized(SideState.initial(.attacker))
+        defender = normalized(SideState.initial(.defender))
+        selectMoveCore("げきりん")
+        tabs = [newTab(.attack)]
+        active = 0
+        recalc()
+        Haptics.play(.success)
+        showToast("リセットしました")
+    }
 
     // MARK: - Swap
 

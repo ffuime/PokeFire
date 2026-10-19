@@ -34,14 +34,7 @@ struct MainScreen: View {
     @State private var showEnvironment = false
 
     private func present(_ item: ActiveSheet) {
-        if item == .environment {
-            Haptics.play(.light)
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
-                showEnvironment = true
-            }
-        } else {
-            sheet = item
-        }
+        sheet = item
     }
 
     private func closeEnvironment() {
@@ -83,22 +76,6 @@ struct MainScreen: View {
         }
         .background {
             EnvironmentBackdrop(weather: model.weather, field: model.field)
-        }
-        .overlay {
-            if showEnvironment {
-                Color.black.opacity(0.14)
-                    .ignoresSafeArea()
-                    .onTapGesture { closeEnvironment() }
-                    .transition(.opacity)
-            }
-        }
-        .overlay(alignment: .top) {
-            if showEnvironment {
-                EnvironmentPanel(close: closeEnvironment)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 4)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-            }
         }
         .sheet(item: $sheet) { item in
             sheetContent(item)
@@ -244,6 +221,17 @@ struct MainHeader: View {
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 10)
+        .contentShape(Rectangle())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    let down = value.translation.height
+                    if down > 44, down > abs(value.translation.width) * 1.4 {
+                        Haptics.play(.light)
+                        present(.environment)
+                    }
+                }
+        )
     }
 }
 
@@ -282,6 +270,7 @@ struct EnvironmentPill: View {
 
 struct TabStrip: View {
     @Environment(AppModel.self) private var model
+    @State private var confirmReset = false
 
     private var items: [TabItem] {
         model.tabs.enumerated().map { index, tab in
@@ -293,8 +282,19 @@ struct TabStrip: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            TabCollection(items: items, active: model.active, model: model)
-                .frame(height: 44)
+            TabCollection(items: items, active: model.active, model: model) {
+                confirmReset = true
+            }
+            .frame(height: 44)
+            .confirmationDialog("すべての条件をリセットしますか？", isPresented: $confirmReset, titleVisibility: .visible) {
+                Button("リセット", role: .destructive) {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                        model.resetAll()
+                    }
+                }
+            } message: {
+                Text("タブ・ポケモン・調整・天候・フィールドが初期状態に戻ります。")
+            }
 
             Menu {
                 ForEach([TabKind.attack, .damage, .heel], id: \.self) { kind in
@@ -375,6 +375,10 @@ struct SideSwitcher: View {
                         dragX = value.location.x
                     }
                     .onEnded { value in
+                        if abs(value.translation.height) > 20, abs(value.translation.height) > abs(value.translation.width) {
+                            dragX = nil
+                            return
+                        }
                         let target: Role = value.location.x < geometry.size.width / 2 ? .attacker : .defender
                         let goal: CGFloat = target == .attacker ? 0 : 1
                         pendingTarget = abs(progress - goal) < 0.02 ? nil : goal
@@ -498,6 +502,16 @@ struct ResultCard: View {
             Haptics.play(.light)
             present(.detail)
         }
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20)
+                .onEnded { value in
+                    let up = -value.translation.height
+                    if up > 36, up > abs(value.translation.width) * 1.2 {
+                        Haptics.play(.light)
+                        present(.detail)
+                    }
+                }
+        )
         .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .contextMenu {
             Button {

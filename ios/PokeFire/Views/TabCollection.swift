@@ -34,6 +34,18 @@ struct TabChipLabel: View {
     }
 }
 
+struct ResetChipLabel: View {
+    var body: some View {
+        Image(systemName: "arrow.counterclockwise")
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Palette.boosted)
+            .frame(width: 34, height: 34)
+            .glassEffect(.regular, in: Circle())
+            .accessibilityLabel("すべてリセット")
+            .accessibilityAddTraits(.isButton)
+    }
+}
+
 final class TabCell: UICollectionViewCell {
     var tabID: Int?
 }
@@ -42,9 +54,12 @@ struct TabCollection: UIViewRepresentable {
     let items: [TabItem]
     let active: Int
     let model: AppModel
+    let onReset: () -> Void
+
+    static let tabSection = 1
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(model: model)
+        Coordinator(model: model, onReset: onReset)
     }
 
     func makeUIView(context: Context) -> UICollectionView {
@@ -59,6 +74,7 @@ struct TabCollection: UIViewRepresentable {
         view.showsHorizontalScrollIndicator = false
         view.clipsToBounds = false
         view.register(TabCell.self, forCellWithReuseIdentifier: "tab")
+        view.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "reset")
         view.dataSource = context.coordinator
         view.delegate = context.coordinator
         view.dragDelegate = context.coordinator
@@ -73,6 +89,7 @@ struct TabCollection: UIViewRepresentable {
     func updateUIView(_ view: UICollectionView, context: Context) {
         let coordinator = context.coordinator
         coordinator.model = model
+        coordinator.onReset = onReset
         guard !view.hasActiveDrag else { return }
         let activeChanged = coordinator.active != active
         guard coordinator.items != items || activeChanged else { return }
@@ -82,7 +99,7 @@ struct TabCollection: UIViewRepresentable {
         coordinator.apply(view, from: old, to: items)
         if activeChanged, items.indices.contains(active) {
             DispatchQueue.main.async {
-                view.scrollToItem(at: IndexPath(item: active, section: 0), at: .centeredHorizontally, animated: true)
+                view.scrollToItem(at: IndexPath(item: active, section: TabCollection.tabSection), at: .centeredHorizontally, animated: true)
             }
         }
     }
@@ -92,11 +109,16 @@ struct TabCollection: UIViewRepresentable {
         var items: [TabItem] = []
         var active = 0
         var model: AppModel
-        var dragging = false
+        var onReset: () -> Void
         private var previewKey: String?
 
-        init(model: AppModel) {
+        init(model: AppModel, onReset: @escaping () -> Void) {
             self.model = model
+            self.onReset = onReset
+        }
+
+        private func path(_ item: Int) -> IndexPath {
+            IndexPath(item: item, section: TabCollection.tabSection)
         }
 
         private func configure(_ cell: UICollectionViewCell, item: TabItem, number: Int, active isActive: Bool) {
@@ -117,7 +139,7 @@ struct TabCollection: UIViewRepresentable {
             if oldIDs.count == newIDs.count + 1, let removed = oldIDs.firstIndex(where: { !newIDs.contains($0) }),
                oldIDs.filter({ newIDs.contains($0) }) == newIDs {
                 collectionView.performBatchUpdates({
-                    collectionView.deleteItems(at: [IndexPath(item: removed, section: 0)])
+                    collectionView.deleteItems(at: [path(removed)])
                 }, completion: { _ in
                     self.relabel(collectionView, order: self.items)
                 })
@@ -127,7 +149,7 @@ struct TabCollection: UIViewRepresentable {
             if newIDs.count == oldIDs.count + 1, let inserted = newIDs.firstIndex(where: { !oldIDs.contains($0) }),
                newIDs.filter({ oldIDs.contains($0) }) == oldIDs {
                 collectionView.performBatchUpdates({
-                    collectionView.insertItems(at: [IndexPath(item: inserted, section: 0)])
+                    collectionView.insertItems(at: [path(inserted)])
                 }, completion: { _ in
                     self.relabel(collectionView, order: self.items)
                 })
@@ -138,7 +160,7 @@ struct TabCollection: UIViewRepresentable {
                 collectionView.performBatchUpdates({
                     for (from, id) in oldIDs.enumerated() {
                         if let to = newIDs.firstIndex(of: id), to != from {
-                            collectionView.moveItem(at: IndexPath(item: from, section: 0), to: IndexPath(item: to, section: 0))
+                            collectionView.moveItem(at: path(from), to: path(to))
                         }
                     }
                 }, completion: { _ in
@@ -147,7 +169,7 @@ struct TabCollection: UIViewRepresentable {
                 relabel(collectionView, order: new)
                 return
             }
-            collectionView.reloadData()
+            collectionView.reloadSections(IndexSet(integer: TabCollection.tabSection))
         }
 
         private func relabel(_ collectionView: UICollectionView, order: [TabItem]) {
@@ -158,11 +180,23 @@ struct TabCollection: UIViewRepresentable {
             }
         }
 
+        func numberOfSections(in collectionView: UICollectionView) -> Int {
+            2
+        }
+
         func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-            items.count
+            section == TabCollection.tabSection ? items.count : 1
         }
 
         func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+            if indexPath.section != TabCollection.tabSection {
+                let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "reset", for: indexPath)
+                cell.contentConfiguration = UIHostingConfiguration {
+                    ResetChipLabel()
+                }
+                .margins(.all, 0)
+                return cell
+            }
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "tab", for: indexPath)
             let index = indexPath.item
             if items.indices.contains(index) {
@@ -173,6 +207,11 @@ struct TabCollection: UIViewRepresentable {
 
         func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
             collectionView.deselectItem(at: indexPath, animated: false)
+            if indexPath.section != TabCollection.tabSection {
+                Haptics.play(.light)
+                onReset()
+                return
+            }
             model.activate(indexPath.item)
         }
 
@@ -182,7 +221,9 @@ struct TabCollection: UIViewRepresentable {
         }
 
         func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemsAt indexPaths: [IndexPath], point: CGPoint) -> UIContextMenuConfiguration? {
-            guard let index = indexPaths.first?.item, items.indices.contains(index) else { return nil }
+            guard let indexPath = indexPaths.first, indexPath.section == TabCollection.tabSection,
+                  items.indices.contains(indexPath.item) else { return nil }
+            let index = indexPath.item
             let kind = items[index].kind
             let tint = UIColor(Palette.tab(kind))
             let count = items.count
@@ -209,8 +250,7 @@ struct TabCollection: UIViewRepresentable {
         }
 
         func collectionView(_ collectionView: UICollectionView, itemsForBeginning session: UIDragSession, at indexPath: IndexPath) -> [UIDragItem] {
-            guard items.indices.contains(indexPath.item) else { return [] }
-            dragging = true
+            guard indexPath.section == TabCollection.tabSection, items.indices.contains(indexPath.item) else { return [] }
             let provider = NSItemProvider(object: String(items[indexPath.item].id) as NSString)
             let item = UIDragItem(itemProvider: provider)
             item.localObject = items[indexPath.item].id
@@ -226,7 +266,6 @@ struct TabCollection: UIViewRepresentable {
         }
 
         func collectionView(_ collectionView: UICollectionView, dragSessionDidEnd session: UIDragSession) {
-            dragging = false
             previewKey = nil
             relabel(collectionView, order: items)
         }
@@ -240,38 +279,46 @@ struct TabCollection: UIViewRepresentable {
             session.localDragSession != nil
         }
 
+        private func target(_ destination: IndexPath?) -> Int? {
+            guard !items.isEmpty, let destination else { return nil }
+            if destination.section != TabCollection.tabSection { return 0 }
+            return min(items.count - 1, max(0, destination.item))
+        }
+
         func collectionView(_ collectionView: UICollectionView, dropSessionDidUpdate session: UIDropSession, withDestinationIndexPath destinationIndexPath: IndexPath?) -> UICollectionViewDropProposal {
             guard let local = session.localDragSession else { return UICollectionViewDropProposal(operation: .forbidden) }
+            guard let destinationIndexPath, destinationIndexPath.section == TabCollection.tabSection else {
+                return UICollectionViewDropProposal(operation: .move, intent: .unspecified)
+            }
             if let id = local.items.first?.localObject as? Int,
                let from = items.firstIndex(where: { $0.id == id }),
-               let destination = destinationIndexPath, !items.isEmpty {
-                let target = min(items.count - 1, max(0, destination.item))
-                let key = "\(id)>\(target)"
+               let to = target(destinationIndexPath) {
+                let key = "\(id)>\(to)"
                 if key != previewKey {
                     previewKey = key
                     var order = items
                     let moved = order.remove(at: from)
-                    order.insert(moved, at: target)
+                    order.insert(moved, at: to)
                     relabel(collectionView, order: order)
-                    if target != from { Haptics.play(.selection) }
+                    if to != from { Haptics.play(.selection) }
                 }
             }
             return UICollectionViewDropProposal(operation: .move, intent: .insertAtDestinationIndexPath)
         }
 
         func collectionView(_ collectionView: UICollectionView, performDropWith coordinator: UICollectionViewDropCoordinator) {
-            guard let dropItem = coordinator.items.first, let source = dropItem.sourceIndexPath, !items.isEmpty else { return }
-            let target = min(items.count - 1, max(0, coordinator.destinationIndexPath?.item ?? items.count - 1))
-            let destination = IndexPath(item: target, section: 0)
+            guard let dropItem = coordinator.items.first, let source = dropItem.sourceIndexPath,
+                  source.section == TabCollection.tabSection,
+                  let to = target(coordinator.destinationIndexPath ?? path(items.count - 1)) else { return }
+            let destination = path(to)
             collectionView.performBatchUpdates({
                 let moved = items.remove(at: source.item)
-                items.insert(moved, at: target)
+                items.insert(moved, at: to)
                 collectionView.moveItem(at: source, to: destination)
             }, completion: nil)
             coordinator.drop(dropItem.dragItem, toItemAt: destination)
-            dragging = false
             previewKey = nil
-            model.reorderTab(from: source.item, to: target)
+            model.reorderTab(from: source.item, to: to)
             active = model.active
             relabel(collectionView, order: items)
         }

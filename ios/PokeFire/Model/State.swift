@@ -59,7 +59,7 @@ struct SideState: Equatable {
             return (key, EVState(points: points))
         })
         if role == .attacker {
-            return SideState(role: role, name: "ガブリアス", types: ["ドラゴン", "じめん"], evs: evs, ability: "さめはだ", move: "じしん")
+            return SideState(role: role, name: "ガブリアス", types: ["ドラゴン", "じめん"], evs: evs, ability: "さめはだ", move: "げきりん")
         }
         return SideState(role: role, name: "メガリザードンX", types: ["ほのお", "ドラゴン"], evs: evs, ability: "かたいツメ", item: "メガストーン")
     }

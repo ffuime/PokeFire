@@ -71,17 +71,6 @@ struct SidePanel: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .onScrollGeometryChange(for: CGFloat.self) { geometry in
-            geometry.contentOffset.y + geometry.contentInsets.top
-        } action: { _, value in
-            if value < -72, !pulled {
-                pulled = true
-                Haptics.play(.medium)
-                present(.environment)
-            } else if value >= -4, pulled {
-                pulled = false
-            }
-        }
     }
 }
 

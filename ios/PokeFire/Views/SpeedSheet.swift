@@ -168,7 +168,12 @@ struct SpeedSheet: View {
 }
 
 private struct BubbleShape: Shape {
-    let tailRatio: CGFloat
+    var tailRatio: CGFloat
+
+    var animatableData: CGFloat {
+        get { tailRatio }
+        set { tailRatio = newValue }
+    }
 
     func path(in rect: CGRect) -> Path {
         var path = RoundedRectangle(cornerRadius: 26, style: .continuous).path(in: rect)
@@ -227,7 +232,16 @@ private struct SpeedEditor: View {
             BubbleShape(tailRatio: role == .attacker ? 0.25 : 0.75)
                 .fill(Color.white)
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
+                .animation(.spring(response: 0.42, dampingFraction: 0.78), value: role)
         )
+        .keyframeAnimator(initialValue: CGFloat(1), trigger: role) { content, scale in
+            content.scaleEffect(scale, anchor: UnitPoint(x: role == .attacker ? 0.25 : 0.75, y: 0))
+        } keyframes: { _ in
+            KeyframeTrack {
+                SpringKeyframe(CGFloat(0.93), duration: 0.12)
+                SpringKeyframe(CGFloat(1), duration: 0.35, spring: .bouncy)
+            }
+        }
         .contentShape(Rectangle())
         .onTapGesture {}
     }
