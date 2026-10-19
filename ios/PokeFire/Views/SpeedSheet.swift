@@ -99,10 +99,9 @@ struct SpeedSheet: View {
                     GeometryReader { geometry in
                         ZStack(alignment: .top) {
                             Color.black.opacity(0.06)
-                                .ignoresSafeArea()
                                 .contentShape(Rectangle())
                                 .onTapGesture { location in
-                                    if location.y < 104 {
+                                    if location.y < 110 {
                                         let tapped: Role = location.x < geometry.size.width / 2 ? .attacker : .defender
                                         Haptics.play(.light)
                                         selected = tapped == role ? nil : tapped
@@ -110,19 +109,22 @@ struct SpeedSheet: View {
                                         selected = nil
                                     }
                                 }
-                            SpeedEditor(role: role) {
-                                selected = nil
-                            }
-                            .id(role)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 108)
-                            .transition(.move(edge: .top).combined(with: .opacity))
                         }
                     }
                     .transition(.opacity)
                 }
             }
-            .animation(.spring(response: 0.38, dampingFraction: 0.86), value: selected)
+            .overlay(alignment: .top) {
+                if let role = selected {
+                    SpeedEditor(role: role) {
+                        selected = nil
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 120)
+                    .transition(.scale(scale: 0.6, anchor: UnitPoint(x: role == .attacker ? 0.25 : 0.75, y: 0)).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.4, dampingFraction: 0.78), value: selected != nil)
             .background(Palette.background)
             .navigationTitle("すばやさ比較")
             .navigationBarTitleDisplayMode(.inline)

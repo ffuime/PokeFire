@@ -31,12 +31,30 @@ struct MainScreen: View {
     @State private var sheet: ActiveSheet?
     @State private var progress: CGFloat = 0
     @State private var pulled = false
+    @State private var showEnvironment = false
+
+    private func present(_ item: ActiveSheet) {
+        if item == .environment {
+            Haptics.play(.light)
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
+                showEnvironment = true
+            }
+        } else {
+            sheet = item
+        }
+    }
+
+    private func closeEnvironment() {
+        withAnimation(.spring(response: 0.38, dampingFraction: 0.86)) {
+            showEnvironment = false
+        }
+    }
 
     var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 0) {
                 ForEach(Role.allCases, id: \.self) { role in
-                    SidePanel(role: role, present: { sheet = $0 })
+                    SidePanel(role: role, present: { present($0) })
                         .containerRelativeFrame(.horizontal)
                         .id(role)
                 }
@@ -58,13 +76,29 @@ struct MainScreen: View {
             }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
-            MainHeader(page: $page, progress: progress, openDrawer: openDrawer, present: { sheet = $0 })
+            MainHeader(page: $page, progress: progress, openDrawer: openDrawer, present: { present($0) })
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            ResultCard(present: { sheet = $0 })
+            ResultCard(present: { present($0) })
         }
         .background {
             EnvironmentBackdrop(weather: model.weather, field: model.field)
+        }
+        .overlay {
+            if showEnvironment {
+                Color.black.opacity(0.14)
+                    .ignoresSafeArea()
+                    .onTapGesture { closeEnvironment() }
+                    .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .top) {
+            if showEnvironment {
+                EnvironmentPanel(close: closeEnvironment)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
         }
         .sheet(item: $sheet) { item in
             sheetContent(item)
@@ -96,6 +130,62 @@ struct MainScreen: View {
         case .item(let role):
             EntrySearchSheet(kind: .items, role: role)
         }
+    }
+}
+
+struct EnvironmentPanel: View {
+    @Environment(AppModel.self) private var model
+    let close: () -> Void
+    @State private var dragY: CGFloat = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("天候").sectionTitle()
+                Spacer()
+                Text(EnvironmentInfo.label(weather: model.weather))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.environment(model.weather))
+            }
+            EnvironmentSegments(kind: "weather", keys: EnvironmentInfo.weathers.map { $0.key }, selected: model.weather) { model.setWeather($0) }
+            HStack {
+                Text("フィールド").sectionTitle()
+                Spacer()
+                Text(EnvironmentInfo.label(field: model.field))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.environment(model.field))
+            }
+            .padding(.top, 6)
+            EnvironmentSegments(kind: "field", keys: EnvironmentInfo.fields.map { $0.key }, selected: model.field) { model.setField($0) }
+            Capsule()
+                .fill(Palette.secondary.opacity(0.35))
+                .frame(width: 40, height: 5)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 4)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 18)
+        .padding(.bottom, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.16), radius: 28, y: 10)
+        )
+        .offset(y: min(0, dragY))
+        .gesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { value in
+                    dragY = value.translation.height
+                }
+                .onEnded { value in
+                    if value.translation.height < -40 || value.predictedEndTranslation.height < -120 {
+                        close()
+                    }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        dragY = 0
+                    }
+                }
+        )
     }
 }
 
