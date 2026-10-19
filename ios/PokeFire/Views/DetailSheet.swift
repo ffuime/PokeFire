@@ -517,12 +517,13 @@ private struct FlowItem: View {
         let ok = result?.isOK ?? false
         let plan = result?.info?.plan
         let crits = plan?.filter(\.crit).count ?? 0
-        let flags: [String?] = [
+        let flagParts: [String?] = [
             atk.move,
             plan.map { "\($0.count)回" },
             atk.crit || crits > 0 ? "急所\(crits > 0 ? "\(crits)回" : "")" : nil,
             atk.powerUp ? "威力アップ" : nil,
-        ].compactMap { $0 }.joined(separator: "・")
+        ]
+        let flags = flagParts.compactMap { $0 }.joined(separator: "・")
         VStack(alignment: .leading, spacing: 2) {
             Text("\(atk.name)→\(output.def?.name ?? "")")
                 .font(.subheadline.weight(.bold))
