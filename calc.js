@@ -61,7 +61,8 @@ const CALC_FIXED_MULTI_HIT = {
 const CALC_VARIABLE_MULTI_HIT = new Set(["スイープビンタ", "スケイルショット", "タネマシンガン", "つららばり", "ボーンラッシュ", "ミサイルばり", "みずしゅりけん", "ロックブラスト"]);
 
 const CALC_OHKO_MOVES = new Set(["じわれ", "ぜったいれいど", "つのドリル", "ハサミギロチン"]);
-const CALC_UNSUPPORTED_MOVES = new Set(["カウンター", "ほうふく", "ミラーコート", "メタルバースト", "はきだす", "なげつける", "ふくろだたき"]);
+const CALC_UNSUPPORTED_MOVES = new Set(["カウンター", "ほうふく", "ミラーコート", "メタルバースト", "はきだす", "ふくろだたき"]);
+const rankSumOf = (p) => ["a", "b", "c", "d", "s"].reduce((sum, key) => sum + Math.max(0, p.evs[key]?.rank ?? 0), 0);
 const CALC_ALWAYS_CRIT_MOVES = new Set(["こおりのいぶき", "トリックフラワー", "やまあらし"]);
 const CALC_SCREEN_BREAK_MOVES = new Set(["かわらわり", "サイコファング", "レイジングブル"]);
 
@@ -69,6 +70,7 @@ const CALC_POWER_UP_MOVES = {
     "しっぺがえし": { kind: "base" }, "じだんだ": { kind: "base" }, "やけっぱち": { kind: "base" }, "ダメおし": { kind: "base" },
     "ゆきなだれ": { kind: "base" }, "たたりめ": { kind: "base" }, "ひゃっきやこう": { kind: "base" }, "どくばりセンボン": { kind: "base" },
     "きまぐレーザー": { kind: "base" }, "りんしょう": { kind: "base" },
+    "アクロバット": { kind: "base" }, "はたきおとす": { kind: "custom" },
     "からげんき": { kind: "power", mod: 8192 }, "うっぷんばらし": { kind: "power", mod: 8192 }, "ベノムショック": { kind: "power", mod: 8192 },
     "Gのちから": { kind: "power", mod: 6144 },
     "じしん": { kind: "damage", label: "地中状態" }, "なみのり": { kind: "damage", label: "水中状態" }, "うずしお": { kind: "damage", label: "水中状態" },
@@ -222,6 +224,9 @@ const readSide = (role) => {
         crits: countValue(side, ".main_move_crits"),
         axel: $$(".main_move_axel_row", side).map((row) => ({ hit: !!$(".hit.active", row), crit: !!$(".crit.active", row) })),
         metronome: countValue(side, ".main_item_metronome"),
+        rankBoost: Number(side.querySelector("button.main_move_boost")?.dataset.extra) || 0,
+        fainted: Number(side.querySelector(".main_move_faint select")?.value ?? 2),
+        fling: Number(side.querySelector(".main_move_fling select")?.value) || 130,
         powerUp: !!side.querySelector("button.main_move_powerup:not([hidden])")?.classList.contains("active"),
         move: calcText(side.querySelector("button.main_move_choose p")),
         evs: Object.fromEntries(["h", "a", "vsa", "b", "c", "d", "s"].map((key) => [key, readEvs(side, key)])),
@@ -416,13 +421,16 @@ const calcCore = (atk, def, field, data) => {
             break;
         case "アシストパワー":
         case "つけあがる":
-            basePower = 20 + 20 * ["a", "b", "c", "d", "s"].reduce((sum, key) => sum + Math.max(0, atk.evs[key]?.rank ?? 0), 0);
+            basePower = 20 + 20 * (rankSumOf(atk) + Math.max(0, atk.rankBoost ?? 0));
+            break;
+        case "おはかまいり":
+            basePower = 50 + 50 * Math.min(100, Math.max(0, atk.fainted ?? 2));
+            break;
+        case "なげつける":
+            basePower = Math.max(1, atk.fling ?? 130);
             break;
         case "ライジングボルト":
             if (terrain === "エレキ" && defGrounded) basePower *= 2;
-            break;
-        case "アクロバット":
-            if (!atkItem) basePower *= 2;
             break;
         default:
             break;
@@ -432,7 +440,7 @@ const calcCore = (atk, def, field, data) => {
     if (!basePower) return { status: "unsupported", message: "この技は計算できません" };
 
     const solarWeak = ["ソーラービーム", "ソーラーブレード"].includes(atk.move) && ["あめ", "すなあらし", "ゆき"].includes(moveWeather);
-    const knockOff = atk.move === "はたきおとす" && defItem;
+    const knockOff = atk.move === "はたきおとす" && atk.powerUp;
     const expanding = atk.move === "ワイドフォース" && terrain === "サイコ" && atkGrounded;
     const displayMods = [];
     if (knockOff) displayMods.push(6144);
@@ -795,6 +803,7 @@ const runCalc = () => {
     Object.assign(calcState, { entries, attacks, def, hp, multi, summary });
     fillResult($(".card_result"), "card_result", hp, summary.min, summary.max, summary.text, summary.rate);
     recordHistory();
+    syncBoostLabel();
     if ($("section.speed.is-open")) renderSpeed();
     refreshConstantPanel();
     if ($("section.detail.is-open")) renderDetail();

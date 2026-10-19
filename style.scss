@@ -2536,6 +2536,103 @@ label.main_count {
         cursor: pointer;
     }
 }
+button.main_move_boost, label.main_move_fling {
+    @include pill;
+    position: relative;
+    display: flex;
+    gap: 4px;
+    padding-inline: 12px;
+
+    &[hidden] {
+        display: none;
+    }
+    span.ttl {
+        color: #535ca8aa;
+    }
+    span.value {
+        font-weight: 700;
+    }
+    select {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+        appearance: none;
+        border: none;
+        font-size: 16px;
+        cursor: pointer;
+    }
+}
+.boost_popup {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background-color: #0000;
+    transition: background-color .2s ease;
+
+    .boost_popup_panel {
+        width: min(440px, 100%);
+        padding: 20px;
+        border-radius: 28px;
+        background-color: #fff;
+        box-shadow: 0 16px 48px -12px #0005;
+        opacity: 0;
+        scale: .88;
+        transition: opacity .2s ease, scale .3s cubic-bezier(.34, 1.4, .64, 1);
+    }
+    &.is-open {
+        background-color: #0003;
+
+        .boost_popup_panel {
+            opacity: 1;
+            scale: 1;
+        }
+    }
+    .boost_popup_header, .boost_popup_footer {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+    }
+    .ttl {
+        font-weight: 700;
+        color: #777;
+    }
+    .boost_popup_value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #535ca8;
+    }
+    .boost_popup_range {
+        display: flex;
+        gap: 1.5px;
+        height: 32px;
+        margin-block: 14px 10px;
+        touch-action: none;
+        cursor: pointer;
+
+        span {
+            flex: 1;
+            border-radius: 4px;
+            background-color: #e5e5ea;
+
+            &.auto {
+                background-color: #535ca855;
+            }
+            &.active {
+                background-color: #535ca8;
+            }
+        }
+    }
+    .boost_popup_footer p {
+        font-size: .8rem;
+        font-weight: 700;
+        color: #777;
+    }
+}
 label.main_item_metronome {
     width: fit-content;
     margin-top: 8px;

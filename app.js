@@ -1134,6 +1134,7 @@ const DEFENDER_STAT_EXCEPTIONS = {
     "いかりのまえば": { basestat: ["h"], evs: ["h"] },
     "ちきゅうなげ": { basestat: ["h"], evs: ["h"] },
     "ナイトヘッド": { basestat: ["h"], evs: ["h"] },
+    "サイコショック": { basestat: ["h", "b"], evs: ["h", "b"] },
 };
 const DEFENDER_STAT_EXTRA_EVS = {
     "エレキボール": ["s"],
@@ -1158,6 +1159,9 @@ const applyStatRule = (side, rule, extraEvs) => {
 const HP_REFERENCE_MOVES = new Set(["ふんか", "しおふき", "ドラゴンエナジー", "じたばた", "きしかいせい", "いのちがけ", "がむしゃら"]);
 
 const AXEL_POWERS = [20, 40, 60];
+const CALC_FLING_POWERS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 130];
+const CALC_RANK_BOOST_MOVES = new Set(["アシストパワー", "つけあがる"]);
+const CALC_RANK_BOOST_LIMIT = 42;
 var countUi = null;
 
 const createCount = (className, title) => {
@@ -1165,6 +1169,7 @@ const createCount = (className, title) => {
     label.className = `main_count ${className}`;
     label.hidden = true;
     label.innerHTML = `<span class="ttl">${title}</span><span class="value"></span><span class="unit">回</span><select></select>`;
+    label.unit = "回";
     const select = $("select", label);
     let range = [0, 0];
     let drag = null;
@@ -1175,7 +1180,7 @@ const createCount = (className, title) => {
         const next = Math.min(range[1], Math.max(range[0], value));
         select.value = next;
         $(".value", label).textContent = next;
-        $(".unit", label).textContent = label.openEnded && next === range[1] ? "回以上" : "回";
+        $(".unit", label).textContent = label.openEnded && next === range[1] ? `${label.unit}以上` : label.unit;
         label.onChange?.(next);
     };
     label.setRange = (min, max, value) => {
@@ -1185,7 +1190,8 @@ const createCount = (className, title) => {
     };
     const setFromX = (x) => {
         const rect = label.getBoundingClientRect();
-        const count = range[1] - range[0] + 1;
+        const top = Math.min(range[1], label.dragMax ?? range[1]);
+        const count = top - range[0] + 1;
         const next = range[0] + Math.min(count - 1, Math.max(0, Math.floor(((x - rect.left) / rect.width) * count)));
         label.set(next);
     };
@@ -1246,6 +1252,25 @@ if (attackerSide) {
         if (!button) return;
         if (button.classList.contains("hit") || $(".hit", button.parentElement).classList.contains("active")) button.classList.toggle("active");
     });
+    const boost = document.createElement("button");
+    boost.className = "main_move_boost";
+    boost.hidden = true;
+    boost.dataset.extra = "0";
+    boost.innerHTML = '<span class="ttl">ランク上昇</span><span class="value">×0</span>';
+    const faint = createCount("main_move_faint", "ひんし数");
+    faint.unit = "匹";
+    faint.openEnded = true;
+    faint.dragMax = 5;
+    faint.setRange(0, 100, 2);
+    const fling = document.createElement("label");
+    fling.className = "main_move_fling";
+    fling.hidden = true;
+    fling.innerHTML = `<span class="ttl">威力</span><span class="value">130</span><select>${CALC_FLING_POWERS.map((power) => `<option value="${power}"${power === 130 ? " selected" : ""}>${power}</option>`).join("")}</select>`;
+    $("select", fling).addEventListener("change", () => {
+        $(".value", fling).textContent = $("select", fling).value;
+    });
+    $(".main_move_btn", attackerSide)?.append(boost, faint, fling);
+    boost.addEventListener("click", () => openBoostPopup());
     const metronome = createCount("main_item_metronome", "連続攻撃回数");
     metronome.openEnded = true;
     metronome.setRange(1, 6, 1);
@@ -1254,12 +1279,72 @@ if (attackerSide) {
     const syncMetronome = () => { metronome.hidden = itemLabel?.textContent.trim() !== "メトロノーム"; };
     if (itemLabel) new MutationObserver(syncMetronome).observe(itemLabel, { childList: true, characterData: true, subtree: true });
     syncMetronome();
-    countUi = { hits, crits, axel, metronome };
+    countUi = { hits, crits, axel, metronome, boost, faint, fling };
+}
+
+const attackerRankSum = () => ["a", "b", "c", "d", "s"].reduce((sum, key) => {
+    const select = attackerSide && $(`.main_evs_${key} .main_evs_ranks select`, attackerSide);
+    return sum + (select ? Math.max(0, 6 - select.selectedIndex) : 0);
+}, 0);
+
+function syncBoostLabel() {
+    const boost = countUi?.boost;
+    if (!boost) return;
+    const total = Math.min(CALC_RANK_BOOST_LIMIT, attackerRankSum() + (Number(boost.dataset.extra) || 0));
+    const text = `×${total}`;
+    const value = $(".value", boost);
+    if (value.textContent !== text) value.textContent = text;
+    const popup = $(".boost_popup");
+    if (popup) renderBoostPopup(popup);
+}
+
+const renderBoostPopup = (popup) => {
+    const boost = countUi.boost;
+    const auto = attackerRankSum();
+    const total = Math.min(CALC_RANK_BOOST_LIMIT, auto + (Number(boost.dataset.extra) || 0));
+    $(".boost_popup_value", popup).textContent = `×${total}`;
+    $(".boost_popup_power", popup).textContent = `威力 ${20 + 20 * total}`;
+    $(".boost_popup_note", popup).textContent = auto > 0 ? `ランク補正の+${auto}段階を含みます` : "なぞって上昇した段階数を指定";
+    $$(".boost_popup_range span", popup).forEach((span, i) => {
+        span.classList.toggle("auto", i < auto);
+        span.classList.toggle("active", i >= auto && i < total);
+    });
+};
+
+function openBoostPopup() {
+    if ($(".boost_popup")) return;
+    const popup = document.createElement("div");
+    popup.className = "boost_popup";
+    popup.innerHTML = `<div class="boost_popup_panel">
+        <div class="boost_popup_header"><p class="ttl">ランク上昇</p><p class="boost_popup_value">×0</p></div>
+        <div class="boost_popup_range">${"<span></span>".repeat(CALC_RANK_BOOST_LIMIT)}</div>
+        <div class="boost_popup_footer"><p class="boost_popup_note"></p><p class="boost_popup_power"></p></div>
+    </div>`;
+    document.body.appendChild(popup);
+    renderBoostPopup(popup);
+    requestAnimationFrame(() => popup.classList.add("is-open"));
+    const close = () => {
+        popup.classList.remove("is-open");
+        setTimeout(() => popup.remove(), 220);
+    };
+    popup.addEventListener("pointerdown", (e) => {
+        if (!e.target.closest(".boost_popup_panel")) close();
+    });
+    bindDrag($(".boost_popup_range", popup), (ratio) => {
+        const auto = attackerRankSum();
+        const total = Math.max(auto, Math.min(CALC_RANK_BOOST_LIMIT, Math.round(ratio * CALC_RANK_BOOST_LIMIT)));
+        const extra = String(total - auto);
+        if (countUi.boost.dataset.extra === extra) return;
+        countUi.boost.dataset.extra = extra;
+        renderBoostPopup(popup);
+        syncBoostLabel();
+        scheduleCalc();
+    });
 }
 
 function syncMultiHit(reset) {
     if (!countUi) return;
-    const { hits, crits, axel } = countUi;
+    const { hits, crits, axel, boost, faint, fling } = countUi;
     const move = $("button.main_move_choose p", attackerSide)?.textContent.trim() ?? "";
     const ability = $("button.main_ability_choose p", attackerSide)?.textContent.trim() ?? "";
     const range = window.calcLoaded ? multiHitRange(move, ability) : null;
@@ -1275,6 +1360,11 @@ function syncMultiHit(reset) {
         hits.setRange(range.min, range.max, reset ? range.def : hits.get() || range.def);
         if (reset) crits.set(0);
     }
+    boost.hidden = !CALC_RANK_BOOST_MOVES.has(move);
+    faint.hidden = move !== "おはかまいり";
+    fling.hidden = move !== "なげつける";
+    if (reset) boost.dataset.extra = "0";
+    syncBoostLabel();
     if (isAxel && reset) {
         $$(".main_move_axel_row", axel).forEach((row) => {
             $(".hit", row).classList.add("active");
@@ -1732,6 +1822,9 @@ const snapshotSide = (side) => {
                 crits: countUi.crits.hidden ? null : countUi.crits.get(),
                 axel: $$(".main_move_axel_row", countUi.axel).map((row) => [$(".hit", row).classList.contains("active"), $(".crit", row).classList.contains("active")]),
                 metronome: countUi.metronome.get(),
+                boost: Number(countUi.boost.dataset.extra) || 0,
+                faint: countUi.faint.get(),
+                fling: Number($("select", countUi.fling).value) || 130,
             };
         }
     }
@@ -1801,6 +1894,12 @@ const restoreSideStages = (side, slot, defaults) => {
                     $(".crit", row).classList.toggle("active", counts.axel[i]?.[1] ?? false);
                 });
                 countUi.metronome.set(counts.metronome);
+                countUi.boost.dataset.extra = String(Math.max(0, Math.min(CALC_RANK_BOOST_LIMIT, counts.boost ?? 0)));
+                countUi.faint.set(counts.faint ?? 2);
+                const flingSelect = $("select", countUi.fling);
+                flingSelect.value = String(CALC_FLING_POWERS.includes(counts.fling) ? counts.fling : 130);
+                $(".value", countUi.fling).textContent = flingSelect.value;
+                syncBoostLabel();
             }
         }
         const hp = get("hp");
@@ -2265,7 +2364,7 @@ const decodeShare = async (text) => JSON.parse(new TextDecoder().decode(await pi
 const EVS_ORDER = ["h", "a", "vsa", "b", "c", "d", "s"];
 const NATURE_MARK = { 9: "-", 11: "+" };
 const CONSTANT_CODES = { damage: "d", heel: "h" };
-const DEFAULT_COUNTS = [-1, -1, 21, 1];
+const DEFAULT_COUNTS = [-1, -1, 21, 1, 0, 2, 130];
 
 const trimTail = (list) => {
     while (list.length && !list[list.length - 1]) list.pop();
@@ -2306,7 +2405,7 @@ const packSide = (snap, role) => {
     ];
     if (role === "attacker") {
         const counts = snap["attacker:counts"];
-        const packedCounts = counts ? [counts.hits ?? -1, counts.crits ?? -1, counts.axel.reduce((bits, [hit, crit], i) => bits | (hit ? 1 << (i * 2) : 0) | (crit ? 2 << (i * 2) : 0), 0), counts.metronome] : [];
+        const packedCounts = counts ? [counts.hits ?? -1, counts.crits ?? -1, counts.axel.reduce((bits, [hit, crit], i) => bits | (hit ? 1 << (i * 2) : 0) | (crit ? 2 << (i * 2) : 0), 0), counts.metronome, counts.boost ?? 0, counts.faint ?? 2, counts.fling ?? 130] : [];
         out.push(
             snap["attacker:move"] ?? "",
             (snap["attacker:weak"] ? 1 : 0) | (snap["attacker:powerup"] ? 2 : 0),
@@ -2331,12 +2430,16 @@ const unpackSide = (packed, role) => {
         snap["attacker:move"] = move;
         snap["attacker:weak"] = !!(flags & 1);
         snap["attacker:powerup"] = !!(flags & 2);
-        const [hits, crits, axel, metronome] = counts || DEFAULT_COUNTS;
+        const values = counts ? [...counts, ...DEFAULT_COUNTS.slice(counts.length)] : DEFAULT_COUNTS;
+        const [hits, crits, axel, metronome, boost, faint, fling] = values;
         snap["attacker:counts"] = {
             hits: hits < 0 ? null : hits,
             crits: crits < 0 ? null : crits,
             axel: [0, 1, 2].map((i) => [!!(axel & (1 << (i * 2))), !!(axel & (2 << (i * 2)))]),
             metronome,
+            boost,
+            faint,
+            fling,
         };
     }
     return snap;
