@@ -1081,7 +1081,7 @@ struct ModeSwitchPull: ViewModifier {
     @State private var fired = false
     @State private var visibleTop: CGFloat = 0
 
-    private let deadZone: CGFloat = 28
+    private let deadZone: CGFloat = 70
 
     private func evaluate(_ pull: CGFloat) {
         let value = max(0, min(1, (pull - deadZone) / distance))
