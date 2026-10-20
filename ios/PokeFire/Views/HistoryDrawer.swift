@@ -2,6 +2,7 @@ import SwiftUI
 
 struct HistoryDrawer: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     let isOpen: Bool
     let close: () -> Void
     let dragChanged: (CGFloat) -> Void
@@ -31,8 +32,12 @@ struct HistoryDrawer: View {
     }
 
     private static func timeText(_ entry: HistoryEntry) -> String {
-        let date = entry.date
-        let group = groupTitle(entry.time)
+        timeText(entry.time)
+    }
+
+    private static func timeText(_ time: Double) -> String {
+        let date = Date(timeIntervalSince1970: time / 1000)
+        let group = groupTitle(time)
         let calendar = Calendar.current
         if group == "今日" || group == "昨日" {
             return String(format: "%02d:%02d", calendar.component(.hour, from: date), calendar.component(.minute, from: date))
@@ -139,7 +144,9 @@ struct HistoryDrawer: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            if sections.isEmpty {
+            if stats.isStats {
+                statsContent
+            } else if sections.isEmpty {
                 Text(query.isEmpty ? "計算した対面が\nここに自動で残ります" : "見つかりません")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Palette.secondary)
@@ -199,6 +206,131 @@ struct HistoryDrawer: View {
                 }
         )
         .animation(.snappy, value: model.history)
+        .animation(.snappy, value: stats.history)
+    }
+
+    private struct StatsGroup: Identifiable {
+        var id: String { title }
+        let title: String
+        var entries: [StatsHistoryEntry]
+    }
+
+    private var statsGroups: [StatsGroup] {
+        let key = Search.normalize(query)
+        let list = stats.history.filter { key.isEmpty || Search.normalize($0.title).contains(key) }
+        var result: [StatsGroup] = []
+        let pinned = list.filter(\.pinned)
+        if !pinned.isEmpty { result.append(StatsGroup(title: "ピン留め", entries: pinned)) }
+        for entry in list where !entry.pinned {
+            let title = Self.groupTitle(entry.time)
+            if result.last?.title == title {
+                result[result.count - 1].entries.append(entry)
+            } else {
+                result.append(StatsGroup(title: title, entries: [entry]))
+            }
+        }
+        return result
+    }
+
+    @ViewBuilder
+    private var statsContent: some View {
+        let sections = statsGroups
+        if sections.isEmpty {
+            Text(query.isEmpty ? "Stats Mode で見たポケモンが
+ここに自動で残ります" : "見つかりません")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Palette.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            List {
+                ForEach(sections) { section in
+                    Text(section.title)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Palette.secondary)
+                        .padding(.top, 14)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 24, bottom: 0, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                    ForEach(section.entries) { entry in
+                        statsRow(entry)
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .scrollDismissesKeyboard(.immediately)
+            .environment(\.defaultMinListRowHeight, 10)
+        }
+    }
+
+    private func statsRow(_ entry: StatsHistoryEntry) -> some View {
+        Button {
+            close()
+            stats.applyHistory(entry)
+        } label: {
+            HStack(spacing: 8) {
+                SpriteView(name: entry.attacker.name, size: 46)
+                VStack(spacing: 3) {
+                    Text(entry.title)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(Color.black)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    HStack(spacing: 4) {
+                        if entry.pinned {
+                            Icon(name: "pin", size: 11)
+                                .foregroundStyle(Palette.accent)
+                        }
+                        Text(Self.timeText(entry.time))
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                SpriteView(name: entry.defender.name, size: 46)
+            }
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(entry.title)
+        .onGeometryChange(for: CGRect.self) { proxy in
+            proxy.frame(in: .global)
+        } action: { frame in
+            rowFrames["stats-" + entry.key] = frame
+        }
+        .onDisappear {
+            rowFrames["stats-" + entry.key] = nil
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                stats.deleteHistory(entry)
+            } label: {
+                Label {
+                    Text("削除")
+                } icon: {
+                    Image("trash")
+                }
+            }
+            .tint(.red)
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            Button {
+                stats.togglePin(entry)
+            } label: {
+                Label {
+                    Text(entry.pinned ? "解除" : "ピン留め")
+                } icon: {
+                    Image("pin")
+                }
+            }
+            .tint(Palette.accent)
+        }
     }
 
     private func row(_ entry: HistoryEntry) -> some View {

@@ -105,6 +105,11 @@ struct MainScreen: View {
         .onChange(of: page) { _, value in
             if value != nil { Haptics.play(.selection) }
         }
+        .onChange(of: stats.pendingPage) { _, value in
+            guard let value else { return }
+            stats.pendingPage = nil
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) { page = value }
+        }
     }
 
     @ViewBuilder
@@ -476,7 +481,7 @@ struct SideSwitcher: View {
                 SpriteView(name: name, size: 30)
             }
             VStack(alignment: .leading, spacing: 0) {
-                if !constant {
+                if !constant, !stats.isStats {
                     Text(role.title)
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(role == .attacker ? Palette.attack : Palette.accent)

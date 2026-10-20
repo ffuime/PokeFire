@@ -30,12 +30,9 @@ struct AbilityInfoSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        SpriteIcon(name: "ability", size: 26)
-                        Text(name)
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(Palette.ink)
-                    }
+                    Text(name)
+                        .font(.title.weight(.bold))
+                        .foregroundStyle(Palette.ink)
                     Text(model.data.abilities[name]?.effect ?? "")
                         .font(.subheadline)
                         .foregroundStyle(Palette.ink.opacity(0.8))
@@ -94,7 +91,7 @@ struct CategoryChip: View {
         }
         .foregroundStyle(color)
         .padding(.horizontal, 10)
-        .frame(height: 30)
+        .frame(height: 26)
         .background(color.opacity(0.13), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
@@ -119,14 +116,14 @@ struct MoveDetailContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             FlowLayout(spacing: 8) {
-                TypeChip(type: info.type, height: 30)
+                TypeChip(type: info.type, height: 26)
                 CategoryChip(category: info.category)
                 Text("威力 \(info.powerText) / 命中 \(info.accuracyText) / PP \(info.ppText)")
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
-                    .foregroundStyle(Palette.ink)
+                    .foregroundStyle(Color(hex: 0x777777))
                     .fixedSize()
-                    .frame(height: 30)
+                    .frame(height: 26)
             }
             if !info.effect.isEmpty {
                 Text(info.effect)
@@ -250,41 +247,24 @@ struct LearnsetSheet: View {
                 onSubmit: { focused = false },
                 onClose: { dismiss() }
             )
-            List {
-                ForEach(list ?? [], id: \.name) { info in
-                    let open = expanded.contains(info.name)
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 12) {
-                            TypeIcon(type: info.type, size: 22)
-                            Text(info.name)
-                                .font(.body.weight(.semibold))
-                                .foregroundStyle(Palette.ink)
-                            Spacer(minLength: 4)
-                            CategoryIcon(category: info.category, size: 18)
-                                .foregroundStyle(CategoryChip.color(info.category))
-                            Text(info.powerText)
-                                .font(.subheadline.weight(.bold))
-                                .monospacedDigit()
-                                .foregroundStyle(Palette.secondary)
-                                .frame(minWidth: 28, alignment: .trailing)
-                        }
-                        if open {
-                            MoveDetailContent(info: info)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
+            ScrollView {
+                LazyVStack(spacing: 4) {
+                    ForEach(list ?? [], id: \.name) { info in
+                        LearnsetRow(info: info, open: expanded.contains(info.name)) {
+                            Haptics.play(.light)
+                            withAnimation(.snappy(duration: 0.28)) {
+                                if expanded.contains(info.name) {
+                                    expanded.remove(info.name)
+                                } else {
+                                    expanded.insert(info.name)
+                                }
+                            }
                         }
                     }
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        Haptics.play(.light)
-                        withAnimation(.snappy(duration: 0.3)) {
-                            if open { expanded.remove(info.name) } else { expanded.insert(info.name) }
-                        }
-                    }
-                    .listRowBackground(open ? Palette.accent.opacity(0.05) : Color.white)
                 }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 24)
             }
-            .listStyle(.plain)
             .scrollDismissesKeyboard(.immediately)
             .overlay {
                 if list == nil {
@@ -300,5 +280,44 @@ struct LearnsetSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+    }
+}
+
+struct LearnsetRow: View {
+    let info: MoveInfo
+    let open: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
+                TypeIcon(type: info.type, size: 22)
+                Text(info.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
+                Spacer(minLength: 4)
+                CategoryIcon(category: info.category, size: 18)
+                    .foregroundStyle(CategoryChip.color(info.category))
+                Text(info.powerText)
+                    .font(.subheadline.weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(Palette.secondary)
+                    .frame(minWidth: 28, alignment: .trailing)
+            }
+            .frame(height: 44)
+            MoveDetailContent(info: info)
+                .padding(.bottom, 12)
+                .frame(maxHeight: open ? nil : 0, alignment: .top)
+                .clipped()
+                .opacity(open ? 1 : 0)
+        }
+        .padding(.horizontal, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(open ? Color.white : Color.clear)
+                .shadow(color: open ? .black.opacity(0.08) : .clear, radius: 10, y: 3)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .onTapGesture(perform: toggle)
     }
 }

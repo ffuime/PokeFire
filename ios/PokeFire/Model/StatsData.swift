@@ -135,44 +135,49 @@ enum TypeChart {
         "すいほう": ["ほのお": 0.5],
         "きよめのしお": ["ゴースト": 0.5],
         "もふもふ": ["ほのお": 2],
+        "かんそうはだ": ["ほのお": 1.25],
     ]
 
+    private static let superReducers: Set<String> = ["ハードロック", "フィルター", "プリズムアーマー"]
+
     static func multiplier(_ attack: String, types: [String], abilities: [String]) -> Double {
-        var value = types.reduce(1.0) { $0 * (Calc.typeChart[attack]?[$1] ?? 1) }
+        let base = types.reduce(1.0) { $0 * (Calc.typeChart[attack]?[$1] ?? 1) }
+        var value = base
         for ability in abilities {
             if immune[ability]?.contains(attack) ?? false { value = 0 }
             if let factor = scaled[ability]?[attack] { value *= factor }
-            if ability == "ふしぎなまもり", value <= 1 { value = 0 }
         }
+        if base > 1, abilities.contains(where: { superReducers.contains($0) }) { value *= 0.75 }
+        if abilities.contains("ふしぎなまもり"), base <= 1 { value = 0 }
         return value
     }
 
+    static func label(_ value: Double) -> String {
+        if value == 0 { return "×0" }
+        if value < 1 {
+            let inverse = 1 / value
+            if abs(inverse - inverse.rounded()) < 0.0001 { return "×1/\(Int(inverse.rounded()))" }
+        }
+        return "×" + String(format: "%g", value)
+    }
+
     static func rows(types: [String], abilities: [String]) -> [Row] {
-        var buckets: [String: [String]] = [:]
+        var buckets: [Double: [String]] = [:]
         for attack in Palette.typeOrder {
             let value = multiplier(attack, types: types, abilities: abilities)
-            let key: String
-            switch value {
-            case 0: key = "x0"
-            case ..<0.375: key = "quarter"
-            case ..<0.75: key = "half"
-            case ..<1.5: key = "x1"
-            case ..<3: key = "x2"
-            default: key = "x4"
-            }
-            buckets[key, default: []].append(attack)
+            if abs(value - 1) < 0.0001 { continue }
+            buckets[value, default: []].append(attack)
         }
-        let layout: [(String, String, String, UInt32, UInt32)] = [
-            ("x4", "×4", "eff_x4", 0xB8433A, 0xFAEFEF),
-            ("x2", "×2", "eff_x2", 0xC8622A, 0xFCF4EE),
-            ("x1", "×1", "minus", 0x8A8FA8, 0xF6F6F8),
-            ("half", "×1/2", "eff_half", 0x3E6FA5, 0xEEF2FA),
-            ("quarter", "×1/4", "eff_quarter", 0x2A5275, 0xE8EEF6),
-            ("x0", "×0", "eff_zero", 0x6B7280, 0xF3F4F6),
-        ]
-        return layout.compactMap { key, label, icon, color, background in
-            guard let types = buckets[key], !types.isEmpty else { return nil }
-            return Row(id: key, label: label, icon: icon, color: color, background: background, types: types)
+        return buckets.keys.sorted(by: >).map { value in
+            let style: (String, UInt32, UInt32)
+            switch value {
+            case 0: style = ("eff_zero", 0x6B7280, 0xF3F4F6)
+            case 4...: style = ("eff_x4", 0xB8433A, 0xFAEFEF)
+            case 1...: style = ("eff_x2", 0xC8622A, 0xFCF4EE)
+            case 0.5...: style = ("eff_half", 0x3E6FA5, 0xEEF2FA)
+            default: style = ("eff_quarter", 0x2A5275, 0xE8EEF6)
+            }
+            return Row(id: String(value), label: label(value), icon: style.0, color: style.1, background: style.2, types: buckets[value] ?? [])
         }
     }
 }

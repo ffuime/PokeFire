@@ -114,6 +114,20 @@ final class AppModel {
         return learnsets[en]
     }
 
+    func applyStats(_ source: StatsSide, to role: Role) {
+        if side(role).name != source.name {
+            selectPokemon(role, source.name)
+        }
+        update(role) { side in
+            for key in Rules.statKeys(role) where StatKey.baseKeys.contains(key) {
+                var value = side.evs[key] ?? EVState(points: 0)
+                value.points = source.point(key)
+                if key.hasNature { value.nature = source.nature(key) }
+                side.evs[key] = value
+            }
+        }
+    }
+
     func usageAbilities(_ name: String) -> [UsagePair] {
         if data.usageName(of: name) != name, let first = data.pokemons[name]?.abilities.first {
             return [UsagePair(name: first, pct: 100)]

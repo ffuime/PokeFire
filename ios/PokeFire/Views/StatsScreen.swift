@@ -42,6 +42,7 @@ struct StatsPanel: View {
                     .contentShape(UnevenBox())
                 }
                 .buttonStyle(PressableStyle())
+                CalcHandoff(role: role)
                 UsageCredit()
             }
             .padding(.horizontal, 20)
@@ -133,10 +134,23 @@ struct ModeSprite: View {
     let onTap: () -> Void
     let onLongPress: () -> Void
     @State private var pressing = false
+    @State private var hold: CGFloat = 0
+
+    private let duration = 0.45
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
-            SpriteView(name: name, size: 84)
+            ZStack {
+                Circle()
+                    .fill(Palette.accent.opacity(pressing ? 0.08 : 0))
+                Circle()
+                    .trim(from: 0, to: hold)
+                    .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .opacity(hold > 0 ? 1 : 0)
+                SpriteView(name: name, size: 84)
+            }
+            .frame(width: 92, height: 92)
             if hasForms {
                 Icon(name: "forms", size: 15)
                     .foregroundStyle(Palette.accent)
@@ -150,11 +164,18 @@ struct ModeSprite: View {
         .animation(.snappy(duration: 0.2), value: pressing)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
-        .onLongPressGesture(minimumDuration: 0.45) {
+        .onLongPressGesture(minimumDuration: duration) {
             Haptics.play(.heavy)
             onLongPress()
+            withAnimation(.easeOut(duration: 0.2)) { hold = 0 }
         } onPressingChanged: { value in
             pressing = value
+            if value {
+                hold = 0
+                withAnimation(.linear(duration: duration)) { hold = 1 }
+            } else {
+                withAnimation(.easeOut(duration: 0.2)) { hold = 0 }
+            }
         }
         .accessibilityLabel(hasForms ? "ほかの姿" : "ポケモンを選ぶ")
         .accessibilityHint("長押しでモードを切り替え")
@@ -201,17 +222,15 @@ struct StatsBaseRow: View {
     @Binding var editing: StatKey?
     @State private var height: CGFloat = 52
 
-    private func key(at x: CGFloat, width: CGFloat) -> StatKey {
-        let keys = StatKey.baseKeys
-        let index = max(0, min(keys.count - 1, Int(x / max(1, width) * CGFloat(keys.count))))
-        return keys[index]
-    }
-
     private func tap(_ key: StatKey) {
         Haptics.play(.light)
         withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) {
             editing = editing == key ? nil : key
         }
+    }
+
+    private func close() {
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) { editing = nil }
     }
 
     var body: some View {
@@ -227,7 +246,7 @@ struct StatsBaseRow: View {
                         .font(.subheadline.weight(.bold))
                     NumberText(side.real(key))
                         .font(.caption2.weight(.heavy))
-                        .foregroundStyle(Palette.ink)
+                        .foregroundStyle(Palette.stat(key).opacity(0.55))
                 }
                 .foregroundStyle(Palette.stat(key))
                 .frame(maxWidth: .infinity)
@@ -243,32 +262,30 @@ struct StatsBaseRow: View {
         .overlay(alignment: .top) {
             if let key = editing {
                 GeometryReader { geometry in
+                    let width = geometry.size.width
                     ZStack(alignment: .top) {
                         Color.black.opacity(0.0001)
-                            .frame(width: geometry.size.width + 400, height: 3000)
+                            .frame(width: width + 400, height: 3000)
                             .offset(y: -1000)
                             .contentShape(Rectangle())
-                            .onTapGesture { local in
-                                let location = CGPoint(x: local.x - 200, y: local.y - 1000)
-                                if location.y >= 0, location.y <= height, location.x >= 0, location.x <= geometry.size.width {
-                                    tap(self.key(at: location.x, width: geometry.size.width))
-                                } else {
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) { editing = nil }
-                                }
+                            .onTapGesture { close() }
+                        HStack(spacing: 0) {
+                            ForEach(StatKey.baseKeys, id: \.self) { column in
+                                Color.clear
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { tap(column) }
                             }
-                        StatsBubble(role: role, key: key)
+                        }
+                        .frame(width: width, height: height)
+                        StatsBubble(role: role, key: key, close: close)
+                            .frame(width: width)
                             .offset(y: height + 14)
-                            .transition(.scale(scale: 0.6, anchor: UnitPoint(x: tailRatio(key), y: 0)).combined(with: .opacity))
+                            .transition(.scale(scale: 0.6, anchor: UnitPoint(x: StatsBubble.ratio(key), y: 0)).combined(with: .opacity))
                     }
-                    .frame(width: geometry.size.width)
+                    .frame(width: width, alignment: .top)
                 }
             }
         }
-    }
-
-    private func tailRatio(_ key: StatKey) -> CGFloat {
-        let index = StatKey.baseKeys.firstIndex(of: key) ?? 0
-        return (CGFloat(index) + 0.5) / CGFloat(StatKey.baseKeys.count)
     }
 }
 
@@ -276,8 +293,9 @@ struct StatsBubble: View {
     @Environment(StatsModel.self) private var stats
     let role: Role
     let key: StatKey
+    let close: () -> Void
 
-    private var tailRatio: CGFloat {
+    static func ratio(_ key: StatKey) -> CGFloat {
         let index = StatKey.baseKeys.firstIndex(of: key) ?? 0
         return (CGFloat(index) + 0.5) / CGFloat(StatKey.baseKeys.count)
     }
@@ -285,23 +303,43 @@ struct StatsBubble: View {
     var body: some View {
         let side = stats.side(role)
         let color = Palette.stat(key)
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(key.title).sectionTitle()
-                Spacer()
-                NumberText(side.real(key))
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(color)
-            }
-            HStack(spacing: 12) {
-                SegmentBar(count: 32, value: side.point(key), color: color) { stats.setPoints(role, key, $0) }
-                NumberText(side.point(key))
+        let tailRatio = Self.ratio(key)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 6) {
+                SpriteView(name: side.name, size: 26)
+                Text(side.name)
                     .font(.headline)
                     .foregroundStyle(Palette.ink)
-                    .frame(width: 30, alignment: .trailing)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Spacer()
+                Button(action: close) {
+                    CloseButtonLabel(size: 13)
+                        .foregroundStyle(Palette.secondary)
+                        .frame(width: 30, height: 30)
+                        .background(Circle().fill(Palette.background))
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityLabel("閉じる")
             }
-            if key.hasNature {
-                NatureControl(nature: side.nature(key)) { stats.setNature(role, key, $0) }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(key.title).sectionTitle()
+                    Spacer()
+                    NumberText(side.real(key))
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundStyle(color)
+                }
+                HStack(spacing: 12) {
+                    SegmentBar(count: 32, value: side.point(key), color: color) { stats.setPoints(role, key, $0) }
+                    NumberText(side.point(key))
+                        .font(.headline)
+                        .foregroundStyle(Palette.ink)
+                        .frame(width: 30, alignment: .trailing)
+                }
+                if key.hasNature {
+                    NatureControl(nature: side.nature(key)) { stats.setNature(role, key, $0) }
+                }
             }
         }
         .padding(18)
@@ -311,7 +349,7 @@ struct StatsBubble: View {
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
                 .animation(.spring(response: 0.42, dampingFraction: 0.78), value: key)
         )
-        .keyframeAnimator(initialValue: CGFloat(1), trigger: key) { [tailRatio] content, scale in
+        .keyframeAnimator(initialValue: CGFloat(1), trigger: key) { content, scale in
             content.scaleEffect(scale, anchor: UnitPoint(x: tailRatio, y: 0))
         } keyframes: { _ in
             KeyframeTrack {
@@ -383,7 +421,7 @@ struct StatsAbilityRow: View {
 
 struct TypeChip: View {
     let type: String
-    var height: CGFloat = 34
+    var height: CGFloat = 28
 
     var body: some View {
         HStack(spacing: 6) {
@@ -411,56 +449,61 @@ struct TypeChartCard: View {
         let side = stats.side(role)
         let abilities = stats.considerAbilities ? side.pokemon?.abilities ?? [] : []
         let rows = TypeChart.rows(types: side.pokemon?.types ?? [], abilities: abilities)
+        let collapsed = stats.chartCollapsed
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text("タイプ相性").sectionTitle()
                 Spacer()
                 Button {
-                    withAnimation(.snappy(duration: 0.3)) { stats.toggleChart() }
+                    withAnimation(.snappy(duration: 0.32)) { stats.toggleChart() }
                 } label: {
-                    Icon(name: stats.chartCollapsed ? "chevron_down" : "chevron_up", size: 15)
+                    Icon(name: "chevron_down", size: 20)
                         .foregroundStyle(Palette.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Palette.background))
+                        .rotationEffect(.degrees(collapsed ? 0 : 180))
+                        .frame(width: 34, height: 30)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableStyle())
-                .accessibilityLabel(stats.chartCollapsed ? "タイプ相性を開く" : "タイプ相性を最小化")
+                .accessibilityLabel(collapsed ? "タイプ相性を開く" : "タイプ相性を最小化")
             }
-            if !stats.chartCollapsed {
-                VStack(spacing: 8) {
-                    ForEach(rows) { row in
-                        HStack(alignment: .center, spacing: 12) {
-                            VStack(spacing: 3) {
-                                Icon(name: row.icon, size: 26)
-                                    .foregroundStyle(Color(hex: row.color))
-                                Text(row.label)
-                                    .font(.caption.weight(.heavy))
-                                    .monospacedDigit()
-                                    .foregroundStyle(Color(hex: row.color))
-                            }
-                            .frame(width: 48)
-                            FlowLayout(spacing: 6) {
-                                ForEach(row.types, id: \.self) { type in
-                                    TypeChip(type: type)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            VStack(spacing: 6) {
+                ForEach(rows) { row in
+                    HStack(alignment: .center, spacing: 12) {
+                        VStack(spacing: 2) {
+                            Icon(name: row.icon, size: 24)
+                                .foregroundStyle(Color(hex: row.color))
+                            Text(row.label)
+                                .font(.caption.weight(.heavy))
+                                .monospacedDigit()
+                                .foregroundStyle(Color(hex: row.color))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                         }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 8)
-                        .background(Color(hex: row.background), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .frame(width: 48)
+                        FlowLayout(spacing: 4) {
+                            ForEach(row.types, id: \.self) { type in
+                                TypeChip(type: type)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    HStack {
-                        Spacer()
-                        Toggle("とくせいを考慮", isOn: $stats.considerAbilities)
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(Palette.secondary)
-                            .fixedSize()
-                    }
+                    .padding(.vertical, 6)
+                    .padding(.horizontal, 8)
+                    .background(Color(hex: row.background), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
-                .animation(.snappy(duration: 0.3), value: stats.considerAbilities)
+                HStack {
+                    Spacer()
+                    Toggle("とくせいを考慮", isOn: $stats.considerAbilities)
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Palette.secondary)
+                        .fixedSize()
+                }
             }
+            .animation(.snappy(duration: 0.3), value: stats.considerAbilities)
+            .frame(maxHeight: collapsed ? 0 : nil, alignment: .top)
+            .clipped()
+            .opacity(collapsed ? 0 : 1)
+            .allowsHitTesting(!collapsed)
         }
     }
 }
@@ -491,7 +534,7 @@ struct MoveUsageSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("わざの採用率").sectionTitle()
+            Text("バトルデータ").sectionTitle()
             VStack(spacing: 6) {
                 ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
                     MoveUsageRow(pair: pair) {
@@ -517,9 +560,8 @@ struct MoveUsageRow: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let info, let id = Palette.types[info.type]?.id {
-                    Outlined(color: color) {
-                        Icon(name: "glyph_\(id)", size: 20)
-                    }
+                    Icon(name: "glyph_\(id)", size: 20)
+                        .foregroundStyle(Color.white)
                 }
                 Outlined(color: color) {
                     Text(pair.name ?? "不明なわざ")
@@ -538,7 +580,7 @@ struct MoveUsageRow: View {
             .background {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        Color(hex: 0xE0E0E0)
+                        Color(hex: 0xEAEAEA)
                         color.frame(width: geometry.size.width * ratio)
                     }
                 }
@@ -621,7 +663,6 @@ struct UsageCarousel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("採用率").sectionTitle()
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 10) {
                     ForEach([UsageKind.abilities, .items, .natures], id: \.self) { kind in
@@ -634,15 +675,16 @@ struct UsageCarousel: View {
                             }
                         }
                         .containerRelativeFrame(.horizontal) { length, _ in
-                            (length - 20) / 2.25
+                            (length - 10) / 1.5
                         }
                     }
                 }
                 .scrollTargetLayout()
             }
+            .contentMargins(.horizontal, 20, for: .scrollContent)
             .scrollTargetBehavior(.viewAligned)
             .scrollIndicators(.hidden)
-            .scrollClipDisabled()
+            .padding(.horizontal, -20)
         }
     }
 }
@@ -694,25 +736,27 @@ struct UsageCard: View {
                     }
                 Button {
                     Haptics.play(.light)
-                    withAnimation(.snappy(duration: 0.3)) { expanded.toggle() }
+                    withAnimation(.snappy(duration: 0.32)) { expanded.toggle() }
                 } label: {
-                    Icon(name: expanded ? "chevron_up" : "chevron_down", size: 13)
+                    Icon(name: "chevron_down", size: 20)
                         .foregroundStyle(Palette.secondary)
-                        .frame(width: 26, height: 26)
-                        .background(Circle().fill(Color.white).shadow(color: .black.opacity(0.08), radius: 4, y: 1))
+                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PressableStyle())
                 .accessibilityLabel(expanded ? "一覧を閉じる" : "一覧を開く")
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.75), value: selected)
-            if expanded {
-                VStack(spacing: 4) {
-                    ForEach(slices.filter { $0.name != nil }) { slice in
-                        row(slice)
-                    }
+            VStack(spacing: 4) {
+                ForEach(slices.filter { $0.name != nil }) { slice in
+                    row(slice)
                 }
-                .transition(.opacity.combined(with: .move(edge: .top)))
             }
+            .frame(maxHeight: expanded ? nil : 0, alignment: .top)
+            .clipped()
+            .opacity(expanded ? 1 : 0)
+            .allowsHitTesting(expanded)
             if slices.isEmpty {
                 Text("データなし")
                     .font(.caption.weight(.semibold))
@@ -901,9 +945,12 @@ struct SpreadSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("能力ポイント").sectionTitle()
-            VStack(spacing: 8) {
+            Text("のうりょくポイント").sectionTitle()
+            VStack(spacing: 0) {
                 ForEach(Array(spreads.enumerated()), id: \.offset) { index, spread in
+                    if index > 0 {
+                        Divider()
+                    }
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Text("\(index + 1)")
@@ -933,8 +980,7 @@ struct SpreadSection: View {
                             }
                         }
                     }
-                    .padding(12)
-                    .background(Palette.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .padding(.vertical, 12)
                 }
             }
         }
@@ -949,7 +995,7 @@ struct ModeSwitchPull: ViewModifier {
     @State private var progress: CGFloat = 0
     @State private var fired = false
 
-    private let distance: CGFloat = 110
+    private let distance: CGFloat = 52
 
     func body(content: Content) -> some View {
         content
@@ -998,5 +1044,41 @@ struct ModeSwitchPull: ViewModifier {
 extension View {
     func modeSwitchPull(label: String, icon: String, tint: Color, onTrigger: @escaping () -> Void) -> some View {
         modifier(ModeSwitchPull(label: label, icon: icon, tint: tint, onTrigger: onTrigger))
+    }
+}
+
+struct CalcHandoff: View {
+    @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
+    let role: Role
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("このポケモンでダメ計する").sectionTitle()
+            HStack(spacing: 8) {
+                ForEach(Role.allCases, id: \.self) { target in
+                    let tint = target == .attacker ? Palette.attack : Palette.accent
+                    Button {
+                        Haptics.play(.medium)
+                        model.applyStats(stats.side(role), to: target)
+                        withAnimation(.easeInOut(duration: 0.35)) {
+                            stats.exit(page: target)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Icon(name: target == .attacker ? "tab_attack" : "shield", size: 17)
+                            Text(target.title)
+                                .font(.subheadline.weight(.bold))
+                        }
+                        .foregroundStyle(tint)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
+                        .background(UnevenBox().fill(tint.opacity(0.1)))
+                        .contentShape(UnevenBox())
+                    }
+                    .buttonStyle(PressableStyle())
+                }
+            }
+        }
     }
 }

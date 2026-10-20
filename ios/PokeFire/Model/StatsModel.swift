@@ -21,6 +21,18 @@ struct StatsSide: Codable, Equatable {
     }
 }
 
+struct StatsHistoryEntry: Codable, Identifiable, Equatable {
+    var id: String { key }
+    var key: String
+    var attacker: StatsSide
+    var defender: StatsSide
+    var time: Double
+    var pinned = false
+
+    var title: String { "\(attacker.name)・\(defender.name)" }
+    var date: Date { Date(timeIntervalSince1970: time / 1000) }
+}
+
 @Observable
 @MainActor
 final class StatsModel {
@@ -32,16 +44,24 @@ final class StatsModel {
     }
 
     private static let key = "pokefire-stats"
+    private static let historyKey = "pokefire-stats-history"
 
     var mode: AppMode = .fire
     var attacker = StatsSide(name: "ガブリアス")
     var defender = StatsSide(name: "メガリザードンX")
     var chartCollapsed = false
     var considerAbilities = true
+    var history: [StatsHistoryEntry] = []
+    var pendingPage: Role?
+    @ObservationIgnored private var historyTask: Task<Void, Never>?
 
     var isStats: Bool { mode == .stats }
 
     init() {
+        if let data = UserDefaults.standard.data(forKey: Self.historyKey),
+           let list = try? JSONDecoder().decode([StatsHistoryEntry].self, from: data) {
+            history = list
+        }
         guard
             let data = UserDefaults.standard.data(forKey: Self.key),
             let saved = try? JSONDecoder().decode(Saved.self, from: data)
@@ -72,6 +92,7 @@ final class StatsModel {
             defender = side
         }
         save()
+        scheduleHistory()
     }
 
     func enter(from model: AppModel) {
@@ -92,11 +113,60 @@ final class StatsModel {
         }
         mode = .stats
         save()
+        scheduleHistory()
     }
 
-    func exit() {
+    func exit(page: Role? = nil) {
         mode = .fire
+        pendingPage = page
         save()
+    }
+
+    private func scheduleHistory() {
+        historyTask?.cancel()
+        historyTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard !Task.isCancelled, let self else { return }
+            self.recordHistory()
+        }
+    }
+
+    private func saveHistory() {
+        let pinned = history.filter(\.pinned)
+        let rest = history.filter { !$0.pinned }.prefix(max(0, Storage.historyLimit - pinned.count))
+        history = (pinned + rest).sorted { $0.time > $1.time }
+        if let data = try? JSONEncoder().encode(history) {
+            UserDefaults.standard.set(data, forKey: Self.historyKey)
+        }
+    }
+
+    private func recordHistory() {
+        let key = "\(attacker.name)|\(defender.name)"
+        let pinned = history.first { $0.key == key }?.pinned ?? false
+        let entry = StatsHistoryEntry(key: key, attacker: attacker, defender: defender, time: Date().timeIntervalSince1970 * 1000, pinned: pinned)
+        history = [entry] + history.filter { $0.key != key }
+        saveHistory()
+    }
+
+    func applyHistory(_ entry: StatsHistoryEntry) {
+        historyTask?.cancel()
+        attacker = entry.attacker
+        defender = entry.defender
+        save()
+        Haptics.play(.medium)
+    }
+
+    func togglePin(_ entry: StatsHistoryEntry) {
+        guard let index = history.firstIndex(where: { $0.key == entry.key }) else { return }
+        history[index].pinned.toggle()
+        saveHistory()
+        Haptics.play(.light)
+    }
+
+    func deleteHistory(_ entry: StatsHistoryEntry) {
+        history.removeAll { $0.key == entry.key }
+        saveHistory()
+        Haptics.play(.medium)
     }
 
     func select(_ role: Role, _ name: String) {
