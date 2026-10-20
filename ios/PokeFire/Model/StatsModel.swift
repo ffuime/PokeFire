@@ -179,6 +179,15 @@ final class StatsModel {
         update(role) { $0.points[key.rawValue] = max(0, min(32, value)) }
     }
 
+    func applySpread(_ role: Role, _ points: [Int]) {
+        update(role) { side in
+            for (index, key) in StatKey.baseKeys.enumerated() where index < points.count {
+                side.points[key.rawValue] = max(0, min(32, points[index]))
+            }
+        }
+        Haptics.play(.success)
+    }
+
     func setNature(_ role: Role, _ key: StatKey, _ value: Int) {
         update(role) { $0.natures[key.rawValue] = value }
         Haptics.play(.selection)

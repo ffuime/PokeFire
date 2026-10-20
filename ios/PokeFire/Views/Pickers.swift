@@ -49,6 +49,8 @@ struct SearchHeader: View {
     let prompt: String
     let onSubmit: () -> Void
     let onClose: () -> Void
+    var filterActive = false
+    var onFilter: (() -> Void)?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -100,6 +102,7 @@ struct SearchHeader: View {
             .padding(.horizontal, 14)
             .frame(height: 44)
             .background(Color(hex: 0xEEEEF1), in: Capsule())
+            .modifier(FilterButtonModifier(active: filterActive, action: onFilter))
         }
         .padding(.horizontal, 16)
         .padding(.top, 18)
@@ -630,5 +633,30 @@ struct EnvironmentSegments: View {
             if keys.indices.contains(index) { onSelect(keys[index]) }
         }
         .frame(height: 56)
+    }
+}
+
+struct FilterButtonModifier: ViewModifier {
+    let active: Bool
+    let action: (() -> Void)?
+
+    func body(content: Content) -> some View {
+        if let action {
+            HStack(spacing: 8) {
+                content
+                Button(action: action) {
+                    Image(systemName: active ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(active ? Palette.accent : Palette.ink)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .accessibilityLabel("絞り込み")
+            }
+        } else {
+            content
+        }
     }
 }

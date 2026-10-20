@@ -214,6 +214,8 @@ struct LearnsetSheet: View {
     @State private var query = ""
     @State private var mode = 0
     @State private var expanded: Set<String> = []
+    @State private var filter = MoveFilter()
+    @State private var showFilter = false
     @FocusState private var focused: Bool
 
     private func searchText(_ info: MoveInfo) -> String {
@@ -230,7 +232,7 @@ struct LearnsetSheet: View {
         guard let learnable = model.learnset(stats.side(role).name) else { return nil }
         let catalog = StatsCatalog.shared
         let set = Set(learnable)
-        let infos = catalog.moveOrder.filter { set.contains($0) }.compactMap { catalog.moveInfo($0) }
+        let infos = catalog.moveOrder.filter { set.contains($0) }.compactMap { catalog.moveInfo($0) }.filter { filter.matches($0) }
         let tiers = Search.rank(infos.map(searchText), query: query)
         return Search.ordered(infos.count, tiers: tiers) { infos[$0].name }.map { infos[$0] }
     }
@@ -245,7 +247,13 @@ struct LearnsetSheet: View {
                 focused: $focused,
                 prompt: "わざの名前・タイプを検索…",
                 onSubmit: { focused = false },
-                onClose: { dismiss() }
+                onClose: { dismiss() },
+                filterActive: filter.isActive,
+                onFilter: {
+                    focused = false
+                    Haptics.play(.light)
+                    showFilter = true
+                }
             )
             ScrollView {
                 LazyVStack(spacing: 4) {
@@ -277,6 +285,9 @@ struct LearnsetSheet: View {
                     EmptyResult(text: "見つかりません")
                 }
             }
+        }
+        .sheet(isPresented: $showFilter) {
+            MoveFilterSheet(filter: $filter)
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)

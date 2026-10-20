@@ -10,6 +10,8 @@ struct MoveInfo {
     let effect: String
     let target: String
     let remarks: [String]
+    var flags: Set<String> = []
+    var priority = 0
 
     var powerText: String { power.map(String.init) ?? "-" }
     var accuracyText: String { accuracy.map(String.init) ?? "-" }
@@ -58,7 +60,9 @@ final class StatsCatalog {
                 pp: value["pp"]?.int,
                 effect: value["effect"]?.string ?? "",
                 target: value["target"]?.string ?? "",
-                remarks: remarks
+                remarks: remarks,
+                flags: Set(value["flags"]?.stringList ?? []),
+                priority: value["priority"]?.int ?? 0
             )
             moveOrder.append(name)
         }

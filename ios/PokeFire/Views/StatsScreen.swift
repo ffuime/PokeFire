@@ -24,7 +24,7 @@ struct StatsPanel: View {
                     UsageCarousel(role: role, present: present)
                 }
                 if let entry, !entry.spreads.isEmpty {
-                    SpreadSection(spreads: entry.spreads)
+                    SpreadSection(role: role, spreads: entry.spreads)
                 }
                 Button {
                     Haptics.play(.light)
@@ -35,10 +35,10 @@ struct StatsPanel: View {
                         Text("覚えるわざを見る")
                             .font(.subheadline.weight(.bold))
                     }
-                    .foregroundStyle(Palette.accent)
+                    .foregroundStyle(Palette.ink)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(UnevenBox().fill(Palette.accent.opacity(0.08)))
+                    .background(UnevenBox().fill(Color(hex: 0xF0F0F3)))
                     .contentShape(UnevenBox())
                 }
                 .buttonStyle(PressableStyle())
@@ -61,7 +61,7 @@ struct StatsPanel: View {
             .animation(.snappy(duration: 0.3), value: stats.chartCollapsed)
         }
         .scrollIndicators(.hidden)
-        .modeSwitchPull(label: "Fire Mode", icon: "tab_attack", tint: Palette.attack) {
+        .modeSwitchPull(label: "Fire Mode", icon: "tab_attack", tint: Palette.attack, distance: 35) {
             withAnimation(.easeInOut(duration: 0.35)) { stats.exit() }
         }
         .onChange(of: side.name) { _, _ in editing = nil }
@@ -233,6 +233,14 @@ struct StatsBaseRow: View {
         withAnimation(.spring(response: 0.4, dampingFraction: 0.78)) { editing = nil }
     }
 
+    private func realText(_ side: StatsSide, _ key: StatKey) -> String {
+        let points = side.point(key)
+        let nature = side.nature(key)
+        let arrow = nature == 11 ? "↑" : nature == 9 ? "↓" : ""
+        guard points > 0 || !arrow.isEmpty else { return "\(side.real(key))" }
+        return "\(side.real(key))(+\(points)\(arrow))"
+    }
+
     var body: some View {
         let side = stats.side(role)
         HStack(spacing: 0) {
@@ -244,9 +252,13 @@ struct StatsBaseRow: View {
                         .opacity(0.7)
                     NumberText(side.base[key])
                         .font(.subheadline.weight(.bold))
-                    NumberText(side.real(key))
+                    Text(realText(side, key))
                         .font(.caption2.weight(.heavy))
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.55)
                         .foregroundStyle(Palette.stat(key).opacity(0.55))
+                        .contentTransition(.numericText(value: Double(side.real(key))))
                 }
                 .foregroundStyle(Palette.stat(key))
                 .frame(maxWidth: .infinity)
@@ -421,12 +433,12 @@ struct StatsAbilityRow: View {
 
 struct TypeChip: View {
     let type: String
-    var height: CGFloat = 28
+    var height: CGFloat = 24
 
     var body: some View {
         HStack(spacing: 6) {
             if let id = Palette.types[type]?.id {
-                Icon(name: "glyph_\(id)", size: height * 0.55)
+                Icon(name: "glyph_\(id)", size: height * 0.66)
                     .foregroundStyle(Color.white)
             }
             Text(type)
@@ -454,23 +466,23 @@ struct TypeChartCard: View {
             HStack {
                 Text("タイプ相性").sectionTitle()
                 Spacer()
-                Button {
-                    withAnimation(.snappy(duration: 0.32)) { stats.toggleChart() }
-                } label: {
-                    Icon(name: "chevron_down", size: 20)
-                        .foregroundStyle(Palette.secondary)
-                        .rotationEffect(.degrees(collapsed ? 0 : 180))
-                        .frame(width: 34, height: 30)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel(collapsed ? "タイプ相性を開く" : "タイプ相性を最小化")
+                Icon(name: "chevron_down", size: 20)
+                    .foregroundStyle(Palette.secondary)
+                    .rotationEffect(.degrees(collapsed ? 0 : 180))
+                    .frame(width: 34, height: 30)
             }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.snappy(duration: 0.32)) { stats.toggleChart() }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityLabel(collapsed ? "タイプ相性を開く" : "タイプ相性を最小化")
             VStack(spacing: 6) {
                 ForEach(rows) { row in
                     HStack(alignment: .center, spacing: 12) {
                         VStack(spacing: 2) {
-                            Icon(name: row.icon, size: 24)
+                            Icon(name: row.icon, size: 30)
                                 .foregroundStyle(Color(hex: row.color))
                             Text(row.label)
                                 .font(.caption.weight(.heavy))
@@ -487,7 +499,7 @@ struct TypeChartCard: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(.vertical, 6)
+                    .padding(.vertical, 5)
                     .padding(.horizontal, 8)
                     .background(Color(hex: row.background), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
@@ -497,11 +509,12 @@ struct TypeChartCard: View {
                         .font(.footnote.weight(.semibold))
                         .foregroundStyle(Palette.secondary)
                         .fixedSize()
+                        .padding(.trailing, 2)
                 }
             }
             .animation(.snappy(duration: 0.3), value: stats.considerAbilities)
             .frame(maxHeight: collapsed ? 0 : nil, alignment: .top)
-            .clipped()
+            .mask { Rectangle().padding(.horizontal, -24) }
             .opacity(collapsed ? 0 : 1)
             .allowsHitTesting(!collapsed)
         }
@@ -510,7 +523,7 @@ struct TypeChartCard: View {
 
 struct Outlined<Content: View>: View {
     let color: Color
-    var outline = Color(hex: 0xE0E0E0)
+    var outline = Color(hex: 0xEAEAEA)
     var width: CGFloat = 1.2
     @ViewBuilder let content: () -> Content
 
@@ -560,8 +573,9 @@ struct MoveUsageRow: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let info, let id = Palette.types[info.type]?.id {
-                    Icon(name: "glyph_\(id)", size: 20)
-                        .foregroundStyle(Color.white)
+                    Outlined(color: .white, outline: color) {
+                        Icon(name: "glyph_\(id)", size: 20)
+                    }
                 }
                 Outlined(color: color) {
                     Text(pair.name ?? "不明なわざ")
@@ -748,7 +762,7 @@ struct UsageCard: View {
                 .accessibilityLabel(expanded ? "一覧を閉じる" : "一覧を開く")
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.75), value: selected)
-            VStack(spacing: 4) {
+            VStack(spacing: 2) {
                 ForEach(slices.filter { $0.name != nil }) { slice in
                     row(slice)
                 }
@@ -757,6 +771,7 @@ struct UsageCard: View {
             .clipped()
             .opacity(expanded ? 1 : 0)
             .allowsHitTesting(expanded)
+            Spacer(minLength: 0)
             if slices.isEmpty {
                 Text("データなし")
                     .font(.caption.weight(.semibold))
@@ -764,7 +779,13 @@ struct UsageCard: View {
             }
         }
         .padding(12)
+        .frame(maxHeight: .infinity, alignment: .top)
         .background(Palette.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .onTapGesture {
+            Haptics.play(.light)
+            withAnimation(.snappy(duration: 0.32)) { expanded.toggle() }
+        }
     }
 
     @ViewBuilder
@@ -834,7 +855,8 @@ struct UsageCard: View {
                 .monospacedDigit()
                 .foregroundStyle(Palette.secondary)
         }
-        .padding(.vertical, 3)
+        .frame(minHeight: 34)
+        .padding(.vertical, 4)
         .contentShape(Rectangle())
         return Group {
             if kind != .natures {
@@ -930,7 +952,10 @@ struct PieSlice: Shape {
 }
 
 struct SpreadSection: View {
+    @Environment(StatsModel.self) private var stats
+    let role: Role
     let spreads: [SpreadUsage]
+    @State private var asking: Int?
 
     private static let letters = ["H", "A", "B", "C", "D", "S"]
 
@@ -951,38 +976,67 @@ struct SpreadSection: View {
                     if index > 0 {
                         Divider()
                     }
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("\(index + 1)")
-                                .font(.caption.weight(.heavy))
-                                .monospacedDigit()
-                                .foregroundStyle(Palette.accent)
-                                .frame(width: 24, height: 24)
-                                .background(Circle().fill(Palette.accent.opacity(0.1)))
-                            Spacer()
-                            Text("\(Format.fixed1(spread.pct))%")
-                                .font(.subheadline.weight(.bold))
-                                .monospacedDigit()
-                                .foregroundStyle(Palette.ink)
-                        }
-                        HStack(spacing: 4) {
-                            ForEach(0..<6, id: \.self) { stat in
-                                let value = stat < spread.points.count ? spread.points[stat] : 0
-                                Text("\(Self.letters[stat])\(value)")
-                                    .font(.caption.weight(.heavy))
-                                    .monospacedDigit()
-                                    .foregroundStyle(color(value))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.7)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 28)
-                                    .background(color(value).opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                            }
-                        }
-                    }
-                    .padding(.vertical, 12)
+                    row(index, spread)
                 }
             }
+        }
+    }
+
+    private func row(_ index: Int, _ spread: SpreadUsage) -> some View {
+        HStack(spacing: 6) {
+            Text("\(index + 1)")
+                .font(.caption2.weight(.heavy))
+                .monospacedDigit()
+                .foregroundStyle(Palette.accent)
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(Palette.accent.opacity(0.1)))
+            HStack(spacing: 3) {
+                ForEach(0..<6, id: \.self) { stat in
+                    let value = stat < spread.points.count ? spread.points[stat] : 0
+                    Text("\(Self.letters[stat])\(value)")
+                        .font(.caption2.weight(.heavy))
+                        .monospacedDigit()
+                        .foregroundStyle(color(value))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 26)
+                        .background(color(value).opacity(0.14), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+            }
+            Text("\(Format.fixed1(spread.pct))%")
+                .font(.footnote.weight(.bold))
+                .monospacedDigit()
+                .foregroundStyle(Palette.ink)
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.vertical, 10)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            Haptics.play(.light)
+            asking = index
+        }
+        .popover(isPresented: Binding(get: { asking == index }, set: { if !$0 { asking = nil } }), attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("こののうりょくポイントをお手本にしますか？")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack(spacing: 8) {
+                    Button("キャンセル") { asking = nil }
+                        .buttonStyle(.bordered)
+                    Button("お手本にする") {
+                        stats.applySpread(role, spread.points)
+                        asking = nil
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .padding(16)
+            .frame(width: 280)
+            .presentationCompactAdaptation(.popover)
         }
     }
 }
@@ -991,11 +1045,10 @@ struct ModeSwitchPull: ViewModifier {
     let label: String
     let icon: String
     let tint: Color
+    let distance: CGFloat
     let onTrigger: () -> Void
     @State private var progress: CGFloat = 0
     @State private var fired = false
-
-    private let distance: CGFloat = 52
 
     func body(content: Content) -> some View {
         content
@@ -1042,8 +1095,8 @@ struct ModeSwitchPull: ViewModifier {
 }
 
 extension View {
-    func modeSwitchPull(label: String, icon: String, tint: Color, onTrigger: @escaping () -> Void) -> some View {
-        modifier(ModeSwitchPull(label: label, icon: icon, tint: tint, onTrigger: onTrigger))
+    func modeSwitchPull(label: String, icon: String, tint: Color, distance: CGFloat, onTrigger: @escaping () -> Void) -> some View {
+        modifier(ModeSwitchPull(label: label, icon: icon, tint: tint, distance: distance, onTrigger: onTrigger))
     }
 }
 
