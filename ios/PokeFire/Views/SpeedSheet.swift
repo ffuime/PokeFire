@@ -19,14 +19,26 @@ private struct SpeedColumn {
 
 struct SpeedSheet: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     @Environment(\.dismiss) private var dismiss
+    var statsMode = false
     @State private var selected: Role?
     @State private var cursor: Int?
 
+    private func statsFighter(_ role: Role) -> Fighter {
+        let side = stats.side(role)
+        var fighter = Fighter()
+        fighter.role = role
+        fighter.name = side.name
+        fighter.base = side.base
+        fighter.evs[.s] = StatValue(real: side.real(.s), points: side.point(.s), rank: 0, nature: side.nature(.s))
+        return fighter
+    }
+
     private func columns() -> [SpeedColumn] {
-        let field = model.output.field
+        let field = statsMode ? Field() : model.output.field
         return Role.allCases.map { role in
-            let p = model.liveFighter(role)
+            let p = statsMode ? statsFighter(role) : model.liveFighter(role)
             let base = p.base.s
             func at(_ points: Int, _ nature: Int, _ scarf: Bool = false) -> Int {
                 Calc.speedStat(p, field.weather, field.terrain, scarf: scarf, real: Calc.realStat(base, points, nature))
@@ -116,7 +128,7 @@ struct SpeedSheet: View {
             }
             .overlay(alignment: .top) {
                 if let role = selected {
-                    SpeedEditor(role: role) {
+                    SpeedEditor(role: role, statsMode: statsMode) {
                         selected = nil
                     }
                     .padding(.horizontal, 16)
@@ -190,21 +202,27 @@ private struct BubbleShape: Shape {
 
 private struct SpeedEditor: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     let role: Role
+    var statsMode = false
     let close: () -> Void
 
     var body: some View {
         let side = model.side(role)
+        let name = statsMode ? stats.side(role).name : side.name
         let tint = role == .attacker ? Palette.attack : Palette.accent
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 6) {
                 Icon(name: role == .attacker ? "tab_attack" : "shield", size: 18)
                     .foregroundStyle(tint)
-                Text(side.name)
+                Text(name)
                     .font(.headline)
                     .foregroundStyle(Palette.ink)
                 Spacer()
             }
+            if statsMode {
+                StatsStatFields(role: role, key: .s)
+            } else {
             StatEditor(role: role, key: .s)
             FlowLayout(spacing: 6) {
                 if Calc.speedAbilities[side.ability] != nil {
@@ -217,6 +235,7 @@ private struct SpeedEditor: View {
                         model.toggleSpeedCondition(role, name)
                     }
                 }
+            }
             }
         }
         .padding(18)

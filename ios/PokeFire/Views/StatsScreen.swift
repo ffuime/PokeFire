@@ -13,7 +13,7 @@ struct StatsPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 StatsHeader(role: role, present: present)
-                StatsBaseRow(role: role, editing: $editing)
+                StatsBaseRow(role: role, editing: $editing, present: present)
                     .zIndex(2)
                 StatsAbilityRow(role: role, present: present)
                 TypeChartCard(role: role)
@@ -59,7 +59,6 @@ struct StatsPanel: View {
             .padding(.top, 6)
             .padding(.bottom, 24)
             .animation(.snappy(duration: 0.3), value: stats.chartCollapsed)
-            PullMarker()
         }
         .scrollIndicators(.hidden)
         .modeSwitchPull(label: "Fire Mode", icon: "tab_attack", tint: Palette.attack, distance: 52) {
@@ -221,6 +220,7 @@ struct StatsBaseRow: View {
     @Environment(StatsModel.self) private var stats
     let role: Role
     @Binding var editing: StatKey?
+    let present: (ActiveSheet) -> Void
     @State private var height: CGFloat = 52
 
     private func tap(_ key: StatKey) {
@@ -291,7 +291,7 @@ struct StatsBaseRow: View {
                             }
                         }
                         .frame(width: width, height: height)
-                        StatsBubble(role: role, key: key, close: close)
+                        StatsBubble(role: role, key: key, close: close, present: present)
                             .frame(width: width)
                             .offset(y: height + 14)
                             .transition(.scale(scale: 0.6, anchor: UnitPoint(x: StatsBubble.ratio(key), y: 0)).combined(with: .opacity))
@@ -303,11 +303,45 @@ struct StatsBaseRow: View {
     }
 }
 
-struct StatsBubble: View {
+struct StatsStatFields: View {
     @Environment(StatsModel.self) private var stats
     let role: Role
     let key: StatKey
+
+    var body: some View {
+        let side = stats.side(role)
+        let color = Palette.stat(key)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(key.title).sectionTitle()
+                Spacer()
+                NumberText(side.real(key))
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(color)
+            }
+            HStack(spacing: 12) {
+                SegmentBar(count: 32, value: side.point(key), color: color) { value in
+                    withAnimation(.snappy(duration: 0.25)) { stats.setPoints(role, key, value) }
+                }
+                NumberText(side.point(key))
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 30, alignment: .trailing)
+            }
+            if key.hasNature {
+                NatureControl(nature: side.nature(key)) { value in
+                    withAnimation(.snappy(duration: 0.25)) { stats.setNature(role, key, value) }
+                }
+            }
+        }
+    }
+}
+
+struct StatsBubble: View {
+    let role: Role
+    let key: StatKey
     let close: () -> Void
+    let present: (ActiveSheet) -> Void
 
     static func ratio(_ key: StatKey) -> CGFloat {
         let index = StatKey.baseKeys.firstIndex(of: key) ?? 0
@@ -315,40 +349,38 @@ struct StatsBubble: View {
     }
 
     var body: some View {
-        let side = stats.side(role)
-        let color = Palette.stat(key)
         let tailRatio = Self.ratio(key)
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 6) {
-                SpriteView(name: side.name, size: 26)
-                Text(side.name)
-                    .font(.headline)
-                    .foregroundStyle(Palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Spacer()
-            }
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(key.title).sectionTitle()
+            StatsStatFields(role: role, key: key)
+            if key == .s {
+                HStack(spacing: 8) {
+                    Button {
+                        Haptics.play(.light)
+                        close()
+                        present(.speedLine(role))
+                    } label: {
+                        Text("すばやさライン")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Palette.stat(.s))
+                            .padding(.horizontal, 14)
+                            .frame(height: 38)
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: Capsule())
                     Spacer()
-                    NumberText(side.real(key))
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(color)
-                }
-                HStack(spacing: 12) {
-                    SegmentBar(count: 32, value: side.point(key), color: color) { value in
-                        withAnimation(.snappy(duration: 0.25)) { stats.setPoints(role, key, value) }
+                    Button {
+                        Haptics.play(.light)
+                        close()
+                        present(.statsSpeed)
+                    } label: {
+                        Icon(name: "speed", size: 19)
+                            .foregroundStyle(Palette.rankDown)
+                            .frame(width: 38, height: 38)
+                            .contentShape(Circle())
                     }
-                    NumberText(side.point(key))
-                        .font(.headline)
-                        .foregroundStyle(Palette.ink)
-                        .frame(width: 30, alignment: .trailing)
-                }
-                if key.hasNature {
-                    NatureControl(nature: side.nature(key)) { value in
-                        withAnimation(.snappy(duration: 0.25)) { stats.setNature(role, key, value) }
-                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .accessibilityLabel("すばやさ比較")
                 }
             }
         }
@@ -960,8 +992,8 @@ struct SpreadSection: View {
     private func color(_ value: Int) -> Color {
         switch value {
         case 30...: return Color(hex: 0xE5534B)
-        case 11...29: return Color(hex: 0xE0A21B)
-        case 1...10: return Color(hex: 0x3FA45B)
+        case 11...29: return Color(hex: 0x3FA45B)
+        case 1...10: return Color(hex: 0xE0A21B)
         default: return Color(hex: 0xA0A0A8)
         }
     }
@@ -1039,27 +1071,6 @@ struct SpreadSection: View {
     }
 }
 
-struct PullMarkerKey: PreferenceKey {
-    static var defaultValue: CGFloat?
-
-    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
-        value = nextValue() ?? value
-    }
-}
-
-struct PullMarker: View {
-    var body: some View {
-        Color.clear
-            .frame(height: 0)
-            .frame(maxWidth: .infinity)
-            .background {
-                GeometryReader { geometry in
-                    Color.clear.preference(key: PullMarkerKey.self, value: geometry.frame(in: .named("modePull")).minY)
-                }
-            }
-    }
-}
-
 struct ModeSwitchPull: ViewModifier {
     let label: String
     let icon: String
@@ -1068,15 +1079,12 @@ struct ModeSwitchPull: ViewModifier {
     let onTrigger: () -> Void
     @State private var progress: CGFloat = 0
     @State private var fired = false
-    @State private var fits = false
-    @State private var geometryOver: CGFloat = 0
-    @State private var markerY: CGFloat?
-    @State private var visibleBottom: CGFloat = 0
+    @State private var visibleTop: CGFloat = 0
 
-    private func evaluate() {
-        let markerOver = markerY.map { visibleBottom - $0 } ?? geometryOver
-        let over = fits ? geometryOver : markerOver
-        let value = max(0, min(1, over / distance))
+    private let deadZone: CGFloat = 28
+
+    private func evaluate(_ pull: CGFloat) {
+        let value = max(0, min(1, (pull - deadZone) / distance))
         let step = Int(value * 8)
         let previous = Int(progress * 8)
         if value != progress { progress = value }
@@ -1084,7 +1092,7 @@ struct ModeSwitchPull: ViewModifier {
             fired = true
             Haptics.play(.success)
             onTrigger()
-        } else if over < 4, fired {
+        } else if pull < 4, fired {
             fired = false
         } else if value > 0, !fired, step != previous {
             Haptics.play(.selection)
@@ -1094,24 +1102,15 @@ struct ModeSwitchPull: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollBounceBehavior(.always, axes: .vertical)
-            .coordinateSpace(.named("modePull"))
-            .onPreferenceChange(PullMarkerKey.self) { value in
-                markerY = value
-                evaluate()
-            }
             .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.size.height - proxy.safeAreaInsets.bottom
+                proxy.safeAreaInsets.top
             } action: { value in
-                visibleBottom = value
+                visibleTop = value
             }
-            .onScrollGeometryChange(for: [CGFloat].self) { geometry in
-                let maxOffset = max(-geometry.contentInsets.top, geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height)
-                let fit = geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom <= geometry.containerSize.height
-                return [geometry.contentOffset.y - maxOffset, fit ? 1 : 0]
-            } action: { _, values in
-                geometryOver = values[0]
-                fits = values[1] > 0
-                evaluate()
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                -(geometry.contentOffset.y + geometry.contentInsets.top)
+            } action: { _, pull in
+                evaluate(pull)
             }
             .overlay(alignment: .top) {
                 VStack(spacing: 6) {
@@ -1133,7 +1132,7 @@ struct ModeSwitchPull: ViewModifier {
                 .opacity(Double(min(1, progress * 3)))
                 .scaleEffect(0.7 + 0.3 * progress)
                 .frame(maxWidth: .infinity)
-                .offset(y: max(0, visibleBottom - 74))
+                .offset(y: visibleTop + 4)
                 .allowsHitTesting(false)
             }
     }

@@ -179,6 +179,16 @@ final class StatsModel {
         update(role) { $0.points[key.rawValue] = max(0, min(32, value)) }
     }
 
+    func applySpeedLine(_ role: Role, name: String, points: Int, nature: Int) {
+        guard GameData.shared.pokemons[name] != nil else { return }
+        update(role) { side in
+            side.name = name
+            side.points = [StatKey.s.rawValue: points]
+            side.natures = [StatKey.s.rawValue: nature]
+        }
+        Haptics.play(.medium)
+    }
+
     func applySpread(_ role: Role, _ points: [Int]) {
         update(role) { side in
             for (index, key) in StatKey.baseKeys.enumerated() where index < points.count {

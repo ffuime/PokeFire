@@ -12,6 +12,8 @@ enum ActiveSheet: Identifiable, Hashable {
     case moveInfo(String)
     case itemInfo(String)
     case learnset(Role)
+    case statsSpeed
+    case speedLine(Role)
 
     var id: String {
         switch self {
@@ -29,6 +31,8 @@ enum ActiveSheet: Identifiable, Hashable {
         case .moveInfo(let name): return "move-info-\(name)"
         case .itemInfo(let name): return "item-info-\(name)"
         case .learnset(let role): return "learnset-\(role.rawValue)"
+        case .statsSpeed: return "stats-speed"
+        case .speedLine(let role): return "speed-line-\(role.rawValue)"
         }
     }
 }
@@ -143,6 +147,10 @@ struct MainScreen: View {
             ItemInfoSheet(name: name)
         case .learnset(let role):
             LearnsetSheet(role: role)
+        case .statsSpeed:
+            SpeedSheet(statsMode: true)
+        case .speedLine(let role):
+            SpeedLineSheet(role: role)
         }
     }
 }

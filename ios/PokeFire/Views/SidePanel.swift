@@ -69,7 +69,6 @@ struct SidePanel: View {
             .animation(.snappy(duration: 0.3), value: model.visibleStats(role))
             .animation(.snappy(duration: 0.3), value: model.showsHP(role))
             .animation(.snappy(duration: 0.3), value: model.isConstantActive)
-            PullMarker()
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
