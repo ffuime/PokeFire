@@ -125,13 +125,13 @@ struct MoveFilterSheet: View {
                     }
                     section("PP") {
                         NativeSegmented(
-                            segments: Self.ppOptions.map { .text("\($0)") },
-                            selected: filter.pp.flatMap { Self.ppOptions.firstIndex(of: $0) } ?? -1,
+                            segments: MoveFilter.ppOptions.map { .text("\($0)") },
+                            selected: filter.pp.flatMap { MoveFilter.ppOptions.firstIndex(of: $0) } ?? -1,
                             height: 36,
                             allowsReselect: true
                         ) { index in
-                            guard Self.ppOptions.indices.contains(index) else { return }
-                            let value = Self.ppOptions[index]
+                            guard MoveFilter.ppOptions.indices.contains(index) else { return }
+                            let value = MoveFilter.ppOptions[index]
                             filter.pp = filter.pp == value ? nil : value
                         }
                         .frame(height: 36)
