@@ -174,6 +174,12 @@ final class AppModel {
         case .toggle:
             if role == .defender, side.ability == "マルチスケイル", output.multiscaleLocked { return false }
             return side.abilityOn
+        case .environment:
+            if let key = Rules.weatherAbilities[side.ability] { return weather == key }
+            if let key = Rules.fieldAbilities[side.ability] { return field == key }
+            return false
+        case .disguise:
+            return disguiseTabIndex != nil
         default: return false
         }
     }
@@ -182,6 +188,7 @@ final class AppModel {
         switch abilityControl(role) {
         case .locked, .hidden: return true
         case .toggle: return role == .defender && side(role).ability == "マルチスケイル" && output.multiscaleLocked
+        case .disguise: return isConstantActive
         default: return false
         }
     }
@@ -723,9 +730,48 @@ final class AppModel {
             Haptics.play(.medium)
         case .rank:
             applyRankAbility(role)
+        case .environment:
+            let ability = side(role).ability
+            if let key = Rules.weatherAbilities[ability] {
+                setWeather(key)
+            } else if let key = Rules.fieldAbilities[ability] {
+                setField(key)
+            }
+        case .disguise:
+            toggleDisguise()
         default:
             break
         }
+    }
+
+    private var disguiseTabIndex: Int? {
+        let index = active - 1
+        guard tabs.indices.contains(active), tabs[active].kind == .attack, tabs.indices.contains(index) else { return nil }
+        let constant = tabs[index].constant
+        guard tabs[index].kind == .damage,
+              constant.ratios.filter({ $0.value > 0 }) == ["1/8": 1],
+              constant.toxic.values.allSatisfy({ $0 == 0 }),
+              constant.fixed == 0,
+              constant.inputs.allSatisfy({ $0.count == 0 }) else { return nil }
+        return index
+    }
+
+    private func toggleDisguise() {
+        guard tabs.indices.contains(active), tabs[active].kind == .attack else { return }
+        if let index = disguiseTabIndex {
+            tabs.remove(at: index)
+            active -= 1
+            showToast("ばけのかわ：1/8ダメージを外しました")
+        } else {
+            var tab = newTab(.damage)
+            tab.constant.ratios["1/8"] = 1
+            tabs.insert(tab, at: active)
+            active += 1
+            showToast("ばけのかわ：直前に1/8ダメージを追加")
+        }
+        historyArmed = true
+        Haptics.play(.medium)
+        scheduleCalc()
     }
 
     private func applyRankAbility(_ role: Role) {

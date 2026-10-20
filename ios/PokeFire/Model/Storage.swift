@@ -90,6 +90,18 @@ enum Storage {
         moveHistory = Array(([name] + moveHistory.filter { $0 != name }).prefix(30))
     }
 
+    static func forgetPokemon(_ name: String) {
+        pokemonHistory.removeAll { $0 == name }
+    }
+
+    static func forgetMove(_ name: String) {
+        moveHistory.removeAll { $0 == name }
+    }
+
+    static func forgetItem(_ name: String) {
+        itemHistory.removeAll { $0 == name }
+    }
+
     static func rememberItem(_ name: String) {
         guard name != "なし" else { return }
         itemHistory = Array(([name] + itemHistory.filter { $0 != name }).prefix(30))

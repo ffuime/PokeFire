@@ -1,7 +1,7 @@
 import Foundation
 
 enum AbilityControl: Equatable {
-    case hidden, locked, toggle, changeType, rank
+    case hidden, locked, toggle, changeType, rank, environment, disguise
 
     var isToggleable: Bool {
         self == .toggle || self == .changeType || self == .rank
@@ -70,7 +70,18 @@ enum Rules {
         "じきゅうりょく": [(.current, .b, 1)],
         "くだけるよろい": [(.current, .b, -1), (.current, .s, 2)],
         "いかく": [(.opponent, .a, -1)],
+        "ぬめぬめ": [(.opponent, .s, -1)],
     ]
+
+    static let weatherAbilities: [String: String] = [
+        "ひでり": "sun", "あめふらし": "rain", "すなおこし": "sand", "すなはき": "sand", "ゆきふらし": "snow",
+    ]
+
+    static let fieldAbilities: [String: String] = [
+        "エレキメイカー": "electric", "グラスメイカー": "grass", "サイコメイカー": "psycho", "ミストメイカー": "mist", "こぼれダネ": "grass",
+    ]
+
+    static let disguiseAbility = "ばけのかわ"
 
     static let intimidateReactions: [String: [(StatKey, Int)]] = [
         "きもったま": [],
@@ -84,6 +95,7 @@ enum Rules {
         "まけんき": [(.a, -1), (.a, 2)],
         "かちき": [(.a, -1), (.c, 2)],
         "びびり": [(.a, -1), (.s, 1)],
+        "ばんけん": [(.a, 1)],
     ]
 
     static let rankStatNames: [StatKey: String] = [.a: "こうげき", .b: "ぼうぎょ", .c: "とくこう", .d: "とくぼう", .s: "すばやさ"]
@@ -167,6 +179,8 @@ enum Rules {
 
     static func abilityControl(_ role: Role, _ ability: String) -> AbilityControl {
         guard let rules = activation[role] else { return .hidden }
+        if weatherAbilities[ability] != nil || fieldAbilities[ability] != nil { return .environment }
+        if role == .defender, ability == disguiseAbility { return .disguise }
         if rules.changeType.contains(ability) { return .changeType }
         if rules.always.contains(ability) { return .locked }
         if rules.toggle.contains(ability) { return .toggle }

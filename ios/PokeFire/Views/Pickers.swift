@@ -114,6 +114,7 @@ struct PokemonPicker: View {
 
     @State private var query = ""
     @State private var mode = 0
+    @State private var revision = 0
     @FocusState private var focused: Bool
 
     private struct Row: Identifiable {
@@ -123,6 +124,7 @@ struct PokemonPicker: View {
     }
 
     private var rows: [Row] {
+        _ = revision
         let data = model.data
         let base: [String] = mode == 0
             ? model.pokemonOrder()
@@ -161,6 +163,19 @@ struct PokemonPicker: View {
                     }
                     .listRowInsets(EdgeInsets(top: 4, leading: row.nested ? 34 : 16, bottom: 4, trailing: 16))
                     .listRowBackground(row.name == current ? Palette.accent.opacity(0.06) : Color.white)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if mode == 1 {
+                            Button(role: .destructive) {
+                                Haptics.play(.medium)
+                                withAnimation {
+                                    Storage.forgetPokemon(row.name)
+                                    revision += 1
+                                }
+                            } label: {
+                                Label("削除", systemImage: "trash")
+                            }
+                        }
+                    }
                 }
                 if !list.isEmpty {
                     UsageCredit()
@@ -253,6 +268,14 @@ enum EntryKind {
         case .abilities: return []
         }
     }
+
+    func forget(_ name: String) {
+        switch self {
+        case .moves: Storage.forgetMove(name)
+        case .items: Storage.forgetItem(name)
+        case .abilities: break
+        }
+    }
 }
 
 struct EntrySearchSheet: View {
@@ -263,6 +286,7 @@ struct EntrySearchSheet: View {
 
     @State private var query = ""
     @State private var mode = 0
+    @State private var revision = 0
     @FocusState private var focused: Bool
 
     private struct Row: Identifiable {
@@ -304,6 +328,7 @@ struct EntrySearchSheet: View {
     }
 
     private var rows: [Row] {
+        _ = revision
         let data = model.data
         let name = model.side(role).name
         var usage: [(String, Double)] = []
@@ -379,6 +404,19 @@ struct EntrySearchSheet: View {
                         EntryRow(kind: kind, name: row.name, effect: row.effect, usage: row.usage, selected: row.name == selected)
                     }
                     .listRowBackground(row.name == selected ? Palette.accent.opacity(0.06) : Color.white)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        if mode == 1, kind.hasHistory {
+                            Button(role: .destructive) {
+                                Haptics.play(.medium)
+                                withAnimation {
+                                    kind.forget(row.name)
+                                    revision += 1
+                                }
+                            } label: {
+                                Label("削除", systemImage: "trash")
+                            }
+                        }
+                    }
                 }
                 if !list.isEmpty {
                     UsageCredit()

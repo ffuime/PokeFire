@@ -221,7 +221,7 @@ enum ShareCodec {
         switch control {
         case .locked: return (true, false)
         case .toggle: return (side.abilityOn, true)
-        case .changeType, .rank: return (false, true)
+        case .changeType, .rank, .environment, .disguise: return (false, true)
         case .hidden: return (false, false)
         }
     }
