@@ -311,7 +311,7 @@ struct StatsBubble: View {
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
                 .animation(.spring(response: 0.42, dampingFraction: 0.78), value: key)
         )
-        .keyframeAnimator(initialValue: CGFloat(1), trigger: key) { content, scale in
+        .keyframeAnimator(initialValue: CGFloat(1), trigger: key) { [tailRatio] content, scale in
             content.scaleEffect(scale, anchor: UnitPoint(x: tailRatio, y: 0))
         } keyframes: { _ in
             KeyframeTrack {
@@ -657,7 +657,7 @@ struct NatureCaption: View {
 
     var body: some View {
         if let up = nature.up, let down = nature.down {
-            Text("\(label(up))↑").foregroundStyle(Palette.rankUp) + Text(" ") + Text("\(label(down))↓").foregroundStyle(Palette.rankDown)
+            Text("\(Text("\(label(up))↑").foregroundStyle(Palette.rankUp)) \(Text("\(label(down))↓").foregroundStyle(Palette.rankDown))")
         } else {
             Text("補正なし").foregroundStyle(Palette.secondary)
         }
@@ -727,7 +727,7 @@ struct UsageCard: View {
     private func tooltip(_ slice: UsageSlice) -> some View {
         let content = HStack(spacing: 0) {
             if let nature = slice.nature, slice.name != nil {
-                Text(slice.label) + Text("（") + natureText(nature) + Text("）")
+                Text("\(slice.label)（\(natureText(nature))）")
             } else {
                 Text(slice.label)
             }
@@ -754,7 +754,7 @@ struct UsageCard: View {
 
     private func natureText(_ nature: NatureUsage) -> Text {
         if let up = nature.up, let down = nature.down {
-            return Text("\(up.letter)↑").foregroundStyle(Palette.rankUp) + Text(" ") + Text("\(down.letter)↓").foregroundStyle(Palette.rankDown)
+            return Text("\(Text("\(up.letter)↑").foregroundStyle(Palette.rankUp)) \(Text("\(down.letter)↓").foregroundStyle(Palette.rankDown))")
         }
         return Text("補正なし")
     }
