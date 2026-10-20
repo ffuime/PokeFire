@@ -130,9 +130,17 @@ struct SpeedLineSheet: View {
                                     .foregroundStyle(mine ? Palette.accent : Palette.ink)
                                     .frame(width: 52, alignment: .trailing)
                                     .padding(.top, 10)
-                                VStack(spacing: 4) {
-                                    ForEach(entries) { entry in
-                                        row(entry, highlighted: entry.name == current.name)
+                                if entries.contains(where: { $0.ability != nil || $0.move != nil }) {
+                                    VStack(spacing: 4) {
+                                        ForEach(entries) { entry in
+                                            row(entry, highlighted: entry.name == current.name)
+                                        }
+                                    }
+                                } else {
+                                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 4), GridItem(.flexible(), spacing: 4)], spacing: 4) {
+                                        ForEach(entries) { entry in
+                                            row(entry, highlighted: entry.name == current.name)
+                                        }
                                     }
                                 }
                             }
@@ -157,15 +165,32 @@ struct SpeedLineSheet: View {
                 }
             }
             .overlay(alignment: .bottomTrailing) {
-                Toggle("使用率TOP50まで", isOn: $top50)
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(Palette.ink)
-                    .fixedSize()
-                    .padding(.leading, 16)
-                    .padding(.trailing, 12)
-                    .frame(height: 48)
-                    .glassEffect(.regular, in: Capsule())
-                    .padding(16)
+                GlassEffectContainer(spacing: 8) {
+                    VStack(alignment: .trailing, spacing: 0) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            SpriteView(name: current.name, size: 30)
+                                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
+                            Text("S")
+                                .font(.caption.weight(.heavy))
+                                .foregroundStyle(Palette.stat(.s))
+                            NumberText(current.real(.s))
+                                .font(.title2.weight(.bold))
+                                .foregroundStyle(Palette.ink)
+                        }
+                        .padding(.horizontal, 16)
+                        .frame(height: 52)
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        Toggle("使用率TOP50まで", isOn: $top50)
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(Palette.ink)
+                            .fixedSize()
+                            .padding(.leading, 16)
+                            .padding(.trailing, 12)
+                            .frame(height: 48)
+                            .glassEffect(.regular, in: Capsule())
+                    }
+                }
+                .padding(16)
             }
             .navigationTitle("すばやさライン")
             .navigationBarTitleDisplayMode(.inline)
