@@ -59,9 +59,10 @@ struct StatsPanel: View {
             .padding(.top, 6)
             .padding(.bottom, 24)
             .animation(.snappy(duration: 0.3), value: stats.chartCollapsed)
+            PullMarker()
         }
         .scrollIndicators(.hidden)
-        .modeSwitchPull(label: "Fire Mode", icon: "tab_attack", tint: Palette.attack, distance: 35) {
+        .modeSwitchPull(label: "Fire Mode", icon: "tab_attack", tint: Palette.attack, distance: 52) {
             withAnimation(.easeInOut(duration: 0.35)) { stats.exit() }
         }
         .onChange(of: side.name) { _, _ in editing = nil }
@@ -259,6 +260,7 @@ struct StatsBaseRow: View {
                         .minimumScaleFactor(0.55)
                         .foregroundStyle(Palette.stat(key).opacity(0.55))
                         .contentTransition(.numericText(value: Double(side.real(key))))
+                        .animation(.snappy(duration: 0.25), value: realText(side, key))
                 }
                 .foregroundStyle(Palette.stat(key))
                 .frame(maxWidth: .infinity)
@@ -325,14 +327,6 @@ struct StatsBubble: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer()
-                Button(action: close) {
-                    CloseButtonLabel(size: 13)
-                        .foregroundStyle(Palette.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Palette.background))
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel("閉じる")
             }
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -343,14 +337,18 @@ struct StatsBubble: View {
                         .foregroundStyle(color)
                 }
                 HStack(spacing: 12) {
-                    SegmentBar(count: 32, value: side.point(key), color: color) { stats.setPoints(role, key, $0) }
+                    SegmentBar(count: 32, value: side.point(key), color: color) { value in
+                        withAnimation(.snappy(duration: 0.25)) { stats.setPoints(role, key, value) }
+                    }
                     NumberText(side.point(key))
                         .font(.headline)
                         .foregroundStyle(Palette.ink)
                         .frame(width: 30, alignment: .trailing)
                 }
                 if key.hasNature {
-                    NatureControl(nature: side.nature(key)) { stats.setNature(role, key, $0) }
+                    NatureControl(nature: side.nature(key)) { value in
+                        withAnimation(.snappy(duration: 0.25)) { stats.setNature(role, key, value) }
+                    }
                 }
             }
         }
@@ -438,7 +436,7 @@ struct TypeChip: View {
     var body: some View {
         HStack(spacing: 6) {
             if let id = Palette.types[type]?.id {
-                Icon(name: "glyph_\(id)", size: height * 0.66)
+                Icon(name: "glyph_\(id)", size: height * 0.82)
                     .foregroundStyle(Color.white)
             }
             Text(type)
@@ -482,7 +480,7 @@ struct TypeChartCard: View {
                 ForEach(rows) { row in
                     HStack(alignment: .center, spacing: 12) {
                         VStack(spacing: 2) {
-                            Icon(name: row.icon, size: 30)
+                            Icon(name: row.icon, size: 24)
                                 .foregroundStyle(Color(hex: row.color))
                             Text(row.label)
                                 .font(.caption.weight(.heavy))
@@ -738,7 +736,7 @@ struct UsageCard: View {
                     .minimumScaleFactor(0.8)
             }
             ZStack(alignment: .bottomTrailing) {
-                PieChart(slices: slices, selected: $selected)
+                PieChart(slices: slices, selected: $selected, onMiss: toggle)
                     .frame(height: 104)
                     .frame(maxWidth: .infinity)
                     .overlay(alignment: .top) {
@@ -748,10 +746,7 @@ struct UsageCard: View {
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                         }
                     }
-                Button {
-                    Haptics.play(.light)
-                    withAnimation(.snappy(duration: 0.32)) { expanded.toggle() }
-                } label: {
+                Button(action: toggle) {
                     Icon(name: "chevron_down", size: 20)
                         .foregroundStyle(Palette.secondary)
                         .rotationEffect(.degrees(expanded ? 180 : 0))
@@ -771,7 +766,6 @@ struct UsageCard: View {
             .clipped()
             .opacity(expanded ? 1 : 0)
             .allowsHitTesting(expanded)
-            Spacer(minLength: 0)
             if slices.isEmpty {
                 Text("データなし")
                     .font(.caption.weight(.semibold))
@@ -779,12 +773,16 @@ struct UsageCard: View {
             }
         }
         .padding(12)
-        .frame(maxHeight: .infinity, alignment: .top)
         .background(Palette.background, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .onTapGesture {
-            Haptics.play(.light)
-            withAnimation(.snappy(duration: 0.32)) { expanded.toggle() }
+        .onTapGesture(perform: toggle)
+    }
+
+    private func toggle() {
+        Haptics.play(.light)
+        withAnimation(.snappy(duration: 0.32)) {
+            selected = nil
+            expanded.toggle()
         }
     }
 
@@ -855,8 +853,7 @@ struct UsageCard: View {
                 .monospacedDigit()
                 .foregroundStyle(Palette.secondary)
         }
-        .frame(minHeight: 34)
-        .padding(.vertical, 4)
+        .frame(height: 42)
         .contentShape(Rectangle())
         return Group {
             if kind != .natures {
@@ -877,6 +874,7 @@ struct UsageCard: View {
 struct PieChart: View {
     let slices: [UsageSlice]
     @Binding var selected: Int?
+    var onMiss: () -> Void = {}
 
     private struct Span: Identifiable {
         var id: Int { slice.id }
@@ -916,8 +914,8 @@ struct PieChart: View {
                 let dx = location.x - center.x
                 let dy = location.y - center.y
                 let distance = sqrt(dx * dx + dy * dy)
-                guard distance <= radius * 1.1, distance >= radius * 0.3 else {
-                    selected = nil
+                guard distance <= radius * 1.1, distance >= radius * 0.4 else {
+                    onMiss()
                     return
                 }
                 var angle = atan2(dx, -dy) / (2 * .pi)
@@ -985,10 +983,10 @@ struct SpreadSection: View {
     private func row(_ index: Int, _ spread: SpreadUsage) -> some View {
         HStack(spacing: 6) {
             Text("\(index + 1)")
-                .font(.caption2.weight(.heavy))
+                .font(.caption.weight(.heavy))
                 .monospacedDigit()
                 .foregroundStyle(Palette.accent)
-                .frame(width: 22, height: 22)
+                .frame(width: 28, height: 28)
                 .background(Circle().fill(Palette.accent.opacity(0.1)))
             HStack(spacing: 3) {
                 ForEach(0..<6, id: \.self) { stat in
@@ -1011,7 +1009,7 @@ struct SpreadSection: View {
                 .lineLimit(1)
                 .fixedSize()
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, 14)
         .contentShape(Rectangle())
         .onTapGesture {
             Haptics.play(.light)
@@ -1025,12 +1023,12 @@ struct SpreadSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button("キャンセル") { asking = nil }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.glass)
                     Button("お手本にする") {
                         stats.applySpread(role, spread.points)
                         asking = nil
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.glassProminent)
                 }
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
@@ -1038,6 +1036,27 @@ struct SpreadSection: View {
             .frame(width: 280)
             .presentationCompactAdaptation(.popover)
         }
+    }
+}
+
+struct PullMarkerKey: PreferenceKey {
+    static var defaultValue: CGFloat?
+
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        value = nextValue() ?? value
+    }
+}
+
+struct PullMarker: View {
+    var body: some View {
+        Color.clear
+            .frame(height: 0)
+            .frame(maxWidth: .infinity)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(key: PullMarkerKey.self, value: geometry.frame(in: .named("modePull")).minY)
+                }
+            }
     }
 }
 
@@ -1049,27 +1068,52 @@ struct ModeSwitchPull: ViewModifier {
     let onTrigger: () -> Void
     @State private var progress: CGFloat = 0
     @State private var fired = false
+    @State private var fits = false
+    @State private var geometryOver: CGFloat = 0
+    @State private var markerY: CGFloat?
+    @State private var visibleBottom: CGFloat = 0
+
+    private func evaluate() {
+        let markerOver = markerY.map { visibleBottom - $0 } ?? geometryOver
+        let over = fits ? geometryOver : markerOver
+        let value = max(0, min(1, over / distance))
+        let step = Int(value * 8)
+        let previous = Int(progress * 8)
+        if value != progress { progress = value }
+        if value >= 1, !fired {
+            fired = true
+            Haptics.play(.success)
+            onTrigger()
+        } else if over < 4, fired {
+            fired = false
+        } else if value > 0, !fired, step != previous {
+            Haptics.play(.selection)
+        }
+    }
 
     func body(content: Content) -> some View {
         content
             .scrollBounceBehavior(.always, axes: .vertical)
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                let maxOffset = max(-geometry.contentInsets.top, geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height)
-                return geometry.contentOffset.y - maxOffset
-            } action: { _, over in
-                let value = max(0, min(1, over / distance))
-                if value != progress { progress = value }
-                if value >= 1, !fired {
-                    fired = true
-                    Haptics.play(.success)
-                    onTrigger()
-                } else if over < 8, fired {
-                    fired = false
-                } else if value > 0, !fired, Int(value * 10) != Int(progress * 10) {
-                    Haptics.play(.selection)
-                }
+            .coordinateSpace(.named("modePull"))
+            .onPreferenceChange(PullMarkerKey.self) { value in
+                markerY = value
+                evaluate()
             }
-            .overlay(alignment: .bottom) {
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.height - proxy.safeAreaInsets.bottom
+            } action: { value in
+                visibleBottom = value
+            }
+            .onScrollGeometryChange(for: [CGFloat].self) { geometry in
+                let maxOffset = max(-geometry.contentInsets.top, geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height)
+                let fit = geometry.contentSize.height + geometry.contentInsets.top + geometry.contentInsets.bottom <= geometry.containerSize.height
+                return [geometry.contentOffset.y - maxOffset, fit ? 1 : 0]
+            } action: { _, values in
+                geometryOver = values[0]
+                fits = values[1] > 0
+                evaluate()
+            }
+            .overlay(alignment: .top) {
                 VStack(spacing: 6) {
                     ZStack {
                         Circle()
@@ -1086,9 +1130,10 @@ struct ModeSwitchPull: ViewModifier {
                         .font(.caption.weight(.bold))
                         .foregroundStyle(tint)
                 }
-                .padding(.bottom, 10)
-                .opacity(Double(min(1, progress * 2.5)))
+                .opacity(Double(min(1, progress * 3)))
                 .scaleEffect(0.7 + 0.3 * progress)
+                .frame(maxWidth: .infinity)
+                .offset(y: max(0, visibleBottom - 74))
                 .allowsHitTesting(false)
             }
     }

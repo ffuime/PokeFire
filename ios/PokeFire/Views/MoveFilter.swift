@@ -23,6 +23,7 @@ struct MoveFilter: Equatable {
     var accuracyMode = CompareMode.atLeast
     var pp: Int?
     var priority: Int?
+    var priorityMode = CompareMode.equal
     var target = ""
     var flags: Set<String> = []
 
@@ -53,7 +54,7 @@ struct MoveFilter: Equatable {
             }
         }
         if let pp, info.pp != pp { return false }
-        if let priority, info.priority != priority { return false }
+        if let priority, !priorityMode.test(info.priority, priority) { return false }
         if !target.isEmpty, info.target != target { return false }
         for group in Self.groups {
             let selected = flags.filter { $0.hasPrefix(group.title + ":") }
@@ -137,14 +138,22 @@ struct MoveFilterSheet: View {
                         .frame(height: 36)
                     }
                     section("優先度") {
-                        Picker("優先度", selection: $filter.priority) {
-                            Text("指定なし").tag(Int?.none)
-                            ForEach(Self.priorities, id: \.self) { value in
-                                Text(value > 0 ? "+\(value)" : "\(value)").tag(Int?.some(value))
+                        HStack(spacing: 12) {
+                            Picker("優先度", selection: $filter.priority) {
+                                Text("指定なし").tag(Int?.none)
+                                ForEach(Self.priorities, id: \.self) { value in
+                                    Text(value > 0 ? "+\(value)" : "\(value)").tag(Int?.some(value))
+                                }
                             }
+                            .pickerStyle(.wheel)
+                            .frame(height: 120)
+                            .frame(maxWidth: .infinity)
+                            Picker("比較", selection: $filter.priorityMode) {
+                                ForEach(CompareMode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                            }
+                            .pickerStyle(.menu)
+                            .disabled(filter.priority == nil)
                         }
-                        .pickerStyle(.wheel)
-                        .frame(height: 120)
                     }
                     section("対象") {
                         Picker("対象", selection: $filter.target) {

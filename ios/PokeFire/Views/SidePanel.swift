@@ -69,10 +69,11 @@ struct SidePanel: View {
             .animation(.snappy(duration: 0.3), value: model.visibleStats(role))
             .animation(.snappy(duration: 0.3), value: model.showsHP(role))
             .animation(.snappy(duration: 0.3), value: model.isConstantActive)
+            PullMarker()
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .modeSwitchPull(label: "Stats Mode", icon: "search", tint: Palette.accent, distance: 21) {
+        .modeSwitchPull(label: "Stats Mode", icon: "search", tint: Palette.accent, distance: 52) {
             withAnimation(.easeInOut(duration: 0.35)) { stats.enter(from: model) }
         }
     }

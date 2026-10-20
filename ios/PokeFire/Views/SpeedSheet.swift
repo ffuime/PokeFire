@@ -204,14 +204,6 @@ private struct SpeedEditor: View {
                     .font(.headline)
                     .foregroundStyle(Palette.ink)
                 Spacer()
-                Button(action: close) {
-                    CloseButtonLabel(size: 13)
-                        .foregroundStyle(Palette.secondary)
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(Palette.background))
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel("閉じる")
             }
             StatEditor(role: role, key: .s)
             FlowLayout(spacing: 6) {
