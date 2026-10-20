@@ -26,11 +26,26 @@ struct UsagePair: Codable, Equatable {
     var pct: Double
 }
 
+struct NatureUsage: Codable, Equatable {
+    var name: String?
+    var pct: Double
+    var up: StatKey?
+    var down: StatKey?
+}
+
+struct SpreadUsage: Codable, Equatable {
+    var pct: Double
+    var points: [Int]
+}
+
 struct UsageEntry: Codable, Equatable {
     var rank: Int
     var moves: [UsagePair]
     var abilities: [UsagePair]
     var items: [UsagePair]
+    var rawItems: [UsagePair] = []
+    var natures: [NatureUsage] = []
+    var spreads: [SpreadUsage] = []
 }
 
 struct UsageData: Codable, Equatable {
@@ -45,7 +60,7 @@ enum Storage {
     static let adjustmentsKey = "pokefire-adjustments"
     static let pokemonHistoryKey = "pokefire-pokemon-history"
     static let historyKey = "pokefire-history"
-    static let usageKey = "pokefire-usage-v3"
+    static let usageKey = "pokefire-usage-v4"
     static let sessionKey = "pokefire-session"
     static let moveHistoryKey = "pokefire-move-history"
     static let itemHistoryKey = "pokefire-item-history"
@@ -157,6 +172,11 @@ enum UsageLoader {
 
     private static func fetch() async throws -> UsageData {
         let names = GameData.shared.usageNames
+        let catalog = StatsCatalog.shared
+        var fireItems = names.items
+        for (en, ja) in catalog.itemNames where !(catalog.items[ja]?.mega ?? false) && fireItems[en] == nil {
+            fireItems[en] = ja
+        }
         let index = try await getJSON("/data/meta/index.json")
         guard let season = index["seasons"]?.array?.first(where: { season in
             (season["formats"]?.stringList.contains("Singles") ?? false) && !(season["dates"]?.array?.isEmpty ?? true)
@@ -175,7 +195,7 @@ enum UsageLoader {
                 let name = row[0]?.string ?? ""
                 let pct = row[1]?.double ?? 0
                 let ja: String
-                if let mapped = names.items[name] {
+                if let mapped = fireItems[name] {
                     ja = mapped
                 } else if name.range(of: "ite( [XYZ])?$", options: .regularExpression) != nil {
                     ja = megaStone
@@ -198,9 +218,21 @@ enum UsageLoader {
             guard let en = names.pokemons[ja], let entry = day["pokemon"]?[en] else { continue }
             pokemons[ja] = UsageEntry(
                 rank: entry["position"]?.int ?? Int.max,
-                moves: pairs(entry["move"], names.moves),
-                abilities: pairs(entry["ability"], names.abilities),
-                items: items(entry["held_item"])
+                moves: pairs(entry["move"], catalog.moveNames),
+                abilities: pairs(entry["ability"], catalog.abilityNames),
+                items: items(entry["held_item"]),
+                rawItems: pairs(entry["held_item"], catalog.itemNames),
+                natures: (entry["stat_alignment"]?.array ?? []).map { row in
+                    NatureUsage(
+                        name: row[0]?.string.flatMap { Natures.names[$0] },
+                        pct: row[1]?.double ?? 0,
+                        up: row[2]?.string.flatMap { Natures.stats[$0] },
+                        down: row[3]?.string.flatMap { Natures.stats[$0] }
+                    )
+                },
+                spreads: (entry["stat_points"]?.array ?? []).map { row in
+                    SpreadUsage(pct: row[0]?.double ?? 0, points: (1...6).map { row[$0]?.int ?? 0 })
+                }
             )
         }
         return UsageData(fetchedAt: nowMillis, season: seasonName, date: date, pokemons: pokemons)

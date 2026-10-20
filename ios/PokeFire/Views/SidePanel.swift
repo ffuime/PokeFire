@@ -19,6 +19,7 @@ struct PanelShape: Shape {
 
 struct SidePanel: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     let role: Role
     let present: (ActiveSheet) -> Void
     @State private var pulled = false
@@ -71,6 +72,9 @@ struct SidePanel: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
+        .modeSwitchPull(label: "Stats Mode", icon: "search", tint: Palette.accent) {
+            withAnimation(.easeInOut(duration: 0.35)) { stats.enter(from: model) }
+        }
     }
 }
 
@@ -94,6 +98,7 @@ struct TypeBadge: View {
 
 struct PokemonHeader: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     let role: Role
     let present: (ActiveSheet) -> Void
     @State private var showForms = false
@@ -105,7 +110,7 @@ struct PokemonHeader: View {
         let forms = model.data.otherForms(of: side.name)
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                Button {
+                ModeSprite(name: side.name, hasForms: !forms.isEmpty, spin: spin) {
                     guard !forms.isEmpty else {
                         present(.pokemon(role))
                         return
@@ -116,21 +121,9 @@ struct PokemonHeader: View {
                         showForms.toggle()
                         if showForms { formsOpenCount += 1 }
                     }
-                } label: {
-                    ZStack(alignment: .bottomTrailing) {
-                        SpriteView(name: side.name, size: 84)
-                        if !forms.isEmpty {
-                            Icon(name: "forms", size: 15)
-                                .foregroundStyle(Palette.accent)
-                                .rotationEffect(.degrees(Double(spin) * -360))
-                                .animation(.spring(response: 0.6, dampingFraction: 0.7), value: spin)
-                                .frame(width: 30, height: 30)
-                                .background(Circle().fill(Color.white).shadow(color: .black.opacity(0.15), radius: 6, y: 1))
-                        }
-                    }
+                } onLongPress: {
+                    withAnimation(.easeInOut(duration: 0.35)) { stats.enter(from: model) }
                 }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel(forms.isEmpty ? "ポケモンを選ぶ" : "ほかの姿")
 
                 ZStack(alignment: .leading) {
                     if showForms, !forms.isEmpty {

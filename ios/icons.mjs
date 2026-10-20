@@ -69,7 +69,15 @@ const typeIcons = {};
 for (const m of app.matchAll(/\["(\w+)", "([^"]+)", "(#[0-9a-f]{6})", '(.*?)'\],?\n/g)) {
     const [, id, , color, shapes] = m;
     typeIcons[`type_${id}`] = `<rect width="76.71" height="76.71" rx="15" fill="${color}"/><g fill="#ffffff">${shapes}</g>`;
+    icons[`glyph_${id}`] = { viewBox: "0 0 76.71 76.71", attrs: 'fill="#000000"', body: shapes.replace(/fill="#?[0-9a-fA-F]{3,6}"/g, "") };
 }
+
+icons.category_status = stroke('<circle cx="12" cy="12" r="9"/><path d="M12 3a4.5 4.5 0 0 1 0 9a4.5 4.5 0 0 0 0 9"/><circle cx="12" cy="7.5" r="0.6"/><circle cx="12" cy="16.5" r="0.6"/>');
+icons.eff_x4 = fill('<path d="M12 2.2l2.95 6.3 6.85.8-5.1 4.7 1.4 6.8L12 17.4l-6.1 3.4 1.4-6.8-5.1-4.7 6.85-.8z"/>');
+icons.eff_x2 = stroke('<circle cx="12" cy="12" r="9.2"/><circle cx="12" cy="12" r="4.6"/>', 2.2);
+icons.eff_half = stroke('<path d="M12 4.2 21 19.8H3z"/>', 2.2);
+icons.eff_quarter = fill('<path d="M3 4.6h18a1 1 0 0 1 .86 1.5l-9 15.2a1 1 0 0 1-1.72 0l-9-15.2A1 1 0 0 1 3 4.6z"/>');
+icons.eff_zero = stroke('<path d="M4.5 4.5l15 15"/><path d="M19.5 4.5l-15 15"/>', 2.6);
 if (Object.keys(typeIcons).length !== 18) throw new Error(`types: ${Object.keys(typeIcons).length}`);
 
 const writeSet = (name, svg, template) => {

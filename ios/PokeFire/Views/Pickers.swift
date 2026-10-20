@@ -111,6 +111,8 @@ struct PokemonPicker: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let role: Role
+    var currentName: String?
+    var onSelect: ((String) -> Void)?
 
     @State private var query = ""
     @State private var mode = 0
@@ -142,7 +144,7 @@ struct PokemonPicker: View {
 
     var body: some View {
         let list = rows
-        let current = model.side(role).name
+        let current = currentName ?? model.side(role).name
         VStack(spacing: 0) {
             SearchHeader(
                 title: "\(role.title)のポケモン",
@@ -201,7 +203,12 @@ struct PokemonPicker: View {
 
     private func select(_ name: String) {
         focused = false
-        model.selectPokemon(role, name)
+        if let onSelect {
+            Storage.rememberPokemon(name)
+            onSelect(name)
+        } else {
+            model.selectPokemon(role, name)
+        }
         dismiss()
     }
 }
@@ -327,31 +334,33 @@ struct EntrySearchSheet: View {
         }
     }
 
-    private var rows: [Row] {
+    private struct RowGroup: Identifiable {
+        let id: String
+        let rows: [Row]
+    }
+
+    private var groups: [RowGroup] {
         _ = revision
         let data = model.data
         let name = model.side(role).name
         var usage: [(String, Double)] = []
-        if kind == .abilities, data.usageName(of: name) != name, let first = data.pokemons[name]?.abilities.first {
-            usage = [(first, 100)]
-        } else if let entry = model.usage?.pokemons[name] {
-            let pairs: [UsagePair]
-            switch kind {
-            case .moves: pairs = entry.moves
-            case .abilities: pairs = entry.abilities
-            case .items: pairs = entry.items
-            }
-            usage = pairs.compactMap { pair in pair.name.map { ($0, pair.pct) } }
+        switch kind {
+        case .abilities:
+            usage = model.usageAbilities(name).compactMap { pair in pair.name.map { ($0, pair.pct) } }
+        case .moves:
+            usage = (model.usage?.pokemons[name]?.moves ?? []).compactMap { pair in pair.name.map { ($0, pair.pct) } }
+        case .items:
+            usage = (model.usage?.pokemons[name]?.items ?? []).compactMap { pair in pair.name.map { ($0, pair.pct) } }
         }
-        var rankOf: [String: Int] = [:]
         var percent: [String: String] = [:]
-        for (index, pair) in usage.enumerated() where rankOf[pair.0] == nil {
-            rankOf[pair.0] = index
+        var used: [String] = []
+        for pair in usage where percent[pair.0] == nil && exists(pair.0) {
             percent[pair.0] = "\(numberText(pair.1))%"
+            used.append(pair.0)
         }
-        let ordered: [String]
+        var lists: [(String, [String])] = []
         if mode == 1, kind.hasHistory {
-            ordered = kind.history.filter(exists)
+            lists = [("", kind.history.filter(exists))]
         } else {
             let names: [String]
             switch kind {
@@ -359,18 +368,21 @@ struct EntrySearchSheet: View {
             case .abilities: names = data.abilityOrder
             case .items: names = data.itemOrder
             }
-            let indices = names.indices.sorted { lhs, rhs in
-                let left = rankOf[names[lhs]] ?? (usage.count + lhs)
-                let right = rankOf[names[rhs]] ?? (usage.count + rhs)
-                return left < right
+            lists.append(("使用率", used))
+            if kind == .moves, let learnable = model.learnset(name) {
+                let set = Set(learnable)
+                lists.append(("覚えるわざ", names.filter { set.contains($0) }))
+                lists.append(("その他", names.filter { !set.contains($0) }))
+            } else {
+                let set = Set(used)
+                lists.append(("その他", names.filter { !set.contains($0) }))
             }
-            ordered = indices.map { names[$0] }
         }
-        let tiers = Search.rank(ordered.map(searchText), query: query)
-        let order = Search.ordered(ordered.count, tiers: tiers) { ordered[$0] }
-        return order.map { index in
-            let entryName = ordered[index]
-            return Row(name: entryName, effect: effect(entryName), usage: percent[entryName])
+        return lists.compactMap { title, names in
+            let tiers = Search.rank(names.map(searchText), query: query)
+            let order = Search.ordered(names.count, tiers: tiers) { names[$0] }
+            let rows = order.map { Row(name: names[$0], effect: effect(names[$0]), usage: percent[names[$0]]) }
+            return rows.isEmpty ? nil : RowGroup(id: title, rows: rows)
         }
     }
 
@@ -383,42 +395,33 @@ struct EntrySearchSheet: View {
     }
 
     var body: some View {
-        let list = rows
+        let sections = groups
+        let first = sections.first?.rows.first
         let selected = current
         VStack(spacing: 0) {
             SearchHeader(
                 title: kind.title,
-                modes: kind.hasHistory ? ["使用率", "履歴"] : [],
+                modes: kind.hasHistory ? ["すべて", "履歴"] : [],
                 mode: $mode,
                 query: $query,
                 focused: $focused,
                 prompt: "\(kind.title)の名前を検索…",
-                onSubmit: { if let first = list.first { select(first.name) } },
+                onSubmit: { if let first { select(first.name) } },
                 onClose: { dismiss() }
             )
             List {
-                ForEach(list) { row in
-                    Button {
-                        select(row.name)
-                    } label: {
-                        EntryRow(kind: kind, name: row.name, effect: row.effect, usage: row.usage, selected: row.name == selected)
-                    }
-                    .listRowBackground(row.name == selected ? Palette.accent.opacity(0.06) : Color.white)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        if mode == 1, kind.hasHistory {
-                            Button(role: .destructive) {
-                                Haptics.play(.medium)
-                                withAnimation {
-                                    kind.forget(row.name)
-                                    revision += 1
-                                }
-                            } label: {
-                                Label("削除", systemImage: "trash")
-                            }
+                ForEach(sections) { group in
+                    Section {
+                        rows(group.rows, selected: selected)
+                    } header: {
+                        if !group.id.isEmpty {
+                            Text(group.id)
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(Palette.secondary)
                         }
                     }
                 }
-                if !list.isEmpty {
+                if first != nil {
                     UsageCredit()
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -427,7 +430,7 @@ struct EntrySearchSheet: View {
             .listStyle(.plain)
             .scrollDismissesKeyboard(.immediately)
             .overlay {
-                if list.isEmpty {
+                if first == nil {
                     EmptyResult(text: mode == 1 && kind.history.isEmpty ? "履歴はまだありません" : "見つかりません")
                 }
             }
@@ -438,6 +441,30 @@ struct EntrySearchSheet: View {
             focused = true
         }
         .presentationDragIndicator(.visible)
+    }
+
+    private func rows(_ list: [Row], selected: String) -> some View {
+        ForEach(list) { row in
+            Button {
+                select(row.name)
+            } label: {
+                EntryRow(kind: kind, name: row.name, effect: row.effect, usage: row.usage, selected: row.name == selected)
+            }
+            .listRowBackground(row.name == selected ? Palette.accent.opacity(0.06) : Color.white)
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                if mode == 1, kind.hasHistory {
+                    Button(role: .destructive) {
+                        Haptics.play(.medium)
+                        withAnimation {
+                            kind.forget(row.name)
+                            revision += 1
+                        }
+                    } label: {
+                        Label("削除", systemImage: "trash")
+                    }
+                }
+            }
+        }
     }
 
     private func select(_ name: String) {

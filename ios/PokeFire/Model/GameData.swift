@@ -184,7 +184,11 @@ final class GameData {
         let abilityData = effects("abilities")
         abilities = abilityData.0
         abilityOrder = abilityData.1
-        let itemData = effects("items")
+        var itemData = effects("items")
+        for (name, value) in load("stats")["items"]?.object?.entries ?? [] where itemData.0[name] == nil && value["mega"] == nil {
+            itemData.0[name] = Effect(name: name, effect: value["effect"]?.string ?? "")
+            itemData.1.append(name)
+        }
         items = itemData.0
         itemOrder = itemData.1
 

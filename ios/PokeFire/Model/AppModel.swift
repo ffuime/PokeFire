@@ -66,6 +66,7 @@ final class AppModel {
     var speedOverride: [Role: SpeedOverride] = [:]
     var output = CalcOutput()
     var usage: UsageData?
+    var learnsets: [String: [String]]?
     var toast: ToastMessage?
     var history: [HistoryEntry] = Storage.history
     var isLoadingShare = false
@@ -102,6 +103,22 @@ final class AppModel {
             let loaded = await UsageLoader.load()
             self?.usage = loaded
         }
+        Task { [weak self] in
+            let loaded = await LearnsetLoader.load()
+            self?.learnsets = loaded
+        }
+    }
+
+    func learnset(_ name: String) -> [String]? {
+        guard let learnsets, let en = data.usageNames.pokemons[name] ?? data.usageNames.pokemons[data.usageName(of: name)] else { return nil }
+        return learnsets[en]
+    }
+
+    func usageAbilities(_ name: String) -> [UsagePair] {
+        if data.usageName(of: name) != name, let first = data.pokemons[name]?.abilities.first {
+            return [UsagePair(name: first, pct: 100)]
+        }
+        return usage?.pokemons[name]?.abilities ?? []
     }
 
     // MARK: - Side access

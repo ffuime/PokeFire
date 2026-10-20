@@ -3,7 +3,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const source = join(here, "..", "sprite");
+const sources = [join(here, "..", "sprite"), join(here, "sprites")];
 const catalog = join(here, "PokeFire", "Assets.xcassets");
 
 for (const dir of readdirSync(catalog)) {
@@ -11,7 +11,7 @@ for (const dir of readdirSync(catalog)) {
 }
 
 let count = 0;
-for (const file of readdirSync(source)) {
+for (const source of sources) for (const file of readdirSync(source)) {
     if (!file.endsWith(".png")) continue;
     const name = file.slice(0, -4).normalize("NFC");
     const id = `sprite_${Buffer.from(name, "utf8").toString("hex")}`;

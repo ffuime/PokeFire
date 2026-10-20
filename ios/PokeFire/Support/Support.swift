@@ -239,7 +239,7 @@ struct CategoryIcon: View {
     var size: CGFloat = 18
 
     var body: some View {
-        Icon(name: category == "物理" ? "category_physical" : "category_special", size: size)
+        Icon(name: category == "物理" ? "category_physical" : category == "特殊" ? "category_special" : "category_status", size: size)
             .accessibilityLabel(category)
     }
 }

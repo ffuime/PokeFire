@@ -7,6 +7,11 @@ enum ActiveSheet: Identifiable, Hashable {
     case move
     case ability(Role)
     case item(Role)
+    case statsPokemon(Role)
+    case abilityInfo(Role, String)
+    case moveInfo(String)
+    case itemInfo(String)
+    case learnset(Role)
 
     var id: String {
         switch self {
@@ -19,12 +24,18 @@ enum ActiveSheet: Identifiable, Hashable {
         case .move: return "move"
         case .ability(let role): return "ability-\(role.rawValue)"
         case .item(let role): return "item-\(role.rawValue)"
+        case .statsPokemon(let role): return "stats-pokemon-\(role.rawValue)"
+        case .abilityInfo(let role, let name): return "ability-info-\(role.rawValue)-\(name)"
+        case .moveInfo(let name): return "move-info-\(name)"
+        case .itemInfo(let name): return "item-info-\(name)"
+        case .learnset(let role): return "learnset-\(role.rawValue)"
         }
     }
 }
 
 struct MainScreen: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     let openDrawer: () -> Void
 
     @State private var page: Role? = .attacker
@@ -47,9 +58,17 @@ struct MainScreen: View {
         ScrollView(.horizontal) {
             HStack(spacing: 0) {
                 ForEach(Role.allCases, id: \.self) { role in
-                    SidePanel(role: role, present: { present($0) })
-                        .containerRelativeFrame(.horizontal)
-                        .id(role)
+                    Group {
+                        if stats.isStats {
+                            StatsPanel(role: role, present: { present($0) })
+                                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                        } else {
+                            SidePanel(role: role, present: { present($0) })
+                                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                        }
+                    }
+                    .containerRelativeFrame(.horizontal)
+                    .id(role)
                 }
             }
             .scrollTargetLayout()
@@ -72,10 +91,13 @@ struct MainScreen: View {
             MainHeader(page: $page, progress: progress, openDrawer: openDrawer, present: { present($0) })
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            ResultCard(present: { present($0) })
+            if !stats.isStats {
+                ResultCard(present: { present($0) })
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .background {
-            EnvironmentBackdrop(weather: model.weather, field: model.field)
+            EnvironmentBackdrop(weather: stats.isStats ? "none" : model.weather, field: stats.isStats ? "none" : model.field)
         }
         .sheet(item: $sheet) { item in
             sheetContent(item)
@@ -106,6 +128,16 @@ struct MainScreen: View {
             EntrySearchSheet(kind: .abilities, role: role)
         case .item(let role):
             EntrySearchSheet(kind: .items, role: role)
+        case .statsPokemon(let role):
+            PokemonPicker(role: role, currentName: stats.side(role).name) { stats.select(role, $0) }
+        case .abilityInfo(let role, let name):
+            AbilityInfoSheet(role: role, name: name)
+        case .moveInfo(let name):
+            MoveInfoSheet(name: name)
+        case .itemInfo(let name):
+            ItemInfoSheet(name: name)
+        case .learnset(let role):
+            LearnsetSheet(role: role)
         }
     }
 }
@@ -213,6 +245,7 @@ struct EnvironmentBackdrop: View {
 
 struct MainHeader: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     @Binding var page: Role?
     let progress: CGFloat
     let openDrawer: () -> Void
@@ -223,11 +256,23 @@ struct MainHeader: View {
             HStack(spacing: 10) {
                 CircleIconButton(icon: "menu", label: "履歴", action: openDrawer)
                 Spacer(minLength: 0)
-                EnvironmentPill { present(.environment) }
+                if stats.isStats {
+                    Text("Stats Mode")
+                        .font(.subheadline.weight(.heavy))
+                        .foregroundStyle(Palette.accent)
+                        .frame(height: 42)
+                        .transition(.opacity)
+                } else {
+                    EnvironmentPill { present(.environment) }
+                        .transition(.opacity)
+                }
                 Spacer(minLength: 0)
                 Color.clear.frame(width: 44, height: 44)
             }
-            TabStrip()
+            if !stats.isStats {
+                TabStrip()
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
             SideSwitcher(page: $page, progress: progress)
         }
         .padding(.horizontal, 16)
@@ -238,7 +283,7 @@ struct MainHeader: View {
             DragGesture(minimumDistance: 24)
                 .onEnded { value in
                     let down = value.translation.height
-                    if down > 44, down > abs(value.translation.width) * 1.4 {
+                    if !stats.isStats, down > 44, down > abs(value.translation.width) * 1.4 {
                         Haptics.play(.light)
                         present(.environment)
                     }
@@ -334,6 +379,7 @@ struct TabStrip: View {
 
 struct SideSwitcher: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     @Binding var page: Role?
     let progress: CGFloat
     @State private var turns = 0
@@ -342,8 +388,8 @@ struct SideSwitcher: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let swapWidth: CGFloat = 44
-            let spacing: CGFloat = 4
+            let swapWidth: CGFloat = stats.isStats ? 0 : 44
+            let spacing: CGFloat = stats.isStats ? 0 : 4
             let side = max(1, (geometry.size.width - swapWidth - spacing * 2) / 2)
             let travel = side + swapWidth + spacing * 2
             let settled = min(1, max(0, pendingTarget ?? progress)) * travel
@@ -360,6 +406,7 @@ struct SideSwitcher: View {
                 HStack(spacing: spacing) {
                     sideLabel(.attacker)
                         .frame(width: side)
+                    if !stats.isStats {
                     Button {
                         turns += 1
                         withAnimation(.spring(response: 0.45, dampingFraction: 0.7)) {
@@ -376,6 +423,7 @@ struct SideSwitcher: View {
                     .buttonStyle(PressableStyle())
                     .disabled(model.isConstantActive)
                     .accessibilityLabel("攻守交代")
+                    }
                     sideLabel(.defender)
                         .frame(width: side)
                 }
@@ -416,8 +464,8 @@ struct SideSwitcher: View {
     }
 
     private func sideLabel(_ role: Role) -> some View {
-        let side = model.side(role)
-        let constant = role == .attacker && model.isConstantActive
+        let name = stats.isStats ? stats.side(role).name : model.side(role).name
+        let constant = !stats.isStats && role == .attacker && model.isConstantActive
         let kind = model.activeTab?.kind ?? .attack
         return HStack(spacing: 6) {
             if constant {
@@ -425,7 +473,7 @@ struct SideSwitcher: View {
                     .foregroundStyle(Palette.tab(kind))
                     .frame(width: 30, height: 30)
             } else {
-                SpriteView(name: side.name, size: 30)
+                SpriteView(name: name, size: 30)
             }
             VStack(alignment: .leading, spacing: 0) {
                 if !constant {
@@ -433,7 +481,7 @@ struct SideSwitcher: View {
                         .font(.caption2.weight(.bold))
                         .foregroundStyle(role == .attacker ? Palette.attack : Palette.accent)
                 }
-                Text(constant ? Constants.kinds[kind]?.title ?? "" : side.name)
+                Text(constant ? Constants.kinds[kind]?.title ?? "" : name)
                     .font(.footnote.weight(.bold))
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
