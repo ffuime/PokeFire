@@ -236,8 +236,7 @@ struct HistoryDrawer: View {
     private var statsContent: some View {
         let sections = statsGroups
         if sections.isEmpty {
-            Text(query.isEmpty ? "Stats Mode で見たポケモンが
-ここに自動で残ります" : "見つかりません")
+            Text(query.isEmpty ? "Stats Mode で見たポケモンが\nここに自動で残ります" : "見つかりません")
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Palette.secondary)
                 .multilineTextAlignment(.center)
