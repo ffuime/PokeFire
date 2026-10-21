@@ -1210,20 +1210,30 @@ struct ShineFlash: View {
 struct TeamCollage: View {
     let entries: [BoxPokemon]
     var frozen = false
+    var portrait = false
 
     static let cardWidth: CGFloat = 380
     static let spacing: CGFloat = 12
     static let padding: CGFloat = 16
-    static var size: CGSize {
-        CGSize(width: cardWidth * 3 + spacing * 2 + padding * 2, height: BoxCard.height * 2 + spacing + padding * 2)
+
+    static func size(portrait: Bool) -> CGSize {
+        let columns: CGFloat = portrait ? 2 : 3
+        let rows: CGFloat = portrait ? 3 : 2
+        return CGSize(
+            width: cardWidth * columns + spacing * (columns - 1) + padding * 2,
+            height: BoxCard.height * rows + spacing * (rows - 1) + padding * 2
+        )
     }
 
     var body: some View {
+        let columns = portrait ? 2 : 3
+        let rows = portrait ? 3 : 2
+        let size = Self.size(portrait: portrait)
         VStack(spacing: Self.spacing) {
-            ForEach(0..<2, id: \.self) { row in
+            ForEach(0..<rows, id: \.self) { row in
                 HStack(spacing: Self.spacing) {
-                    ForEach(0..<3, id: \.self) { column in
-                        let index = row * 3 + column
+                    ForEach(0..<columns, id: \.self) { column in
+                        let index = row * columns + column
                         if index < entries.count {
                             BoxCard(entry: entries[index], frozen: frozen)
                                 .frame(width: Self.cardWidth)
@@ -1237,27 +1247,28 @@ struct TeamCollage: View {
             }
         }
         .padding(Self.padding)
-        .frame(width: Self.size.width, height: Self.size.height)
+        .frame(width: size.width, height: size.height)
         .background(Color.white)
     }
 }
 
 struct TeamCollagePreview: View {
     let entries: [BoxPokemon]
+    @AppStorage(AppSettings.portraitTeamKey) private var portrait = false
 
     var body: some View {
-        let size = TeamCollage.size
+        let size = TeamCollage.size(portrait: portrait)
         Color.clear
             .aspectRatio(size.width / size.height, contentMode: .fit)
             .overlay(alignment: .topLeading) {
                 GeometryReader { geometry in
-                    TeamCollage(entries: entries, frozen: true)
+                    TeamCollage(entries: entries, frozen: true, portrait: portrait)
                         .scaleEffect(geometry.size.width / size.width, anchor: .topLeading)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .holdToSave {
-                CardImage.save(TeamCollage(entries: entries, frozen: true))
+                CardImage.save(TeamCollage(entries: entries, frozen: true, portrait: portrait))
             }
     }
 }

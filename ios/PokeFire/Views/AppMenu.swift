@@ -3,6 +3,7 @@ import UIKit
 
 enum AppSettings {
     static let autoSleepKey = "pokefire-auto-sleep"
+    static let portraitTeamKey = "pokefire-team-portrait"
 
     static func applyAutoSleep(_ on: Bool) {
         UIApplication.shared.isIdleTimerDisabled = !on
@@ -84,6 +85,7 @@ struct AppMenuButton: View {
 struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppSettings.autoSleepKey) private var autoSleep = true
+    @AppStorage(AppSettings.portraitTeamKey) private var portraitTeam = false
 
     var body: some View {
         NavigationStack {
@@ -93,19 +95,10 @@ struct SettingsSheet: View {
                 } footer: {
                     Text("オフにすると、アプリを開いている間は画面が消えなくなります。")
                 }
-                Section("出典") {
-                    Link(destination: URL(string: "https://championsbattledata.com")!) {
-                        LabeledContent("使用率・覚えるわざ", value: "Pokémon Champions Battle Data")
-                    }
-                    Link(destination: URL(string: "https://gamewith.jp/pokemon-champions/")!) {
-                        LabeledContent("わざ・もちものの情報と画像", value: "GameWith")
-                    }
-                    Link(destination: URL(string: "https://pokeapi.co")!) {
-                        LabeledContent("英語名の対応", value: "PokéAPI")
-                    }
-                    Link(destination: URL(string: "https://github.com/PokeAPI/sprites")!) {
-                        LabeledContent("ポケモンの画像", value: "PokéAPI sprites")
-                    }
+                Section {
+                    Toggle("チームの画像を縦長にする", isOn: $portraitTeam)
+                } footer: {
+                    Text("オンにすると、チームの一枚絵が横2×縦3の並びになります。")
                 }
                 Section("免責事項") {
                     Text("Pokélett は個人が作成した非公式のツールで、任天堂・クリーチャーズ・ゲームフリーク・株式会社ポケモンとは関係ありません。")

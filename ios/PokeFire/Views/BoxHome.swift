@@ -482,11 +482,13 @@ struct TeamDetail: View {
         let members = (team?.members ?? []).compactMap { box.pokemon($0) }
         List(selection: $selection) {
             if !members.isEmpty, !editing {
-                TeamCollagePreview(entries: members)
-                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
-                    .listRowBackground(Color.clear)
-                    .selectionDisabled()
+                Section {
+                    TeamCollagePreview(entries: members)
+                        .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                        .selectionDisabled()
+                }
             }
+            Section {
             ForEach(Array(members.enumerated()), id: \.element.id) { index, entry in
                 NavigationLink(value: BoxRoute.member(teamID, index)) {
                     BoxPokemonRow(entry: entry)
@@ -521,6 +523,7 @@ struct TeamDetail: View {
                     Label("ポケモンを追加", systemImage: "plus.circle.fill")
                         .font(.body.weight(.semibold))
                 }
+            }
             }
         }
         .listStyle(.insetGrouped)
