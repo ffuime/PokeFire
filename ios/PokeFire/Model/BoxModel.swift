@@ -239,12 +239,16 @@ final class BoxModel {
         }
     }
 
+    func nextTeamName() -> String {
+        var number = teams.count + 1
+        while teams.contains(where: { $0.name == "チーム\(number)" }) { number += 1 }
+        return "チーム\(number)"
+    }
+
     @discardableResult
     func createTeam(_ name: String) -> BoxTeam {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        var number = teams.count + 1
-        while teams.contains(where: { $0.name == "チーム\(number)" }) { number += 1 }
-        let team = BoxTeam(name: trimmed.isEmpty ? "チーム\(number)" : trimmed)
+        let team = BoxTeam(name: trimmed.isEmpty ? nextTeamName() : trimmed)
         teams.append(team)
         save()
         return team

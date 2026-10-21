@@ -53,7 +53,7 @@ struct AppMenuButton: View {
                 }
                 .disabled(stats.mode == .stats)
                 Button { go(.box) } label: {
-                    Label("PokéBox", systemImage: "archivebox")
+                    Label("PokéBox", systemImage: "cube.box")
                 }
                 .disabled(stats.mode == .box)
             }

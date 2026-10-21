@@ -91,10 +91,10 @@ struct BoxRoot: View {
     var body: some View {
         NavigationStack(path: $path) {
             TabView(selection: $tab) {
-                Tab("ボックス", systemImage: "square.grid.2x2", value: 0) {
+                Tab("ボックス", systemImage: "person.crop.square", value: 0) {
                     boxList
                 }
-                Tab("チーム", systemImage: "person.3", value: 1) {
+                Tab("チーム", systemImage: "rectangle.stack", value: 1) {
                     teamList
                 }
             }
@@ -111,6 +111,9 @@ struct BoxRoot: View {
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    AppMenuButton(inToolbar: true)
+                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     sortMenu
                     Button {
@@ -151,7 +154,7 @@ struct BoxRoot: View {
             }
         }
         .sheet(isPresented: $askTeamName) {
-            TeamNameSheet(title: "チームを作成", action: "チームを作成", name: $teamName) {
+            TeamNameSheet(title: "チームを作成", action: "チームを作成", placeholder: box.nextTeamName(), name: $teamName) {
                 let team = box.createTeam(teamName)
                 autoPick = team.id
                 path.append(.team(team.id))
@@ -219,7 +222,7 @@ struct BoxRoot: View {
                     tab = 1
                     path.append(.team(team.id))
                 } label: {
-                    Label("チームを作る", systemImage: "person.3")
+                    Label("チームを作る", systemImage: "rectangle.stack.badge.plus")
                         .font(.body.weight(.bold))
                         .padding(.horizontal, 10)
                         .frame(height: 40)
@@ -386,6 +389,12 @@ struct BoxPokemonRow: View {
     var body: some View {
         HStack(spacing: 12) {
             SpriteView(name: entry.name, size: 52)
+                .frame(width: 52, height: 52)
+                .overlay(alignment: .bottomTrailing) {
+                    if !entry.item.isEmpty {
+                        SpriteIcon(name: entry.item, size: 20)
+                    }
+                }
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 4) {
                     Text(entry.title)
@@ -551,7 +560,7 @@ struct TeamDetail: View {
             }
         }
         .sheet(isPresented: $renaming) {
-            TeamNameSheet(title: "名前を編集", action: "変更", name: $newName) {
+            TeamNameSheet(title: "名前を編集", action: "変更", placeholder: team?.name ?? "チーム", name: $newName) {
                 let trimmed = newName.trimmingCharacters(in: .whitespaces)
                 if !trimmed.isEmpty { box.updateTeam(teamID) { $0.name = trimmed } }
             }
@@ -579,6 +588,7 @@ struct TeamNameSheet: View {
     @Environment(\.dismiss) private var dismiss
     let title: String
     let action: String
+    let placeholder: String
     @Binding var name: String
     let onConfirm: () -> Void
     @FocusState private var focused: Bool
@@ -588,7 +598,7 @@ struct TeamNameSheet: View {
             Text(title)
                 .font(.title3.weight(.bold))
                 .foregroundStyle(Palette.ink)
-            TextField("チーム名（任意）", text: $name)
+            TextField(placeholder, text: $name)
                 .focused($focused)
                 .submitLabel(.done)
                 .onSubmit(confirm)

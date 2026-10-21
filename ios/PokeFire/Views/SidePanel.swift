@@ -222,7 +222,7 @@ struct FormsStrip: View {
                 if let onBox {
                     Button(action: onBox) {
                         VStack(spacing: 2) {
-                            Image(systemName: "archivebox")
+                            Image(systemName: "cube.box")
                                 .font(.system(size: 22, weight: .semibold))
                             Text("ボックス")
                                 .font(.system(size: 9, weight: .bold))

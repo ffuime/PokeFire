@@ -132,7 +132,7 @@ struct BoxCard: View {
                 .onTapGesture { tap(.ability) }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 7) {
                 ForEach(0..<4, id: \.self) { slot in
                     let move = slot < entry.moves.count ? entry.moves[slot] : ""
                     HStack(spacing: 5) {
@@ -158,7 +158,7 @@ struct BoxCard: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
 
             HStack(spacing: 6) {
-                column(StatKey.baseKeys.map { Text($0.letter) }, alignment: .center, width: 14)
+                column(StatKey.baseKeys.map { Text($0.letter).foregroundStyle(Palette.ink.opacity(0.45)) }, alignment: .center, width: 14)
                 column(StatKey.baseKeys.map { Text("\(entry.real($0))") }, alignment: .trailing, width: 30)
                 column(StatKey.baseKeys.map { pointText($0) }, alignment: .trailing, width: 34)
             }
@@ -232,7 +232,7 @@ struct BoxCard: View {
     private func pointText(_ key: StatKey) -> Text {
         let points = entry.point(key)
         let nature = entry.nature(key)
-        if points == 0, nature == 10 { return Text("-") }
+        if points == 0, nature == 10 { return Text("-").foregroundStyle(Palette.ink.opacity(0.35)) }
         switch nature {
         case 11: return Text("+\(points)↑").foregroundStyle(Palette.rankUp)
         case 9: return Text("+\(points)↓").foregroundStyle(Palette.rankDown)

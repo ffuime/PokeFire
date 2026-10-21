@@ -68,9 +68,26 @@ struct HistoryDrawer: View {
         let sections = groups
         VStack(alignment: .leading, spacing: 0) {
             if stats.mode == .box {
+                HStack {
+                    Spacer()
+                    Button {
+                        Haptics.play(.light)
+                        showHelp = true
+                    } label: {
+                        Icon(name: "help", size: 20)
+                            .foregroundStyle(Color.black)
+                            .frame(width: 46, height: 46)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(PressableStyle())
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .accessibilityLabel("ヘルプ")
+                }
+                .padding(.trailing, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
                 ModeSwitcherList(close: close)
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
                 Spacer(minLength: 0)
             } else {
             HStack(spacing: 12) {
@@ -522,7 +539,7 @@ struct ModeSwitcherList: View {
     private let items: [Item] = [
         Item(id: .fire, title: "PokéFire", subtitle: "ダメージ計算", symbol: nil, image: "tab_attack", tint: Palette.attack),
         Item(id: .stats, title: "PokéStats", subtitle: "使用率・ステータス", symbol: "chart.pie", image: nil, tint: Palette.accent),
-        Item(id: .box, title: "PokéBox", subtitle: "ポケモン・チーム管理", symbol: "archivebox", image: nil, tint: Color(hex: 0x20A6A6)),
+        Item(id: .box, title: "PokéBox", subtitle: "ポケモン・チーム管理", symbol: "cube.box", image: nil, tint: Color(hex: 0x20A6A6)),
     ]
 
     private func go(_ mode: AppMode) {
