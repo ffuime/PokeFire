@@ -114,6 +114,25 @@ final class AppModel {
         return learnsets[en]
     }
 
+    func applyBox(_ entry: BoxPokemon, to role: Role) {
+        if side(role).name != entry.name {
+            selectPokemon(role, entry.name)
+        }
+        update(role) { side in
+            for key in Rules.statKeys(role) where StatKey.baseKeys.contains(key) {
+                var value = side.evs[key] ?? EVState(points: 0)
+                value.points = entry.point(key)
+                if key.hasNature { value.nature = entry.nature(key) }
+                side.evs[key] = value
+            }
+        }
+        if !entry.ability.isEmpty { selectAbility(role, entry.ability) }
+        if !entry.item.isEmpty { selectItem(role, entry.item) }
+        if role == .attacker, let move = entry.moves.first(where: { !$0.isEmpty }), data.moves[move] != nil {
+            selectMove(move)
+        }
+    }
+
     func applyStats(_ source: StatsSide, to role: Role) {
         if side(role).name != source.name {
             selectPokemon(role, source.name)

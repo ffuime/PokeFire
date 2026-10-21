@@ -2,11 +2,35 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     @State private var drawerOpen = false
     @State private var dragX: CGFloat = 0
     @State private var dragging = false
 
     var body: some View {
+        Group {
+            if stats.mode == .box {
+                BoxRoot()
+                    .transition(.opacity)
+            } else {
+                mainContent
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: stats.mode == .box)
+        .overlay(alignment: .top) {
+            ToastView()
+        }
+        .overlay {
+            if model.isLoadingShare {
+                LoadingOverlay()
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: model.isLoadingShare)
+    }
+
+    private var mainContent: some View {
         GeometryReader { geometry in
             let width = min(geometry.size.width * 0.8, 340)
             let base: CGFloat = drawerOpen ? width : 0
@@ -62,16 +86,6 @@ struct RootView: View {
             .animation(dragging ? nil : .spring(response: 0.42, dampingFraction: 0.86), value: drawerOpen)
             .animation(dragging ? nil : .spring(response: 0.42, dampingFraction: 0.86), value: dragX)
         }
-        .overlay(alignment: .top) {
-            ToastView()
-        }
-        .overlay {
-            if model.isLoadingShare {
-                LoadingOverlay()
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: model.isLoadingShare)
     }
 
     private func setDrawer(_ open: Bool) {

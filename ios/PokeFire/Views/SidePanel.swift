@@ -111,10 +111,6 @@ struct PokemonHeader: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
                 ModeSprite(name: side.name, hasForms: !forms.isEmpty, spin: spin) {
-                    guard !forms.isEmpty else {
-                        present(.pokemon(role))
-                        return
-                    }
                     spin += 1
                     Haptics.play(.light)
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
@@ -126,8 +122,13 @@ struct PokemonHeader: View {
                 }
 
                 ZStack(alignment: .leading) {
-                    if showForms, !forms.isEmpty {
-                        FormsStrip(forms: forms, openCount: formsOpenCount) { name in
+                    if showForms {
+                        FormsStrip(forms: forms, openCount: formsOpenCount, onBox: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                                showForms = false
+                            }
+                            present(.boxImport(role))
+                        }) { name in
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                                 showForms = false
                             }
@@ -211,12 +212,30 @@ struct PokemonHeader: View {
 struct FormsStrip: View {
     let forms: [String]
     var openCount = 0
+    var onBox: (() -> Void)?
     let onSelect: (String) -> Void
     @State private var shown = 0
 
     var body: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 8) {
+                if let onBox {
+                    Button(action: onBox) {
+                        VStack(spacing: 2) {
+                            Image(systemName: "archivebox")
+                                .font(.system(size: 22, weight: .semibold))
+                            Text("ボックス")
+                                .font(.system(size: 9, weight: .bold))
+                        }
+                        .foregroundStyle(Palette.accent)
+                        .frame(width: 70, height: 70)
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(Palette.accent.opacity(0.25), lineWidth: 1))
+                    }
+                    .buttonStyle(PressableStyle())
+                    .scaleEffect(shown > 0 || forms.isEmpty ? 1 : 0.2)
+                    .accessibilityLabel("ボックスから持ってくる")
+                }
                 ForEach(Array(forms.enumerated()), id: \.element) { index, name in
                     Button {
                         onSelect(name)

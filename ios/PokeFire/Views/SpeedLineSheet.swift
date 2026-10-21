@@ -104,9 +104,10 @@ enum SpeedLine {
 
 struct SpeedLineSheet: View {
     @Environment(AppModel.self) private var model
-    @Environment(StatsModel.self) private var stats
     @Environment(\.dismiss) private var dismiss
-    let role: Role
+    let currentName: String
+    let currentSpeed: Int
+    let onPick: (SpeedLineEntry) -> Bool
     @State private var top50 = false
     @State private var lines: [Int: [SpeedLineEntry]] = [:]
 
@@ -114,7 +115,6 @@ struct SpeedLineSheet: View {
     private static let moveColor = Color(hex: 0xC99A06)
 
     var body: some View {
-        let current = stats.side(role)
         let values = lines.keys.sorted(by: >)
         NavigationStack {
             ScrollViewReader { proxy in
@@ -122,7 +122,7 @@ struct SpeedLineSheet: View {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(values, id: \.self) { value in
                             let entries = lines[value] ?? []
-                            let mine = entries.contains { $0.name == current.name }
+                            let mine = entries.contains { $0.name == currentName }
                             HStack(alignment: .top, spacing: 12) {
                                 Text("\(value)")
                                     .font(.title3.weight(.bold))
@@ -133,13 +133,13 @@ struct SpeedLineSheet: View {
                                 if entries.contains(where: { $0.ability != nil || $0.move != nil }) {
                                     VStack(spacing: 4) {
                                         ForEach(entries) { entry in
-                                            row(entry, highlighted: entry.name == current.name)
+                                            row(entry, highlighted: entry.name == currentName)
                                         }
                                     }
                                 } else {
                                     LazyVGrid(columns: [GridItem(.flexible(), spacing: 4), GridItem(.flexible(), spacing: 4)], spacing: 4) {
                                         ForEach(entries) { entry in
-                                            row(entry, highlighted: entry.name == current.name)
+                                            row(entry, highlighted: entry.name == currentName)
                                         }
                                     }
                                 }
@@ -157,7 +157,7 @@ struct SpeedLineSheet: View {
                 .task(id: top50) {
                     lines = SpeedLine.build(model: model, top50: top50)
                     try? await Task.sleep(for: .milliseconds(80))
-                    let target = current.real(.s)
+                    let target = currentSpeed
                     let keys = lines.keys.sorted(by: >)
                     if let nearest = keys.min(by: { abs($0 - target) < abs($1 - target) }) {
                         proxy.scrollTo(nearest, anchor: .center)
@@ -168,12 +168,12 @@ struct SpeedLineSheet: View {
                 GlassEffectContainer(spacing: 8) {
                     VStack(alignment: .trailing, spacing: 0) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            SpriteView(name: current.name, size: 30)
+                            SpriteView(name: currentName, size: 30)
                                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
                             Text("S")
                                 .font(.caption.weight(.heavy))
                                 .foregroundStyle(Palette.stat(.s))
-                            NumberText(current.real(.s))
+                            NumberText(currentSpeed)
                                 .font(.title2.weight(.bold))
                                 .foregroundStyle(Palette.ink)
                         }
@@ -206,8 +206,7 @@ struct SpeedLineSheet: View {
 
     private func row(_ entry: SpeedLineEntry, highlighted: Bool) -> some View {
         Button {
-            stats.applySpeedLine(role, name: entry.name, points: entry.tier.points, nature: entry.tier.nature)
-            dismiss()
+            if onPick(entry) { dismiss() }
         } label: {
             HStack(spacing: 8) {
                 SpriteView(name: entry.name, size: 34)

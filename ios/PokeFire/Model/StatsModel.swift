@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum AppMode: String {
-    case fire, stats
+    case fire, stats, box
 }
 
 struct StatsSide: Codable, Equatable {
@@ -114,6 +114,24 @@ final class StatsModel {
         mode = .stats
         save()
         scheduleHistory()
+    }
+
+    func openBox() {
+        mode = .box
+        save()
+    }
+
+    func applyBox(_ role: Role, _ entry: BoxPokemon) {
+        update(role) { side in
+            side.name = entry.name
+            side.points = [:]
+            side.natures = [:]
+            for key in StatKey.baseKeys {
+                side.points[key.rawValue] = entry.point(key)
+                if key.hasNature { side.natures[key.rawValue] = entry.nature(key) }
+            }
+        }
+        Haptics.play(.medium)
     }
 
     func exit(page: Role? = nil) {

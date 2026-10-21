@@ -14,6 +14,7 @@ enum ActiveSheet: Identifiable, Hashable {
     case learnset(Role)
     case statsSpeed
     case speedLine(Role)
+    case boxImport(Role)
 
     var id: String {
         switch self {
@@ -33,6 +34,7 @@ enum ActiveSheet: Identifiable, Hashable {
         case .learnset(let role): return "learnset-\(role.rawValue)"
         case .statsSpeed: return "stats-speed"
         case .speedLine(let role): return "speed-line-\(role.rawValue)"
+        case .boxImport(let role): return "box-import-\(role.rawValue)"
         }
     }
 }
@@ -150,7 +152,18 @@ struct MainScreen: View {
         case .statsSpeed:
             SpeedSheet(statsMode: true)
         case .speedLine(let role):
-            SpeedLineSheet(role: role)
+            SpeedLineSheet(currentName: stats.side(role).name, currentSpeed: stats.side(role).real(.s)) { entry in
+                stats.applySpeedLine(role, name: entry.name, points: entry.tier.points, nature: entry.tier.nature)
+                return true
+            }
+        case .boxImport(let role):
+            BoxImportSheet { entry in
+                if stats.isStats {
+                    stats.applyBox(role, entry)
+                } else {
+                    model.applyBox(entry, to: role)
+                }
+            }
         }
     }
 }
@@ -267,7 +280,7 @@ struct MainHeader: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                CircleIconButton(icon: "menu", label: "履歴", action: openDrawer)
+                AppMenuButton(openHistory: openDrawer)
                 Spacer(minLength: 0)
                 if stats.isStats {
                     Text("Stats Mode")

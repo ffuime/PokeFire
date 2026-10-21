@@ -293,6 +293,9 @@ struct EntrySearchSheet: View {
     @Environment(\.dismiss) private var dismiss
     let kind: EntryKind
     let role: Role
+    var pokemonName: String?
+    var currentValue: String?
+    var onPick: ((String) -> Void)?
 
     @State private var query = ""
     @State private var mode = 0
@@ -345,7 +348,7 @@ struct EntrySearchSheet: View {
     private var groups: [RowGroup] {
         _ = revision
         let data = model.data
-        let name = model.side(role).name
+        let name = pokemonName ?? model.side(role).name
         var usage: [(String, Double)] = []
         switch kind {
         case .abilities:
@@ -390,6 +393,7 @@ struct EntrySearchSheet: View {
     }
 
     private var current: String {
+        if let currentValue { return currentValue }
         switch kind {
         case .moves: return model.attacker.move
         case .abilities: return model.side(role).ability
@@ -472,6 +476,12 @@ struct EntrySearchSheet: View {
 
     private func select(_ name: String) {
         focused = false
+        if let onPick {
+            if kind == .items { Storage.rememberItem(name) }
+            onPick(name)
+            dismiss()
+            return
+        }
         switch kind {
         case .moves:
             Storage.rememberMove(name)

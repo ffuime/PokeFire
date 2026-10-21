@@ -81,10 +81,6 @@ struct StatsHeader: View {
         let forms = GameData.shared.otherForms(of: side.name)
         HStack(spacing: 12) {
             ModeSprite(name: side.name, hasForms: !forms.isEmpty, spin: spin) {
-                guard !forms.isEmpty else {
-                    present(.statsPokemon(role))
-                    return
-                }
                 spin += 1
                 Haptics.play(.light)
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
@@ -96,8 +92,13 @@ struct StatsHeader: View {
             }
 
             ZStack(alignment: .leading) {
-                if showForms, !forms.isEmpty {
-                    FormsStrip(forms: forms, openCount: formsOpenCount) { name in
+                if showForms {
+                    FormsStrip(forms: forms, openCount: formsOpenCount, onBox: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
+                            showForms = false
+                        }
+                        present(.boxImport(role))
+                    }) { name in
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
                             showForms = false
                         }
