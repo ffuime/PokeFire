@@ -159,16 +159,17 @@ struct BoxCard: View {
             .onTapGesture { tap(.stats) }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
 
-            ZStack(alignment: .bottomTrailing) {
-                SpriteView(name: entry.name, size: 92)
-                    .contentShape(Rectangle())
-                    .onTapGesture { tap(.species) }
-                SpriteIcon(name: entry.item.isEmpty ? "" : entry.item, size: 30)
-                    .opacity(entry.item.isEmpty ? 0 : 1)
-                    .offset(x: 4, y: 2)
-                    .onTapGesture { tap(.item) }
-            }
-            .offset(x: -4, y: 6)
+            SpriteView(name: entry.name, size: 92)
+                .frame(width: 92, height: 92)
+                .contentShape(Rectangle())
+                .onTapGesture { tap(.species) }
+                .overlay(alignment: .bottomTrailing) {
+                    if !entry.item.isEmpty {
+                        SpriteIcon(name: entry.item, size: 30)
+                            .onTapGesture { tap(.item) }
+                    }
+                }
+                .offset(x: -4, y: 6)
         }
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 14)
