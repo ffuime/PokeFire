@@ -481,6 +481,12 @@ struct TeamDetail: View {
         let team = box.team(teamID)
         let members = (team?.members ?? []).compactMap { box.pokemon($0) }
         List(selection: $selection) {
+            if !members.isEmpty, !editing {
+                TeamCollagePreview(entries: members)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 8, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .selectionDisabled()
+            }
             ForEach(Array(members.enumerated()), id: \.element.id) { index, entry in
                 NavigationLink(value: BoxRoute.member(teamID, index)) {
                     BoxPokemonRow(entry: entry)

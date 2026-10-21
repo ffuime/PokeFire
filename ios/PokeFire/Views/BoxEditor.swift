@@ -49,6 +49,9 @@ struct BoxEditor: View {
                                         BoxCard(entry: entry) { part in
                                             if offset == current { sheet = part }
                                         }
+                                        .holdToSave {
+                                            CardImage.save(BoxCard(entry: entry, frozen: true).frame(width: 380))
+                                        }
                                         .padding(.horizontal, 16)
                                         .tag(offset)
                                     }
@@ -69,11 +72,17 @@ struct BoxEditor: View {
                         .onChange(of: current) { _, _ in Haptics.play(.selection) }
                     } else if let entry = box.pokemon(id) {
                         BoxCard(entry: entry) { sheet = $0 }
+                            .holdToSave {
+                                CardImage.save(BoxCard(entry: entry, frozen: true).frame(width: 380))
+                            }
                             .padding(.horizontal, 16)
                     }
                     BoxEditorBody(id: id, sheet: $sheet)
                         .id(id)
                         .padding(.horizontal, 20)
+                        .overlay {
+                            ShineFlash(trigger: current)
+                        }
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 40)
@@ -89,7 +98,7 @@ struct BoxEditor: View {
 struct BoxCard: View {
     let entry: BoxPokemon
     var onTap: ((BoxSheet) -> Void)?
-    var snapshot: UIImage?
+    var frozen = false
 
     static let height: CGFloat = 176
 
@@ -185,52 +194,15 @@ struct BoxCard: View {
         .background {
             ZStack {
                 LinearGradient(colors: [Color.washed(first, white: 0.7), Color.washed(second, white: 0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                CardGlints(seed: entry.id.hashValue, frozen: snapshot != nil)
+                CardGlints(seed: entry.id.hashValue, frozen: frozen)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .shadow(color: .black.opacity(snapshot == nil ? 0.08 : 0), radius: 14, y: 4)
-        .onLongPressGesture(minimumDuration: 0.5) {
-            guard snapshot == nil else { return }
-            Task { await saveImage() }
-        }
+        .shadow(color: .black.opacity(frozen ? 0 : 0.08), radius: 14, y: 4)
     }
 
-    @ViewBuilder
     private var spriteImage: some View {
-        if let snapshot {
-            Image(uiImage: snapshot)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: 92, height: 92)
-        } else {
-            SpriteView(name: entry.name, size: 92, shiny: entry.isShiny)
-        }
-    }
-
-    @MainActor
-    private func saveImage() async {
-        Haptics.play(.heavy)
-        var loaded = PokemonSprites.image(entry.name, shiny: entry.isShiny)
-        if loaded == nil, let url = entry.pokemon?.spriteURL {
-            loaded = await SpriteCache.shared.image(url)
-        }
-        guard let sprite = loaded else {
-            Haptics.play(.error)
-            return
-        }
-        let card = BoxCard(entry: entry, snapshot: sprite)
-            .frame(width: 380)
-        let renderer = ImageRenderer(content: card)
-        renderer.scale = 3
-        guard let image = renderer.uiImage else {
-            Haptics.play(.error)
-            return
-        }
-        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
-        Haptics.play(.success)
-        NotificationCenter.default.post(name: .pokefireToast, object: "画像を写真に保存しました")
+        SpriteView(name: entry.name, size: 92, shiny: entry.isShiny)
     }
 
     private func pointText(_ key: StatKey) -> Text {
@@ -293,7 +265,7 @@ struct BoxEditorBody: View {
                         showForms.toggle()
                         if showForms { formsOpenCount += 1 }
                     }
-                } onLongPress: {}
+                }
                 ZStack(alignment: .leading) {
                     if showForms, !forms.isEmpty {
                         FormsStrip(forms: forms, openCount: formsOpenCount) { name in
@@ -1124,5 +1096,168 @@ struct SparkleShape: Shape {
         var path = star(center: center, radius: big)
         path.addPath(star(center: CGPoint(x: center.x + big * 0.95, y: center.y - big * 0.95), radius: small))
         return path
+    }
+}
+
+enum CardImage {
+    @MainActor
+    static func save<Content: View>(_ content: Content) {
+        let renderer = ImageRenderer(content: content)
+        renderer.scale = 3
+        guard let image = renderer.uiImage else {
+            Haptics.play(.error)
+            return
+        }
+        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        Haptics.play(.success)
+        NotificationCenter.default.post(name: .pokefireToast, object: "画像を写真に保存しました")
+    }
+}
+
+struct HoldToSave: ViewModifier {
+    let action: () -> Void
+    @State private var pressing = false
+    @State private var visible = false
+    @State private var progress: CGFloat = 0
+    @State private var token = 0
+
+    private let delay = 0.15
+    private let duration = 0.7
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                if visible {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.white.opacity(0.6), lineWidth: 5)
+                        Circle()
+                            .trim(from: 0, to: progress)
+                            .stroke(Palette.accent, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(Palette.accent)
+                    }
+                    .frame(width: 56, height: 56)
+                    .background(Circle().fill(.ultraThinMaterial))
+                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    .allowsHitTesting(false)
+                }
+            }
+            .animation(.snappy(duration: 0.2), value: visible)
+            .onLongPressGesture(minimumDuration: duration, maximumDistance: 12) {
+                Haptics.play(.heavy)
+                visible = false
+                progress = 0
+                action()
+            } onPressingChanged: { value in
+                pressing = value
+                token += 1
+                let current = token
+                if value {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
+                        guard pressing, current == token else { return }
+                        progress = 0
+                        visible = true
+                        withAnimation(.linear(duration: duration - delay)) { progress = 1 }
+                    }
+                } else {
+                    visible = false
+                    progress = 0
+                }
+            }
+    }
+}
+
+extension View {
+    func holdToSave(_ action: @escaping () -> Void) -> some View {
+        modifier(HoldToSave(action: action))
+    }
+}
+
+struct ShineFlash: View {
+    let trigger: Int
+    @State private var phase: CGFloat = 1.2
+    @State private var opacity: Double = 0
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.white.opacity(opacity * 0.7)
+                LinearGradient(
+                    colors: [Color.white.opacity(0), Color.white.opacity(0.95), Color.white.opacity(0)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(width: geometry.size.width * 0.5)
+                .rotationEffect(.degrees(18))
+                .offset(x: phase * geometry.size.width)
+                .opacity(opacity)
+            }
+        }
+        .allowsHitTesting(false)
+        .onChange(of: trigger) { _, _ in
+            phase = -0.8
+            opacity = 1
+            withAnimation(.easeOut(duration: 0.55)) { phase = 1.2 }
+            withAnimation(.easeOut(duration: 0.6).delay(0.1)) { opacity = 0 }
+        }
+    }
+}
+
+struct TeamCollage: View {
+    let entries: [BoxPokemon]
+    var frozen = false
+
+    static let cardWidth: CGFloat = 380
+    static let spacing: CGFloat = 12
+    static let padding: CGFloat = 16
+    static var size: CGSize {
+        CGSize(width: cardWidth * 3 + spacing * 2 + padding * 2, height: BoxCard.height * 2 + spacing + padding * 2)
+    }
+
+    var body: some View {
+        VStack(spacing: Self.spacing) {
+            ForEach(0..<2, id: \.self) { row in
+                HStack(spacing: Self.spacing) {
+                    ForEach(0..<3, id: \.self) { column in
+                        let index = row * 3 + column
+                        if index < entries.count {
+                            BoxCard(entry: entries[index], frozen: frozen)
+                                .frame(width: Self.cardWidth)
+                        } else {
+                            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                                .fill(Palette.background)
+                                .frame(width: Self.cardWidth, height: BoxCard.height)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(Self.padding)
+        .frame(width: Self.size.width, height: Self.size.height)
+        .background(Color.white)
+    }
+}
+
+struct TeamCollagePreview: View {
+    let entries: [BoxPokemon]
+
+    var body: some View {
+        let size = TeamCollage.size
+        Color.clear
+            .aspectRatio(size.width / size.height, contentMode: .fit)
+            .overlay(alignment: .topLeading) {
+                GeometryReader { geometry in
+                    TeamCollage(entries: entries, frozen: true)
+                        .scaleEffect(geometry.size.width / size.width, anchor: .topLeading)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .holdToSave {
+                CardImage.save(TeamCollage(entries: entries, frozen: true))
+            }
     }
 }

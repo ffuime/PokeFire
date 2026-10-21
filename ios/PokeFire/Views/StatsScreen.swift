@@ -134,9 +134,10 @@ struct ModeSprite: View {
     let spin: Int
     var shiny = false
     let onTap: () -> Void
-    let onLongPress: () -> Void
+    var onLongPress: (() -> Void)? = nil
     @State private var pressing = false
     @State private var hold: CGFloat = 0
+    @State private var token = 0
 
     private let duration = 0.45
 
@@ -167,14 +168,22 @@ struct ModeSprite: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
         .onLongPressGesture(minimumDuration: duration) {
+            guard let onLongPress else { return }
             Haptics.play(.heavy)
             onLongPress()
             withAnimation(.easeOut(duration: 0.2)) { hold = 0 }
         } onPressingChanged: { value in
+            guard onLongPress != nil else { return }
             pressing = value
+            token += 1
+            let current = token
             if value {
-                hold = 0
-                withAnimation(.linear(duration: duration)) { hold = 1 }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    guard pressing, current == token else { return }
+                    hold = 0
+                    withAnimation(.linear(duration: duration - 0.15)) { hold = 1 }
+                }
             } else {
                 withAnimation(.easeOut(duration: 0.2)) { hold = 0 }
             }
