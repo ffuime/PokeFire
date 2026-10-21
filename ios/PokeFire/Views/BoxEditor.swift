@@ -1127,7 +1127,6 @@ struct HoldToSave: ViewModifier {
     func body(content: Content) -> some View {
         content
             .overlay {
-                if visible {
                     ZStack {
                         Circle()
                             .stroke(Color.white.opacity(0.6), lineWidth: 5)
@@ -1141,15 +1140,17 @@ struct HoldToSave: ViewModifier {
                     }
                     .frame(width: 56, height: 56)
                     .background(Circle().fill(.ultraThinMaterial))
-                    .transition(.scale(scale: 0.6).combined(with: .opacity))
+                    .opacity(visible ? 1 : 0)
+                    .scaleEffect(visible ? 1 : 0.6)
                     .allowsHitTesting(false)
-                }
             }
             .animation(.snappy(duration: 0.2), value: visible)
             .onLongPressGesture(minimumDuration: duration, maximumDistance: 12) {
                 Haptics.play(.heavy)
                 visible = false
-                progress = 0
+                var reset = Transaction()
+                reset.disablesAnimations = true
+                withTransaction(reset) { progress = 0 }
                 action()
             } onPressingChanged: { value in
                 pressing = value
@@ -1159,13 +1160,19 @@ struct HoldToSave: ViewModifier {
                     Task { @MainActor in
                         try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
                         guard pressing, current == token else { return }
-                        progress = 0
+                        var reset = Transaction()
+                        reset.disablesAnimations = true
+                        withTransaction(reset) { progress = 0 }
                         visible = true
-                        withAnimation(.linear(duration: duration - delay)) { progress = 1 }
+                        try? await Task.sleep(for: .milliseconds(16))
+                        guard pressing, current == token else { return }
+                        withAnimation(.linear(duration: duration - delay - 0.016)) { progress = 1 }
                     }
                 } else {
                     visible = false
-                    progress = 0
+                    var reset = Transaction()
+                    reset.disablesAnimations = true
+                    withTransaction(reset) { progress = 0 }
                 }
             }
     }
