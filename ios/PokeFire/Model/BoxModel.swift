@@ -50,10 +50,13 @@ struct BoxPokemon: Codable, Identifiable, Equatable {
     var ability = ""
     var item = ""
     var favorite = false
+    var shiny: Bool?
     var created = Date().timeIntervalSince1970
     var updated = Date().timeIntervalSince1970
 
     static let pointLimit = 66
+
+    var isShiny: Bool { shiny ?? false }
 
     var pokemon: Pokemon? { GameData.shared.pokemons[name] }
     var base: BaseStats { pokemon?.base ?? BaseStats() }

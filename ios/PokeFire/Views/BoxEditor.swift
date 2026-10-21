@@ -205,14 +205,14 @@ struct BoxCard: View {
                 .scaledToFit()
                 .frame(width: 92, height: 92)
         } else {
-            SpriteView(name: entry.name, size: 92)
+            SpriteView(name: entry.name, size: 92, shiny: entry.isShiny)
         }
     }
 
     @MainActor
     private func saveImage() async {
         Haptics.play(.heavy)
-        var loaded = PokemonSprites.image(entry.name)
+        var loaded = PokemonSprites.image(entry.name, shiny: entry.isShiny)
         if loaded == nil, let url = entry.pokemon?.spriteURL {
             loaded = await SpriteCache.shared.image(url)
         }
@@ -282,7 +282,7 @@ struct BoxEditorBody: View {
         let forms = model.data.otherForms(of: entry.name)
         VStack(alignment: .leading, spacing: 24) {
             HStack(spacing: 12) {
-                ModeSprite(name: entry.name, hasForms: !forms.isEmpty, spin: spin) {
+                ModeSprite(name: entry.name, hasForms: !forms.isEmpty, spin: spin, shiny: entry.isShiny) {
                     guard !forms.isEmpty else {
                         sheet = .species
                         return
@@ -306,13 +306,31 @@ struct BoxEditorBody: View {
                                 Haptics.play(.light)
                                 sheet = .species
                             }
-                            TextField("ニックネーム（任意）", text: Binding(
-                                get: { box.pokemon(id)?.nickname ?? "" },
-                                set: { value in box.update(id) { $0.nickname = value } }
-                            ))
-                            .font(.subheadline)
-                            .padding(.horizontal, 4)
-                            .frame(height: 30)
+                            HStack(spacing: 8) {
+                                TextField("ニックネーム（任意）", text: Binding(
+                                    get: { box.pokemon(id)?.nickname ?? "" },
+                                    set: { value in box.update(id) { $0.nickname = value } }
+                                ))
+                                .font(.subheadline)
+                                .padding(.horizontal, 4)
+                                .frame(height: 30)
+                                Button {
+                                    Haptics.play(entry.isShiny ? .light : .success)
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.6)) {
+                                        box.update(id) { $0.shiny = $0.isShiny ? nil : true }
+                                    }
+                                } label: {
+                                    SparkleShape()
+                                        .fill(entry.isShiny ? AnyShapeStyle(LinearGradient(colors: [Color(hex: 0xF7C948), Color(hex: 0xF08C33)], startPoint: .topTrailing, endPoint: .bottomLeading)) : AnyShapeStyle(Color(hex: 0xC8C8CE)))
+                                        .frame(width: 24, height: 24)
+                                        .scaleEffect(entry.isShiny ? 1.12 : 1)
+                                        .frame(width: 36, height: 30)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(PressableStyle())
+                                .accessibilityLabel(entry.isShiny ? "色違いをオフ" : "色違いをオン")
+                                .accessibilityAddTraits(entry.isShiny ? .isSelected : [])
+                            }
                             HStack(spacing: 4) {
                                 ForEach(entry.pokemon?.types ?? [], id: \.self) { TypeBadge(type: $0) }
                             }
@@ -1084,5 +1102,28 @@ struct CardGlints: View {
                 }
             }
             .allowsHitTesting(false)
+    }
+}
+
+struct SparkleShape: Shape {
+    private func star(center: CGPoint, radius: CGFloat) -> Path {
+        let pinch = radius * 0.18
+        var path = Path()
+        path.move(to: CGPoint(x: center.x, y: center.y - radius))
+        path.addQuadCurve(to: CGPoint(x: center.x + radius, y: center.y), control: CGPoint(x: center.x + pinch, y: center.y - pinch))
+        path.addQuadCurve(to: CGPoint(x: center.x, y: center.y + radius), control: CGPoint(x: center.x + pinch, y: center.y + pinch))
+        path.addQuadCurve(to: CGPoint(x: center.x - radius, y: center.y), control: CGPoint(x: center.x - pinch, y: center.y + pinch))
+        path.addQuadCurve(to: CGPoint(x: center.x, y: center.y - radius), control: CGPoint(x: center.x - pinch, y: center.y - pinch))
+        path.closeSubpath()
+        return path
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let size = min(rect.width, rect.height)
+        let big = size * 0.36
+        let small = big * 0.5
+        var path = star(center: CGPoint(x: rect.minX + big + size * 0.02, y: rect.maxY - big - size * 0.02), radius: big)
+        path.addPath(star(center: CGPoint(x: rect.maxX - small - size * 0.04, y: rect.minY + small + size * 0.04), radius: small))
+        return path
     }
 }

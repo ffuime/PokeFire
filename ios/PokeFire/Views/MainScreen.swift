@@ -491,6 +491,7 @@ struct SideSwitcher: View {
 
     private func sideLabel(_ role: Role) -> some View {
         let name = stats.isStats ? stats.side(role).name : model.side(role).name
+        let shiny = stats.isStats ? stats.side(role).isShiny : model.side(role).shiny
         let constant = !stats.isStats && role == .attacker && model.isConstantActive
         let kind = model.activeTab?.kind ?? .attack
         return HStack(spacing: 6) {
@@ -499,7 +500,7 @@ struct SideSwitcher: View {
                     .foregroundStyle(Palette.tab(kind))
                     .frame(width: 30, height: 30)
             } else {
-                SpriteView(name: name, size: 30)
+                SpriteView(name: name, size: 30, shiny: shiny)
             }
             VStack(alignment: .leading, spacing: 0) {
                 if !constant, !stats.isStats {

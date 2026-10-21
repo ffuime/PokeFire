@@ -80,7 +80,7 @@ struct StatsHeader: View {
         let side = stats.side(role)
         let forms = GameData.shared.otherForms(of: side.name)
         HStack(spacing: 12) {
-            ModeSprite(name: side.name, hasForms: true, spin: spin) {
+            ModeSprite(name: side.name, hasForms: true, spin: spin, shiny: side.isShiny) {
                 spin += 1
                 Haptics.play(.light)
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
@@ -132,6 +132,7 @@ struct ModeSprite: View {
     let name: String
     let hasForms: Bool
     let spin: Int
+    var shiny = false
     let onTap: () -> Void
     let onLongPress: () -> Void
     @State private var pressing = false
@@ -149,7 +150,7 @@ struct ModeSprite: View {
                     .stroke(Palette.accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .opacity(hold > 0 ? 1 : 0)
-                SpriteView(name: name, size: 84)
+                SpriteView(name: name, size: 84, shiny: shiny)
             }
             .frame(width: 92, height: 92)
             if hasForms {

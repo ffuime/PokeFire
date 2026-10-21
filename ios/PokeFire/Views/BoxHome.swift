@@ -388,7 +388,7 @@ struct BoxPokemonRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            SpriteView(name: entry.name, size: 52)
+            SpriteView(name: entry.name, size: 52, shiny: entry.isShiny)
                 .frame(width: 52, height: 52)
                 .overlay(alignment: .bottomTrailing) {
                     if !entry.item.isEmpty {
@@ -443,7 +443,7 @@ struct TeamRow: View {
                     let member = index < team.members.count ? box.pokemon(team.members[index]) : nil
                     ZStack(alignment: .bottomTrailing) {
                         if let member {
-                            SpriteView(name: member.name, size: 44)
+                            SpriteView(name: member.name, size: 44, shiny: member.isShiny)
                             if !member.item.isEmpty {
                                 SpriteIcon(name: member.item, size: 16)
                             }

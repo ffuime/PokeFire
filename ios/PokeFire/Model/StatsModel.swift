@@ -9,6 +9,9 @@ struct StatsSide: Codable, Equatable {
     var name: String
     var points: [String: Int] = [:]
     var natures: [String: Int] = [:]
+    var shiny: Bool?
+
+    var isShiny: Bool { shiny ?? false }
 
     var pokemon: Pokemon? { GameData.shared.pokemons[name] }
     var base: BaseStats { pokemon?.base ?? BaseStats() }
@@ -100,6 +103,7 @@ final class StatsModel {
         for role in Role.allCases {
             let source = model.side(role)
             var side = StatsSide(name: source.name)
+            side.shiny = source.shiny ? true : nil
             for key in StatKey.baseKeys {
                 if let value = source.evs[key] {
                     side.points[key.rawValue] = value.points
@@ -125,6 +129,7 @@ final class StatsModel {
     func applyBox(_ role: Role, _ entry: BoxPokemon) {
         update(role) { side in
             side.name = entry.name
+            side.shiny = entry.isShiny ? true : nil
             side.points = [:]
             side.natures = [:]
             for key in StatKey.baseKeys {
@@ -190,7 +195,10 @@ final class StatsModel {
 
     func select(_ role: Role, _ name: String) {
         guard GameData.shared.pokemons[name] != nil else { return }
-        update(role) { $0.name = name }
+        update(role) { side in
+            if side.name != name { side.shiny = nil }
+            side.name = name
+        }
         Haptics.play(.light)
     }
 

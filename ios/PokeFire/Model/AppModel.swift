@@ -123,6 +123,7 @@ final class AppModel {
             selectPokemon(role, entry.name)
         }
         update(role) { side in
+            side.shiny = entry.isShiny
             for key in Rules.statKeys(role) where StatKey.baseKeys.contains(key) {
                 var value = side.evs[key] ?? EVState(points: 0)
                 value.points = entry.point(key)
@@ -449,6 +450,7 @@ final class AppModel {
         guard let pokemon = data.pokemons[name] else { return }
         var side = self.side(role)
         side.name = name
+        side.shiny = false
         side.types = pokemon.types
         if role == .defender {
             for index in tabs.indices {
