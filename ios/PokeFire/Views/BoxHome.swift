@@ -35,6 +35,7 @@ struct BoxRoot: View {
     @State private var teamName = ""
     @State private var confirmDelete = false
     @State private var autoPick: UUID?
+    @Environment(StatsModel.self) private var stats
 
     private var editing: Bool { editMode.isEditing }
 
@@ -110,9 +111,6 @@ struct BoxRoot: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    AppMenuButton(inToolbar: true)
-                }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     sortMenu
                     Button {
@@ -125,6 +123,9 @@ struct BoxRoot: View {
                     }
                     .accessibilityLabel(editing ? "選択を終了" : "選択")
                 }
+            }
+            .onChange(of: path) { _, value in
+                stats.boxAtRoot = value.isEmpty
             }
             .onChange(of: tab) { _, _ in
                 selection = []
@@ -219,21 +220,16 @@ struct BoxRoot: View {
                     path.append(.team(team.id))
                 } label: {
                     Label("チームを作る", systemImage: "person.3")
-                        .padding(.horizontal, 6)
+                        .font(.body.weight(.bold))
+                        .padding(.horizontal, 10)
+                        .frame(height: 40)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.glassProminent)
             }
             Spacer()
-            Button(role: .destructive) {
+            SelectionDeleteButton(count: selection.count) {
                 confirmDelete = true
-            } label: {
-                Label("削除", systemImage: "trash")
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 6)
             }
-            .buttonStyle(.glass)
-            .tint(.red)
-            .disabled(selection.isEmpty)
         }
         .padding(16)
     }
@@ -543,20 +539,13 @@ struct TeamDetail: View {
             if editing {
                 HStack {
                     Spacer()
-                    Button(role: .destructive) {
+                    SelectionDeleteButton(count: selection.count, title: "チームから外す", icon: "minus.circle") {
                         withAnimation {
                             box.updateTeam(teamID) { $0.members.removeAll { selection.contains($0) } }
                             selection = []
                             editMode = .inactive
                         }
-                    } label: {
-                        Label("チームから外す", systemImage: "minus.circle")
-                            .foregroundStyle(.red)
-                            .padding(.horizontal, 6)
                     }
-                    .buttonStyle(.glass)
-                    .tint(.red)
-                    .disabled(selection.isEmpty)
                 }
                 .padding(16)
             }
@@ -715,5 +704,29 @@ struct MemberPicker: View {
                 onCreated(entry.id)
             }
         }
+    }
+}
+
+struct SelectionDeleteButton: View {
+    let count: Int
+    var title = "削除"
+    var icon = "trash"
+    let action: () -> Void
+
+    var body: some View {
+        let active = count > 0
+        Button(role: .destructive, action: action) {
+            Label(count > 0 ? "\(title)（\(count)）" : title, systemImage: icon)
+                .font(.body.weight(.bold))
+                .foregroundStyle(active ? Color.white : Color.red.opacity(0.5))
+                .padding(.horizontal, 10)
+                .frame(height: 40)
+                .contentTransition(.numericText(value: Double(count)))
+        }
+        .buttonStyle(.glassProminent)
+        .tint(active ? .red : Color.red.opacity(0.12))
+        .disabled(!active)
+        .animation(.snappy(duration: 0.25), value: active)
+        .animation(.snappy(duration: 0.25), value: count)
     }
 }

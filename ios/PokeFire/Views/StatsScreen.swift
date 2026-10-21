@@ -61,7 +61,7 @@ struct StatsPanel: View {
             .animation(.snappy(duration: 0.3), value: stats.chartCollapsed)
         }
         .scrollIndicators(.hidden)
-        .modeSwitchPull(label: "Fire Mode", icon: "tab_attack", tint: Palette.attack, distance: 52) {
+        .modeSwitchPull(label: "PokéFire", icon: "tab_attack", tint: Palette.attack, distance: 52) {
             withAnimation(.easeInOut(duration: 0.35)) { stats.exit() }
         }
         .onChange(of: side.name) { _, _ in editing = nil }
@@ -1147,7 +1147,7 @@ struct ModeSwitchPull: ViewModifier {
                 .opacity(Double(min(1, progress * 3)))
                 .scaleEffect(0.7 + 0.3 * progress)
                 .frame(maxWidth: .infinity)
-                .offset(y: visibleTop + max(0, pullAmount / 2 - 34))
+                .offset(y: visibleTop + 8)
                 .allowsHitTesting(false)
             }
     }

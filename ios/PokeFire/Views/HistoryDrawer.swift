@@ -67,6 +67,13 @@ struct HistoryDrawer: View {
     var body: some View {
         let sections = groups
         VStack(alignment: .leading, spacing: 0) {
+            ModeSwitcherList(close: close)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, stats.mode == .box ? 0 : 14)
+            if stats.mode == .box {
+                Spacer(minLength: 0)
+            } else {
             HStack(spacing: 12) {
                 Text("履歴")
                     .font(.system(size: 30, weight: .bold))
@@ -171,6 +178,7 @@ struct HistoryDrawer: View {
                 .scrollContentBackground(.hidden)
                 .scrollDismissesKeyboard(.immediately)
                 .environment(\.defaultMinListRowHeight, 10)
+            }
             }
         }
         .background(Color.white.ignoresSafeArea())
@@ -488,5 +496,82 @@ private struct HistoryPreview: View {
         .padding(20)
         .frame(width: 300, alignment: .leading)
         .background(Color.white)
+    }
+}
+
+struct ModeSwitcherList: View {
+    @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
+    let close: () -> Void
+
+    private struct Item: Identifiable {
+        let id: AppMode
+        let title: String
+        let subtitle: String
+        let symbol: String?
+        let image: String?
+        let tint: Color
+    }
+
+    private let items: [Item] = [
+        Item(id: .fire, title: "PokéFire", subtitle: "ダメージ計算", symbol: nil, image: "tab_attack", tint: Palette.attack),
+        Item(id: .stats, title: "PokéStats", subtitle: "使用率・ステータス", symbol: "chart.pie", image: nil, tint: Palette.accent),
+        Item(id: .box, title: "PokéBox", subtitle: "ポケモン・チーム管理", symbol: "archivebox", image: nil, tint: Color(hex: 0x20A6A6)),
+    ]
+
+    private func go(_ mode: AppMode) {
+        close()
+        guard mode != stats.mode else { return }
+        Haptics.play(.medium)
+        withAnimation(.easeInOut(duration: 0.35)) {
+            switch mode {
+            case .fire: stats.exit()
+            case .stats: stats.enter(from: model)
+            case .box: stats.openBox()
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 4) {
+            ForEach(items) { item in
+                let current = stats.mode == item.id
+                Button {
+                    go(item.id)
+                } label: {
+                    HStack(spacing: 12) {
+                        Group {
+                            if let image = item.image {
+                                Icon(name: image, size: 18)
+                            } else if let symbol = item.symbol {
+                                Image(systemName: symbol)
+                                    .font(.system(size: 17, weight: .semibold))
+                            }
+                        }
+                        .foregroundStyle(current ? Color.white : item.tint)
+                        .frame(width: 36, height: 36)
+                        .background(Circle().fill(current ? item.tint : item.tint.opacity(0.12)))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(item.title)
+                                .font(.headline)
+                                .foregroundStyle(Color.black)
+                            Text(item.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(Palette.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(current ? Color(hex: 0xF2F2F4) : Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(PressableStyle())
+                .accessibilityAddTraits(current ? .isSelected : [])
+            }
+        }
     }
 }

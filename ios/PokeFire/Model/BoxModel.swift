@@ -42,7 +42,11 @@ struct BoxPokemon: Codable, Identifiable, Equatable {
     var up: StatKey?
     var down: StatKey?
     var neutral = false
-    var moves: [String] = ["", "", "", ""]
+    var moves: [String] = ["", "", "", ""] {
+        didSet {
+            while moves.count < 4 { moves.append("") }
+        }
+    }
     var ability = ""
     var item = ""
     var favorite = false

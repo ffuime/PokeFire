@@ -283,7 +283,7 @@ struct MainHeader: View {
                 AppMenuButton(openHistory: openDrawer)
                 Spacer(minLength: 0)
                 if stats.isStats {
-                    Text("Stats Mode")
+                    Text("PokéStats")
                         .font(.subheadline.weight(.heavy))
                         .foregroundStyle(Palette.accent)
                         .frame(height: 42)

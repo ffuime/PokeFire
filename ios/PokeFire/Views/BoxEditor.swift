@@ -103,24 +103,16 @@ struct BoxCard: View {
         let first = Palette.types[types.first ?? ""]?.color ?? 0x999999
         let second = Palette.types[types.count > 1 ? types[1] : types.first ?? ""]?.color ?? first
         HStack(alignment: .center, spacing: 6) {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 5) {
                     ForEach(types, id: \.self) { TypeIcon(type: $0, size: 18) }
                     Text(entry.name)
                         .font(.subheadline.weight(.bold))
-                        .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { tap(.species) }
-                Text(entry.ability.isEmpty ? "とくせい" : entry.ability)
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(entry.ability.isEmpty ? Palette.secondary : Palette.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .contentShape(Rectangle())
-                    .onTapGesture { tap(.ability) }
                 ForEach(0..<4, id: \.self) { slot in
                     let move = slot < entry.moves.count ? entry.moves[slot] : ""
                     HStack(spacing: 5) {
@@ -129,13 +121,12 @@ struct BoxCard: View {
                         } else {
                             Text("?")
                                 .font(.system(size: 11, weight: .heavy))
-                                .foregroundStyle(Palette.ink)
                                 .frame(width: 16, height: 16)
                                 .background(Color.white, in: RoundedRectangle(cornerRadius: 3))
                         }
                         Text(move.isEmpty ? "わざを入力" : move)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(move.isEmpty ? Palette.secondary : Palette.ink)
+                            .opacity(move.isEmpty ? 0.5 : 1)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                     }
@@ -154,19 +145,30 @@ struct BoxCard: View {
                     .onTapGesture { tap(.item) }
             }
             .frame(width: 96)
-            HStack(spacing: 3) {
-                column(StatKey.baseKeys.map { Text($0.letter).foregroundStyle(Palette.stat($0)) }, alignment: .center, width: 20)
-                column(StatKey.baseKeys.map { Text("\(entry.real($0))").foregroundStyle(Palette.ink) }, alignment: .trailing, width: 34)
-                column(StatKey.baseKeys.map { pointText($0) }, alignment: .trailing, width: 34)
+            VStack(alignment: .trailing, spacing: 6) {
+                Text(entry.ability.isEmpty ? "とくせい" : entry.ability)
+                    .font(.footnote.weight(.bold))
+                    .opacity(entry.ability.isEmpty ? 0.5 : 1)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .contentShape(Rectangle())
+                    .onTapGesture { tap(.ability) }
+                HStack(spacing: 6) {
+                    column(StatKey.baseKeys.map { Text($0.letter) }, alignment: .center, width: 14)
+                    column(StatKey.baseKeys.map { Text("\(entry.real($0))") }, alignment: .trailing, width: 30)
+                    column(StatKey.baseKeys.map { pointText($0) }, alignment: .trailing, width: 34)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { tap(.stats) }
             }
-            .contentShape(Rectangle())
-            .onTapGesture { tap(.stats) }
+            .frame(width: 112, alignment: .trailing)
         }
+        .foregroundStyle(Palette.ink)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(height: Self.height)
         .background(
-            LinearGradient(colors: [Color.washed(first, white: 0.5), Color.washed(second, white: 0.5)], startPoint: .topLeading, endPoint: .bottomTrailing)
+            LinearGradient(colors: [Color.washed(first, white: 0.7), Color.washed(second, white: 0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
         )
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .shadow(color: .black.opacity(0.08), radius: 14, y: 4)
@@ -175,9 +177,12 @@ struct BoxCard: View {
     private func pointText(_ key: StatKey) -> Text {
         let points = entry.point(key)
         let nature = entry.nature(key)
-        if points == 0, nature == 10 { return Text("-").foregroundStyle(Palette.secondary) }
-        let arrow = nature == 11 ? Text("↑").foregroundStyle(Palette.rankUp) : nature == 9 ? Text("↓").foregroundStyle(Palette.rankDown) : Text("")
-        return Text("\(Text("+\(points)").foregroundStyle(Palette.ink))\(arrow)")
+        if points == 0, nature == 10 { return Text("-") }
+        switch nature {
+        case 11: return Text("+\(points)↑").foregroundStyle(Palette.rankUp)
+        case 9: return Text("+\(points)↓").foregroundStyle(Palette.rankDown)
+        default: return Text("+\(points)")
+        }
     }
 
     private func column(_ items: [Text], alignment: HorizontalAlignment, width: CGFloat) -> some View {
@@ -188,13 +193,10 @@ struct BoxCard: View {
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .frame(height: 19)
+                    .frame(height: 17)
             }
         }
         .frame(width: width, alignment: Alignment(horizontal: alignment, vertical: .center))
-        .padding(.vertical, 6)
-        .padding(.horizontal, 2)
-        .background(Color.black.opacity(0.06), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 }
 
@@ -250,10 +252,8 @@ struct BoxEditorBody: View {
                                 set: { value in box.update(id) { $0.nickname = value } }
                             ))
                             .font(.subheadline)
-                            .padding(.horizontal, 14)
-                            .frame(height: 38)
-                            .background(Color.white, in: UnevenBox(strong: 18, weak: 5))
-                            .overlay(UnevenBox(strong: 18, weak: 5).stroke(Color(hex: 0xDDDDDD), lineWidth: 1))
+                            .padding(.horizontal, 4)
+                            .frame(height: 30)
                             HStack(spacing: 4) {
                                 ForEach(entry.pokemon?.types ?? [], id: \.self) { TypeBadge(type: $0) }
                             }
@@ -271,14 +271,25 @@ struct BoxEditorBody: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("わざ").sectionTitle()
-                ForEach(0..<4, id: \.self) { slot in
-                    let move = slot < entry.moves.count ? entry.moves[slot] : ""
-                    BoxMoveButton(move: move) {
-                        Haptics.play(.light)
-                        sheet = .moves(slot)
+                List {
+                    ForEach(Array(entry.moves.prefix(4).enumerated()), id: \.offset) { slot, move in
+                        BoxMoveButton(move: move) {
+                            Haptics.play(.light)
+                            sheet = .moves(slot)
+                        }
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
                     }
-                    .moveSlotDrag(id: id, slot: slot)
+                    .onMove { from, to in
+                        Haptics.play(.medium)
+                        box.update(id) { $0.moves.move(fromOffsets: from, toOffset: to) }
+                    }
                 }
+                .listStyle(.plain)
+                .scrollDisabled(true)
+                .scrollContentBackground(.hidden)
+                .frame(height: 4 * 54)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -742,23 +753,70 @@ struct BoxMoveSheet: View {
     var body: some View {
         if let entry = box.pokemon(id) {
             let sections = groups(entry)
+            let usage = Dictionary((model.usage?.pokemons[entry.name]?.moves ?? []).compactMap { pair in pair.name.map { ($0, pair.pct) } }, uniquingKeysWith: { first, _ in first })
             VStack(spacing: 0) {
-                SearchHeader(
-                    title: "わざ",
-                    mode: $mode,
-                    query: $query,
-                    focused: $focused,
-                    prompt: "わざの名前を検索…",
-                    onSubmit: { if let first = sections.first?.rows.first { pick(first.name, entry) } },
-                    onClose: { dismiss() }
-                )
-                VStack(spacing: 6) {
-                    ForEach(0..<4, id: \.self) { slot in
-                        slotRow(slot, entry)
+                HStack {
+                    Text("わざ")
+                        .font(.headline)
+                        .foregroundStyle(Palette.ink)
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        CloseButtonLabel()
+                            .foregroundStyle(Palette.ink)
+                            .frame(width: 40, height: 40)
+                            .contentShape(Circle())
                     }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .accessibilityLabel("閉じる")
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 10)
+                .padding(.top, 18)
+                .padding(.bottom, 6)
+                List {
+                    ForEach(Array(entry.moves.prefix(4).enumerated()), id: \.offset) { slot, _ in
+                        slotRow(slot, entry)
+                            .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
+                    .onMove { from, to in
+                        Haptics.play(.medium)
+                        let moved = from.first.map { $0 == focus } ?? false
+                        box.update(id) { $0.moves.move(fromOffsets: from, toOffset: to) }
+                        if moved { focus = to > (from.first ?? 0) ? to - 1 : to }
+                    }
+                }
+                .listStyle(.plain)
+                .scrollDisabled(true)
+                .scrollContentBackground(.hidden)
+                .frame(height: 4 * 46)
+                HStack(spacing: 8) {
+                    Icon(name: "search", size: 17)
+                        .foregroundStyle(Palette.secondary)
+                    TextField("わざの名前を検索…", text: $query)
+                        .focused($focused)
+                        .submitLabel(.search)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                        .onSubmit { if let first = sections.first?.rows.first { pick(first.name, entry) } }
+                    if !query.isEmpty {
+                        Button {
+                            query = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(Palette.secondary.opacity(0.6))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .frame(height: 44)
+                .background(Color(hex: 0xEEEEF1), in: Capsule())
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
                 List {
                     ForEach(sections) { group in
                         Section {
@@ -769,9 +827,20 @@ struct BoxMoveSheet: View {
                                     HStack(spacing: 10) {
                                         TypeIcon(type: info.type, size: 22)
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(info.name)
-                                                .font(.body.weight(.semibold))
-                                                .foregroundStyle(entry.moves.contains(info.name) ? Palette.accent : Palette.ink)
+                                            HStack(spacing: 6) {
+                                                Text(info.name)
+                                                    .font(.body.weight(.semibold))
+                                                    .foregroundStyle(entry.moves.contains(info.name) ? Palette.accent : Palette.ink)
+                                                if let pct = usage[info.name] {
+                                                    Text("\(Format.fixed1(pct))%")
+                                                        .font(.caption.weight(.bold))
+                                                        .monospacedDigit()
+                                                        .foregroundStyle(Palette.accent)
+                                                        .padding(.horizontal, 6)
+                                                        .padding(.vertical, 1)
+                                                        .background(Palette.accent.opacity(0.1), in: Capsule())
+                                                }
+                                            }
                                             if !info.effect.isEmpty {
                                                 Text(info.effect)
                                                     .font(.caption)
@@ -846,10 +915,6 @@ struct BoxMoveSheet: View {
             Haptics.play(.selection)
             withAnimation(.snappy(duration: 0.25)) { focus = slot }
         }
-        .onLongPressGesture {
-            if !move.isEmpty { clear(slot) }
-        }
-        .moveSlotDrag(id: id, slot: slot)
     }
 }
 
@@ -887,44 +952,5 @@ struct BoxImportSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-    }
-}
-
-struct MoveSlotDrag: ViewModifier {
-    @Environment(BoxModel.self) private var box
-    let id: UUID
-    let slot: Int
-    @State private var targeted = false
-
-    func body(content: Content) -> some View {
-        content
-            .draggable("pokefire-move-slot:\(slot)") {
-                Text(box.pokemon(id).flatMap { slot < $0.moves.count ? $0.moves[slot] : nil } ?? "")
-                    .font(.subheadline.weight(.bold))
-                    .padding(.horizontal, 14)
-                    .frame(height: 40)
-                    .background(Color.white, in: Capsule())
-            }
-            .dropDestination(for: String.self) { items, _ in
-                guard let item = items.first, item.hasPrefix("pokefire-move-slot:"), let from = Int(item.dropFirst("pokefire-move-slot:".count)), from != slot else { return false }
-                Haptics.play(.medium)
-                withAnimation(.snappy(duration: 0.25)) {
-                    box.update(id) { entry in
-                        while entry.moves.count < 4 { entry.moves.append("") }
-                        entry.moves.swapAt(from, slot)
-                    }
-                }
-                return true
-            } isTargeted: { value in
-                targeted = value
-            }
-            .scaleEffect(targeted ? 1.03 : 1)
-            .animation(.snappy(duration: 0.2), value: targeted)
-    }
-}
-
-extension View {
-    func moveSlotDrag(id: UUID, slot: Int) -> some View {
-        modifier(MoveSlotDrag(id: id, slot: slot))
     }
 }

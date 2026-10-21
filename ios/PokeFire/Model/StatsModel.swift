@@ -53,6 +53,7 @@ final class StatsModel {
     var considerAbilities = true
     var history: [StatsHistoryEntry] = []
     var pendingPage: Role?
+    var boxAtRoot = true
     @ObservationIgnored private var historyTask: Task<Void, Never>?
 
     var isStats: Bool { mode == .stats }

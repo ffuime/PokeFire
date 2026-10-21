@@ -8,16 +8,7 @@ struct RootView: View {
     @State private var dragging = false
 
     var body: some View {
-        Group {
-            if stats.mode == .box {
-                BoxRoot()
-                    .transition(.opacity)
-            } else {
-                mainContent
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.3), value: stats.mode == .box)
+        mainContent
         .overlay(alignment: .top) {
             ToastView()
         }
@@ -56,7 +47,16 @@ struct RootView: View {
                     .offset(x: (progress - 1) * width * 0.3)
                     .opacity(0.4 + 0.6 * progress)
 
-                MainScreen(openDrawer: { setDrawer(true) })
+                Group {
+                    if stats.mode == .box {
+                        BoxRoot()
+                            .transition(.opacity)
+                    } else {
+                        MainScreen(openDrawer: { setDrawer(true) })
+                            .transition(.opacity)
+                    }
+                }
+                .animation(.easeInOut(duration: 0.3), value: stats.mode == .box)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .allowsHitTesting(progress < 0.01)
                     .overlay {
@@ -74,7 +74,7 @@ struct RootView: View {
                     .offset(x: offset)
                     .simultaneousGesture(closeGesture(width: width), including: drawerOpen ? .all : .none)
 
-                if !drawerOpen {
+                if !drawerOpen, stats.mode != .box || stats.boxAtRoot {
                     Color.clear
                         .frame(width: 14)
                         .frame(maxHeight: .infinity)

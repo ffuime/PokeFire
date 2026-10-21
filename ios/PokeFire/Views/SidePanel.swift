@@ -72,7 +72,7 @@ struct SidePanel: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .modeSwitchPull(label: "Stats Mode", icon: "search", tint: Palette.accent, distance: 52) {
+        .modeSwitchPull(label: "PokéStats", icon: "search", tint: Palette.accent, distance: 52) {
             withAnimation(.easeInOut(duration: 0.35)) { stats.enter(from: model) }
         }
     }
