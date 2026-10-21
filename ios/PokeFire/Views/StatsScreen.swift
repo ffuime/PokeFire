@@ -774,7 +774,7 @@ struct UsageCard: View {
                     .overlay(alignment: .top) {
                         if let selected, let slice = slices.first(where: { $0.id == selected }) {
                             tooltip(slice)
-                                .offset(y: -8)
+                                .offset(y: -19)
                                 .transition(.scale(scale: 0.8).combined(with: .opacity))
                         }
                     }
@@ -1081,22 +1081,35 @@ struct ModeSwitchPull: ViewModifier {
     @State private var fired = false
     @State private var visibleTop: CGFloat = 0
 
-    private let deadZone: CGFloat = 70
+    @State private var armed = false
+
+    private let deadZone: CGFloat = 110
 
     private func evaluate(_ pull: CGFloat) {
         let value = max(0, min(1, (pull - deadZone) / distance))
         let step = Int(value * 8)
         let previous = Int(progress * 8)
         if value != progress { progress = value }
-        if value >= 1, !fired {
-            fired = true
-            Haptics.play(.success)
-            onTrigger()
-        } else if pull < 4, fired {
-            fired = false
-        } else if value > 0, !fired, step != previous {
+        if fired {
+            if pull < 4 { fired = false }
+            return
+        }
+        if value >= 1, !armed {
+            armed = true
+            Haptics.play(.rigid)
+        } else if value < 1, armed {
+            armed = false
+        } else if value > 0, value < 1, step != previous {
             Haptics.play(.selection)
         }
+    }
+
+    private func released() {
+        guard armed, !fired else { return }
+        armed = false
+        fired = true
+        Haptics.play(.success)
+        onTrigger()
     }
 
     func body(content: Content) -> some View {
@@ -1111,6 +1124,9 @@ struct ModeSwitchPull: ViewModifier {
                 -(geometry.contentOffset.y + geometry.contentInsets.top)
             } action: { _, pull in
                 evaluate(pull)
+            }
+            .onScrollPhaseChange { old, new in
+                if old == .interacting, new != .interacting { released() }
             }
             .overlay(alignment: .top) {
                 VStack(spacing: 6) {
