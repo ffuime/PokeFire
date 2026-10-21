@@ -107,6 +107,10 @@ final class AppModel {
             let loaded = await LearnsetLoader.load()
             self?.learnsets = loaded
         }
+        NotificationCenter.default.addObserver(forName: .pokefireToast, object: nil, queue: .main) { [weak self] note in
+            guard let text = note.object as? String else { return }
+            MainActor.assumeIsolated { self?.showToast(text) }
+        }
     }
 
     func learnset(_ name: String) -> [String]? {
@@ -534,7 +538,7 @@ final class AppModel {
         var megas: [String: [String]] = [:]
         var roots: [(String, Int)] = []
         for (index, name) in data.pokemonOrder.enumerated() {
-            if let parent = data.megaParent(name) {
+            if let parent = data.groupParent(name) {
                 megas[parent, default: []].append(name)
             } else {
                 roots.append((name, index))

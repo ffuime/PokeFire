@@ -112,6 +112,7 @@ final class GameData {
     let usageNames: UsageNames
     private var megaParentCache: [String: String] = [:]
     private var formsCache: [String: [String]] = [:]
+    private var groupCache: [String: String] = [:]
     private var searchCache: [String: String] = [:]
 
     private init() {
@@ -240,6 +241,18 @@ final class GameData {
         }
         let parent = candidates.first(where: { $0 == rest }) ?? candidates.first
         megaParentCache[name] = parent ?? ""
+        return parent
+    }
+
+    func groupParent(_ name: String) -> String? {
+        if let parent = megaParent(name) { return parent }
+        if let cached = groupCache[name] { return cached.isEmpty ? nil : cached }
+        var parent: String?
+        if let en = usageNames.pokemons[name] {
+            let first = pokemonOrder.first { usageNames.pokemons[$0] == en && megaParent($0) == nil }
+            parent = first == name ? nil : first
+        }
+        groupCache[name] = parent ?? ""
         return parent
     }
 

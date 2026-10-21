@@ -136,12 +136,12 @@ struct PokemonPicker: View {
             : Storage.pokemonHistory.filter { data.pokemons[$0] != nil }
         let tiers = Search.rank(base.map { data.pokemonSearchText($0) }, query: query)
         let order = Search.ordered(base.count, tiers: tiers) { index in
-            mode == 0 ? (data.megaParent(base[index]) ?? base[index]) : base[index]
+            mode == 0 ? (data.groupParent(base[index]) ?? base[index]) : base[index]
         }
         let names = order.map { base[$0] }
         let visible = Set(names)
         return names.map { name in
-            Row(name: name, nested: mode == 0 && (data.megaParent(name).map { visible.contains($0) } ?? false))
+            Row(name: name, nested: mode == 0 && (data.groupParent(name).map { visible.contains($0) } ?? false))
         }
     }
 

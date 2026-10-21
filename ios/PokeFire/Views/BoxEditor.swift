@@ -89,6 +89,7 @@ struct BoxEditor: View {
 struct BoxCard: View {
     let entry: BoxPokemon
     var onTap: ((BoxSheet) -> Void)?
+    var snapshot: UIImage?
 
     static let height: CGFloat = 176
 
@@ -113,6 +114,12 @@ struct BoxCard: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { tap(.species) }
+                if !entry.nickname.isEmpty {
+                    Text(entry.nickname)
+                        .font(.caption2.weight(.semibold))
+                        .opacity(0.55)
+                        .lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
@@ -159,7 +166,7 @@ struct BoxCard: View {
             .onTapGesture { tap(.stats) }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
 
-            SpriteView(name: entry.name, size: 92)
+            spriteImage
                 .frame(width: 92, height: 92)
                 .contentShape(Rectangle())
                 .onTapGesture { tap(.species) }
@@ -178,11 +185,48 @@ struct BoxCard: View {
         .background {
             ZStack {
                 LinearGradient(colors: [Color.washed(first, white: 0.7), Color.washed(second, white: 0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                CardGlints(seed: entry.id.hashValue)
+                CardGlints(seed: entry.id.hashValue, frozen: snapshot != nil)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .shadow(color: .black.opacity(0.08), radius: 14, y: 4)
+        .shadow(color: .black.opacity(snapshot == nil ? 0.08 : 0), radius: 14, y: 4)
+        .onLongPressGesture(minimumDuration: 0.5) {
+            guard snapshot == nil else { return }
+            Task { await saveImage() }
+        }
+    }
+
+    @ViewBuilder
+    private var spriteImage: some View {
+        if let snapshot {
+            Image(uiImage: snapshot)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: 92, height: 92)
+        } else {
+            SpriteView(name: entry.name, size: 92)
+        }
+    }
+
+    @MainActor
+    private func saveImage() async {
+        Haptics.play(.heavy)
+        guard let url = entry.pokemon?.spriteURL, let sprite = await SpriteCache.shared.image(url) else {
+            Haptics.play(.error)
+            return
+        }
+        let card = BoxCard(entry: entry, snapshot: sprite)
+            .frame(width: 380)
+        let renderer = ImageRenderer(content: card)
+        renderer.scale = 3
+        guard let image = renderer.uiImage else {
+            Haptics.play(.error)
+            return
+        }
+        UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+        Haptics.play(.success)
+        NotificationCenter.default.post(name: .pokefireToast, object: "画像を写真に保存しました")
     }
 
     private func pointText(_ key: StatKey) -> Text {
@@ -300,7 +344,9 @@ struct BoxEditorBody: View {
                 .listStyle(.plain)
                 .scrollDisabled(true)
                 .scrollContentBackground(.hidden)
-                .frame(height: 4 * 54)
+                .environment(\.defaultMinListRowHeight, 10)
+                .contentMargins(.vertical, 0, for: .scrollContent)
+                .frame(height: 4 * 54 + 4)
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -696,10 +742,15 @@ struct BoxMoveSheet: View {
     @Environment(BoxModel.self) private var box
     @Environment(\.dismiss) private var dismiss
     let id: UUID
-    @State var focus: Int
+    @State private var focus: Int
     @State private var query = ""
     @State private var mode = 0
     @FocusState private var focused: Bool
+
+    init(id: UUID, focus: Int) {
+        self.id = id
+        _focus = State(initialValue: max(0, min(3, focus)))
+    }
 
     private struct MoveGroup: Identifiable {
         let id: String
@@ -803,7 +854,9 @@ struct BoxMoveSheet: View {
                 .listStyle(.plain)
                 .scrollDisabled(true)
                 .scrollContentBackground(.hidden)
-                .frame(height: 4 * 46)
+                .environment(\.defaultMinListRowHeight, 10)
+                .contentMargins(.vertical, 0, for: .scrollContent)
+                .frame(height: 4 * 46 + 4)
                 HStack(spacing: 8) {
                     Icon(name: "search", size: 17)
                         .foregroundStyle(Palette.secondary)
@@ -868,6 +921,8 @@ struct BoxMoveSheet: View {
                                             .foregroundStyle(Palette.secondary)
                                             .frame(minWidth: 28, alignment: .trailing)
                                     }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
                             }
@@ -966,8 +1021,13 @@ struct BoxImportSheet: View {
     }
 }
 
+extension Notification.Name {
+    static let pokefireToast = Notification.Name("pokefire-toast")
+}
+
 struct CardGlints: View {
     let seed: Int
+    var frozen = false
 
     private struct Glint {
         let radius: CGFloat
@@ -997,10 +1057,19 @@ struct CardGlints: View {
     }
 
     var body: some View {
+        if frozen {
+            canvas(time: 12)
+        } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+                canvas(time: context.date.timeIntervalSinceReferenceDate)
+            }
+            .allowsHitTesting(false)
+        }
+    }
+
+    private func canvas(time: Double) -> some View {
         let list = glints
-        TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-            let time = context.date.timeIntervalSinceReferenceDate
-            Canvas { graphics, size in
+        return Canvas { graphics, size in
                 graphics.addFilter(.blur(radius: 16))
                 for glint in list {
                     let x = (0.5 + 0.45 * sin(time * glint.speedX + glint.phaseX) * cos(time * glint.speedX * 0.37 + glint.phaseY)) * size.width
@@ -1010,7 +1079,6 @@ struct CardGlints: View {
                     graphics.fill(Path(ellipseIn: rect), with: .color(.white.opacity(glint.opacity * pulse)))
                 }
             }
-        }
-        .allowsHitTesting(false)
+            .allowsHitTesting(false)
     }
 }

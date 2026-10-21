@@ -67,17 +67,13 @@ struct HistoryDrawer: View {
     var body: some View {
         let sections = groups
         VStack(alignment: .leading, spacing: 0) {
-            ModeSwitcherList(close: close)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, stats.mode == .box ? 0 : 14)
             if stats.mode == .box {
+                ModeSwitcherList(close: close)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
                 Spacer(minLength: 0)
             } else {
             HStack(spacing: 12) {
-                Text("履歴")
-                    .font(.system(size: 30, weight: .bold))
-                    .foregroundStyle(Color.black)
                 Spacer()
                 HStack(spacing: 0) {
                 Button {
@@ -123,7 +119,17 @@ struct HistoryDrawer: View {
             .padding(.leading, 24)
             .padding(.trailing, 16)
             .padding(.top, 8)
-            .padding(.bottom, 12)
+            .padding(.bottom, 8)
+
+            ModeSwitcherList(close: close)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+
+            Text("履歴")
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(Color.black)
+                .padding(.leading, 24)
+                .padding(.bottom, 8)
 
             if searching {
                 HStack(spacing: 8) {
