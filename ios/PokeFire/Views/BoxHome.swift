@@ -109,19 +109,21 @@ struct BoxRoot: View {
                     .searchCompletion(name)
                 }
             }
-            .environment(\.editMode, $editMode)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    AppMenuButton()
+                    AppMenuButton(inToolbar: true)
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     sortMenu
-                    Button(editing ? "完了" : "選択") {
+                    Button {
                         withAnimation {
                             editMode = editing ? .inactive : .active
                             selection = []
                         }
+                    } label: {
+                        Image(systemName: editing ? "checkmark.circle.fill" : "checkmark.circle")
                     }
+                    .accessibilityLabel(editing ? "選択を終了" : "選択")
                 }
             }
             .onChange(of: tab) { _, _ in
@@ -147,15 +149,12 @@ struct BoxRoot: View {
                 path.append(.pokemon(entry.id))
             }
         }
-        .alert("チームを作成", isPresented: $askTeamName) {
-            TextField("チーム名（任意）", text: $teamName)
-            Button("キャンセル", role: .cancel) {}
-            Button("チームを作成") {
+        .sheet(isPresented: $askTeamName) {
+            TeamNameSheet(title: "チームを作成", action: "チームを作成", name: $teamName) {
                 let team = box.createTeam(teamName)
                 autoPick = team.id
                 path.append(.team(team.id))
             }
-            .keyboardShortcut(.defaultAction)
         }
         .confirmationDialog("選択した\(selection.count)件を削除しますか？", isPresented: $confirmDelete, titleVisibility: .visible) {
             Button("削除", role: .destructive) {
@@ -229,9 +228,11 @@ struct BoxRoot: View {
                 confirmDelete = true
             } label: {
                 Label("削除", systemImage: "trash")
+                    .foregroundStyle(.red)
                     .padding(.horizontal, 6)
             }
             .buttonStyle(.glass)
+            .tint(.red)
             .disabled(selection.isEmpty)
         }
         .padding(16)
@@ -253,12 +254,31 @@ struct BoxRoot: View {
                 NavigationLink(value: BoxRoute.pokemon(entry.id)) {
                     BoxPokemonRow(entry: entry)
                 }
+                .contextMenu {
+                    Button {
+                        box.toggleFavorite(entry.id)
+                    } label: {
+                        Label(entry.favorite ? "お気に入りを解除" : "お気に入り", systemImage: entry.favorite ? "star.slash" : "star")
+                    }
+                    Button {
+                        withAnimation { box.duplicate(entry.id) }
+                    } label: {
+                        Label("複製", systemImage: "plus.square.on.square")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        withAnimation { box.delete([entry.id]) }
+                    } label: {
+                        Label("削除", systemImage: "trash")
+                    }
+                }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
                         withAnimation { box.delete([entry.id]) }
                     } label: {
                         Label("削除", systemImage: "trash")
                     }
+                    .tint(.red)
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
@@ -277,6 +297,10 @@ struct BoxRoot: View {
             }
         }
         .listStyle(.plain)
+        .environment(\.editMode, $editMode)
+        .onChange(of: selection) { _, value in
+            if !editing, !value.isEmpty { selection = [] }
+        }
         .overlay {
             if list.isEmpty {
                 EmptyResult(text: query.isEmpty ? "＋からポケモンを登録できます" : "見つかりません")
@@ -294,12 +318,31 @@ struct BoxRoot: View {
                 NavigationLink(value: BoxRoute.team(team.id)) {
                     TeamRow(team: team)
                 }
+                .contextMenu {
+                    Button {
+                        box.toggleTeamFavorite(team.id)
+                    } label: {
+                        Label(team.favorite ? "お気に入りを解除" : "お気に入り", systemImage: team.favorite ? "star.slash" : "star")
+                    }
+                    Button {
+                        withAnimation { box.duplicateTeam(team.id) }
+                    } label: {
+                        Label("複製", systemImage: "plus.square.on.square")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        withAnimation { box.deleteTeams([team.id]) }
+                    } label: {
+                        Label("削除", systemImage: "trash")
+                    }
+                }
                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                     Button(role: .destructive) {
                         withAnimation { box.deleteTeams([team.id]) }
                     } label: {
                         Label("削除", systemImage: "trash")
                     }
+                    .tint(.red)
                 }
                 .swipeActions(edge: .leading, allowsFullSwipe: true) {
                     Button {
@@ -318,6 +361,10 @@ struct BoxRoot: View {
             }
         }
         .listStyle(.plain)
+        .environment(\.editMode, $editMode)
+        .onChange(of: selection) { _, value in
+            if !editing, !value.isEmpty { selection = [] }
+        }
         .overlay {
             if list.isEmpty {
                 EmptyResult(text: query.isEmpty ? "＋からチームを作成できます" : "見つかりません")
@@ -420,11 +467,15 @@ struct TeamDetail: View {
     @State private var showMembers = false
     @State private var renaming = false
     @State private var newName = ""
+    @State private var editMode: EditMode = .inactive
+    @State private var selection: Set<UUID> = []
+
+    private var editing: Bool { editMode.isEditing }
 
     var body: some View {
         let team = box.team(teamID)
         let members = (team?.members ?? []).compactMap { box.pokemon($0) }
-        List {
+        List(selection: $selection) {
             ForEach(Array(members.enumerated()), id: \.element.id) { index, entry in
                 NavigationLink(value: BoxRoute.member(teamID, index)) {
                     BoxPokemonRow(entry: entry)
@@ -437,12 +488,22 @@ struct TeamDetail: View {
                     } label: {
                         Label("外す", systemImage: "minus.circle")
                     }
+                    .tint(.red)
+                }
+                .contextMenu {
+                    Button(role: .destructive) {
+                        withAnimation {
+                            box.updateTeam(teamID) { $0.members.removeAll { $0 == entry.id } }
+                        }
+                    } label: {
+                        Label("チームから外す", systemImage: "minus.circle")
+                    }
                 }
             }
             .onMove { from, to in
                 box.updateTeam(teamID) { $0.members.move(fromOffsets: from, toOffset: to) }
             }
-            if members.count < 6 {
+            if members.count < 6, !editing {
                 Button {
                     showMembers = true
                 } label: {
@@ -452,31 +513,59 @@ struct TeamDetail: View {
             }
         }
         .listStyle(.insetGrouped)
+        .environment(\.editMode, $editMode)
+        .onChange(of: selection) { _, value in
+            if !editing, !value.isEmpty { selection = [] }
+        }
         .navigationTitle(team?.name ?? "チーム")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        newName = team?.name ?? ""
-                        renaming = true
-                    } label: {
-                        Label("名前を変更", systemImage: "pencil")
-                    }
-                    EditButton()
+            ToolbarItemGroup(placement: .topBarTrailing) {
+                Button {
+                    newName = team?.name ?? ""
+                    renaming = true
                 } label: {
-                    Image(systemName: "ellipsis")
+                    Image(systemName: "pencil")
                 }
+                .accessibilityLabel("名前を編集")
+                Button {
+                    withAnimation {
+                        editMode = editing ? .inactive : .active
+                        selection = []
+                    }
+                } label: {
+                    Image(systemName: editing ? "checkmark.circle.fill" : "checkmark.circle")
+                }
+                .accessibilityLabel(editing ? "選択を終了" : "選択")
             }
         }
-        .alert("チーム名", isPresented: $renaming) {
-            TextField("チーム名", text: $newName)
-            Button("キャンセル", role: .cancel) {}
-            Button("変更") {
+        .overlay(alignment: .bottom) {
+            if editing {
+                HStack {
+                    Spacer()
+                    Button(role: .destructive) {
+                        withAnimation {
+                            box.updateTeam(teamID) { $0.members.removeAll { selection.contains($0) } }
+                            selection = []
+                            editMode = .inactive
+                        }
+                    } label: {
+                        Label("チームから外す", systemImage: "minus.circle")
+                            .foregroundStyle(.red)
+                            .padding(.horizontal, 6)
+                    }
+                    .buttonStyle(.glass)
+                    .tint(.red)
+                    .disabled(selection.isEmpty)
+                }
+                .padding(16)
+            }
+        }
+        .sheet(isPresented: $renaming) {
+            TeamNameSheet(title: "名前を編集", action: "変更", name: $newName) {
                 let trimmed = newName.trimmingCharacters(in: .whitespaces)
                 if !trimmed.isEmpty { box.updateTeam(teamID) { $0.name = trimmed } }
             }
-            .keyboardShortcut(.defaultAction)
         }
         .sheet(isPresented: $showMembers) {
             MemberPicker(teamID: teamID) { created in
@@ -494,6 +583,63 @@ struct TeamDetail: View {
                 showMembers = true
             }
         }
+    }
+}
+
+struct TeamNameSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let title: String
+    let action: String
+    @Binding var name: String
+    let onConfirm: () -> Void
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text(title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(Palette.ink)
+            TextField("チーム名（任意）", text: $name)
+                .focused($focused)
+                .submitLabel(.done)
+                .onSubmit(confirm)
+                .padding(.horizontal, 16)
+                .frame(height: 48)
+                .background(Color(hex: 0xEEEEF1), in: Capsule())
+            HStack(spacing: 10) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text("キャンセル")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Palette.secondary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 30)
+                }
+                .buttonStyle(.glass)
+                Button(action: confirm) {
+                    Text(action)
+                        .font(.body.weight(.bold))
+                        .foregroundStyle(Color.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 30)
+                }
+                .buttonStyle(.glassProminent)
+            }
+        }
+        .padding(24)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .presentationDetents([.height(230)])
+        .presentationDragIndicator(.visible)
+        .task {
+            try? await Task.sleep(for: .milliseconds(250))
+            focused = true
+        }
+    }
+
+    private func confirm() {
+        onConfirm()
+        dismiss()
     }
 }
 

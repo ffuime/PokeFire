@@ -179,6 +179,7 @@ struct PokemonPicker: View {
                             } label: {
                                 Label("削除", systemImage: "trash")
                             }
+                            .tint(.red)
                         }
                     }
                 }
@@ -469,6 +470,7 @@ struct EntrySearchSheet: View {
                     } label: {
                         Label("削除", systemImage: "trash")
                     }
+                    .tint(.red)
                 }
             }
         }

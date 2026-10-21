@@ -110,7 +110,7 @@ struct PokemonHeader: View {
         let forms = model.data.otherForms(of: side.name)
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 12) {
-                ModeSprite(name: side.name, hasForms: !forms.isEmpty, spin: spin) {
+                ModeSprite(name: side.name, hasForms: true, spin: spin) {
                     spin += 1
                     Haptics.play(.light)
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {

@@ -80,7 +80,7 @@ struct StatsHeader: View {
         let side = stats.side(role)
         let forms = GameData.shared.otherForms(of: side.name)
         HStack(spacing: 12) {
-            ModeSprite(name: side.name, hasForms: !forms.isEmpty, spin: spin) {
+            ModeSprite(name: side.name, hasForms: true, spin: spin) {
                 spin += 1
                 Haptics.play(.light)
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) {
@@ -1083,6 +1083,7 @@ struct ModeSwitchPull: ViewModifier {
     @State private var visibleTop: CGFloat = 0
 
     @State private var armed = false
+    @State private var pullAmount: CGFloat = 0
 
     private let deadZone: CGFloat = 110
 
@@ -1116,15 +1117,12 @@ struct ModeSwitchPull: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollBounceBehavior(.always, axes: .vertical)
-            .onGeometryChange(for: CGFloat.self) { proxy in
-                proxy.safeAreaInsets.top
-            } action: { value in
-                visibleTop = value
-            }
-            .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                -(geometry.contentOffset.y + geometry.contentInsets.top)
-            } action: { _, pull in
-                evaluate(pull)
+            .onScrollGeometryChange(for: [CGFloat].self) { geometry in
+                [-(geometry.contentOffset.y + geometry.contentInsets.top), geometry.contentInsets.top]
+            } action: { _, values in
+                visibleTop = values[1]
+                pullAmount = max(0, values[0])
+                evaluate(values[0])
             }
             .onScrollPhaseChange { old, new in
                 if old == .interacting, new != .interacting { released() }
@@ -1149,7 +1147,7 @@ struct ModeSwitchPull: ViewModifier {
                 .opacity(Double(min(1, progress * 3)))
                 .scaleEffect(0.7 + 0.3 * progress)
                 .frame(maxWidth: .infinity)
-                .offset(y: visibleTop + 4)
+                .offset(y: visibleTop + max(0, pullAmount / 2 - 34))
                 .allowsHitTesting(false)
             }
     }
