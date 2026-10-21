@@ -64,7 +64,7 @@ struct AppMenuButton: View {
             }
         } label: {
             if inToolbar {
-                Icon(name: "menu", size: 20)
+                fixedIcon("menu", size: 20)
                     .foregroundStyle(Palette.ink)
             } else {
                 Icon(name: "menu", size: 20)
@@ -129,4 +129,12 @@ struct SettingsSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
+}
+
+func fixedIcon(_ name: String, size: CGFloat) -> Image {
+    guard let base = UIImage(named: name) else { return Image(name) }
+    let rendered = UIGraphicsImageRenderer(size: CGSize(width: size, height: size)).image { _ in
+        base.draw(in: CGRect(x: 0, y: 0, width: size, height: size))
+    }
+    return Image(uiImage: rendered.withRenderingMode(.alwaysTemplate))
 }

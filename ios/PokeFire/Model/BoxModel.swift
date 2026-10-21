@@ -147,9 +147,29 @@ final class BoxModel {
         } else {
             entry.ability = data.pokemons[name]?.abilities.first ?? ""
         }
+        if data.megaParent(name) != nil { entry.item = "メガストーン" }
         pokemons.append(entry)
         save()
         return entry
+    }
+
+    func changeSpecies(_ id: UUID, to name: String, usage: UsageData?) {
+        let data = GameData.shared
+        update(id) { entry in
+            entry.name = name
+            if data.usageName(of: name) != name, let first = data.pokemons[name]?.abilities.first {
+                entry.ability = first
+            } else if let top = usage?.pokemons[name]?.abilities.compactMap(\.name).first {
+                entry.ability = top
+            } else {
+                entry.ability = data.pokemons[name]?.abilities.first ?? ""
+            }
+            if data.megaParent(name) != nil {
+                entry.item = "メガストーン"
+            } else if entry.item == "メガストーン" {
+                entry.item = ""
+            }
+        }
     }
 
     func update(_ id: UUID, _ body: (inout BoxPokemon) -> Void) {

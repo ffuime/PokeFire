@@ -590,7 +590,7 @@ struct ItemSection: View {
         let side = model.side(role)
         VStack(alignment: .leading, spacing: 10) {
             Text("もちもの").sectionTitle()
-            SelectButton(text: side.item, sprite: side.item) {
+            SelectButton(text: side.item, sprite: StatsCatalog.shared.itemSprite(side.item, pokemon: side.name)) {
                 Haptics.play(.light)
                 present(.item(role))
             }

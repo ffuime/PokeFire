@@ -91,11 +91,17 @@ struct BoxRoot: View {
     var body: some View {
         NavigationStack(path: $path) {
             TabView(selection: $tab) {
-                Tab("ボックス", systemImage: "person.crop.square", value: 0) {
+                Tab(value: 0) {
                     boxList
+                } label: {
+                    Label("ボックス", systemImage: tab == 0 ? "person.crop.square.fill" : "person.crop.square")
+                        .environment(\.symbolVariants, .none)
                 }
-                Tab("チーム", systemImage: "rectangle.stack", value: 1) {
+                Tab(value: 1) {
                     teamList
+                } label: {
+                    Label("チーム", systemImage: tab == 1 ? "rectangle.stack.fill" : "rectangle.stack")
+                        .environment(\.symbolVariants, .none)
                 }
             }
             .navigationTitle("PokéBox")
@@ -213,21 +219,15 @@ struct BoxRoot: View {
 
     private var editBar: some View {
         HStack(spacing: 12) {
-            if tab == 0, (1...6).contains(selection.count) {
-                Button {
+            if tab == 0 {
+                SelectionDeleteButton(count: selection.count, title: "チームを作る", icon: "rectangle.stack.badge.plus", tint: Palette.accent, enabled: (1...6).contains(selection.count), role: nil) {
                     let team = box.createTeam("")
                     box.updateTeam(team.id) { $0.members = pokemons.map(\.id).filter { selection.contains($0) } }
                     selection = []
                     editMode = .inactive
                     tab = 1
                     path.append(.team(team.id))
-                } label: {
-                    Label("チームを作る", systemImage: "rectangle.stack.badge.plus")
-                        .font(.body.weight(.bold))
-                        .padding(.horizontal, 10)
-                        .frame(height: 40)
                 }
-                .buttonStyle(.glassProminent)
             }
             Spacer()
             SelectionDeleteButton(count: selection.count) {
@@ -392,7 +392,7 @@ struct BoxPokemonRow: View {
                 .frame(width: 52, height: 52)
                 .overlay(alignment: .bottomTrailing) {
                     if !entry.item.isEmpty {
-                        SpriteIcon(name: entry.item, size: 20)
+                        SpriteIcon(name: StatsCatalog.shared.itemSprite(entry.item, pokemon: entry.name), size: 20)
                     }
                 }
             VStack(alignment: .leading, spacing: 2) {
@@ -445,7 +445,7 @@ struct TeamRow: View {
                         if let member {
                             SpriteView(name: member.name, size: 44, shiny: member.isShiny)
                             if !member.item.isEmpty {
-                                SpriteIcon(name: member.item, size: 16)
+                                SpriteIcon(name: StatsCatalog.shared.itemSprite(member.item, pokemon: member.name), size: 16)
                             }
                         } else {
                             Circle()
@@ -530,7 +530,7 @@ struct TeamDetail: View {
                     newName = team?.name ?? ""
                     renaming = true
                 } label: {
-                    Image(systemName: "pencil")
+                    Image(systemName: "pencil.and.outline")
                 }
                 .accessibilityLabel("名前を編集")
                 Button {
@@ -721,20 +721,23 @@ struct SelectionDeleteButton: View {
     let count: Int
     var title = "削除"
     var icon = "trash"
+    var tint: Color = .red
+    var enabled: Bool?
+    var role: ButtonRole? = .destructive
     let action: () -> Void
 
     var body: some View {
-        let active = count > 0
-        Button(role: .destructive, action: action) {
+        let active = enabled ?? (count > 0)
+        Button(role: role, action: action) {
             Label(count > 0 ? "\(title)（\(count)）" : title, systemImage: icon)
                 .font(.body.weight(.bold))
-                .foregroundStyle(active ? Color.white : Color.red.opacity(0.5))
+                .foregroundStyle(active ? Color.white : tint.opacity(0.5))
                 .padding(.horizontal, 10)
                 .frame(height: 40)
                 .contentTransition(.numericText(value: Double(count)))
         }
         .buttonStyle(.glassProminent)
-        .tint(active ? .red : Color.red.opacity(0.12))
+        .tint(active ? tint : tint.opacity(0.12))
         .disabled(!active)
         .animation(.snappy(duration: 0.25), value: active)
         .animation(.snappy(duration: 0.25), value: count)

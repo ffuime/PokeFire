@@ -97,6 +97,30 @@ final class StatsCatalog {
         return MoveInfo(name: name, type: move.type, category: move.category, power: move.power, accuracy: nil, pp: nil, effect: move.effect, target: "", remarks: move.remarks)
     }
 
+    func megaStone(for pokemon: String) -> String? {
+        let data = GameData.shared
+        guard let parent = data.megaParent(pokemon) else { return nil }
+        var core = pokemon
+        if let range = core.range(of: "\\(.*\\)$", options: .regularExpression) { core.removeSubrange(range) }
+        let suffix = core.last.flatMap { "XYZ".contains($0) ? String($0) : nil }
+        let prefix = parent + "が"
+        let stones = itemOrder.filter { items[$0]?.mega ?? false }
+        let base = GameData.baseName(parent)
+        let candidates = stones.filter { name in
+            let effect = items[name]?.effect ?? ""
+            return effect.hasPrefix(prefix) || effect.hasPrefix(base + "が")
+        }
+        if let suffix {
+            return candidates.first { $0.hasSuffix(suffix) } ?? candidates.first
+        }
+        return candidates.first { name in !(name.last.map { "XYZ".contains($0) } ?? false) } ?? candidates.first
+    }
+
+    func itemSprite(_ item: String, pokemon: String) -> String {
+        guard item == "メガストーン", let stone = megaStone(for: pokemon) else { return item }
+        return stone
+    }
+
     func itemEffect(_ name: String) -> String {
         items[name]?.effect ?? GameData.shared.items[name]?.effect ?? ""
     }

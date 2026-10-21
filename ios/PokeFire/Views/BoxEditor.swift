@@ -172,7 +172,7 @@ struct BoxCard: View {
                 .onTapGesture { tap(.species) }
                 .overlay(alignment: .bottomTrailing) {
                     if !entry.item.isEmpty {
-                        SpriteIcon(name: entry.item, size: 30)
+                        SpriteIcon(name: StatsCatalog.shared.itemSprite(entry.item, pokemon: entry.name), size: 30)
                             .onTapGesture { tap(.item) }
                     }
                 }
@@ -298,7 +298,7 @@ struct BoxEditorBody: View {
                     if showForms, !forms.isEmpty {
                         FormsStrip(forms: forms, openCount: formsOpenCount) { name in
                             withAnimation(.spring(response: 0.4, dampingFraction: 0.82)) { showForms = false }
-                            box.update(id) { $0.name = name }
+                            box.changeSpecies(id, to: name, usage: model.usage)
                         }
                     } else {
                         VStack(alignment: .leading, spacing: 8) {
@@ -362,7 +362,9 @@ struct BoxEditorBody: View {
                         Haptics.play(.medium)
                         box.update(id) { $0.moves.move(fromOffsets: from, toOffset: to) }
                     }
+                    .deleteDisabled(true)
                 }
+                .environment(\.editMode, .constant(.active))
                 .listStyle(.plain)
                 .scrollDisabled(true)
                 .scrollContentBackground(.hidden)
@@ -381,7 +383,7 @@ struct BoxEditorBody: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("もちもの").sectionTitle()
-                SelectButton(text: entry.item, sprite: entry.item.isEmpty ? nil : entry.item) {
+                SelectButton(text: entry.item, sprite: entry.item.isEmpty ? nil : StatsCatalog.shared.itemSprite(entry.item, pokemon: entry.name)) {
                     Haptics.play(.light)
                     sheet = .item
                 }
@@ -405,7 +407,7 @@ struct BoxEditorBody: View {
         switch item {
         case .species:
             PokemonPicker(role: .attacker, currentName: entry.name) { name in
-                box.update(id) { $0.name = name }
+                box.changeSpecies(id, to: name, usage: model.usage)
             }
         case .stats:
             BoxStatsSheet(id: id) {
@@ -872,7 +874,9 @@ struct BoxMoveSheet: View {
                         box.update(id) { $0.moves.move(fromOffsets: from, toOffset: to) }
                         if moved { focus = to > (from.first ?? 0) ? to - 1 : to }
                     }
+                    .deleteDisabled(true)
                 }
+                .environment(\.editMode, .constant(.active))
                 .listStyle(.plain)
                 .scrollDisabled(true)
                 .scrollContentBackground(.hidden)
@@ -1120,10 +1124,11 @@ struct SparkleShape: Shape {
 
     func path(in rect: CGRect) -> Path {
         let size = min(rect.width, rect.height)
-        let big = size * 0.36
+        let big = size * 0.4
         let small = big * 0.5
-        var path = star(center: CGPoint(x: rect.minX + big + size * 0.02, y: rect.maxY - big - size * 0.02), radius: big)
-        path.addPath(star(center: CGPoint(x: rect.maxX - small - size * 0.04, y: rect.minY + small + size * 0.04), radius: small))
+        let center = CGPoint(x: rect.minX + size * 0.42, y: rect.maxY - size * 0.42)
+        var path = star(center: center, radius: big)
+        path.addPath(star(center: CGPoint(x: center.x + big * 0.95, y: center.y - big * 0.95), radius: small))
         return path
     }
 }
