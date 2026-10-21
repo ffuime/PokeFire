@@ -102,7 +102,7 @@ struct BoxCard: View {
         let types = entry.pokemon?.types ?? []
         let first = Palette.types[types.first ?? ""]?.color ?? 0x999999
         let second = Palette.types[types.count > 1 ? types[1] : types.first ?? ""]?.color ?? first
-        HStack(alignment: .center, spacing: 6) {
+        ZStack {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 5) {
                     ForEach(types, id: \.self) { TypeIcon(type: $0, size: 18) }
@@ -113,6 +113,19 @@ struct BoxCard: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { tap(.species) }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+
+            Text(entry.ability.isEmpty ? "とくせい" : entry.ability)
+                .font(.footnote.weight(.bold))
+                .opacity(entry.ability.isEmpty ? 0.5 : 1)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .contentShape(Rectangle())
+                .onTapGesture { tap(.ability) }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+            VStack(alignment: .leading, spacing: 4) {
                 ForEach(0..<4, id: \.self) { slot in
                     let move = slot < entry.moves.count ? entry.moves[slot] : ""
                     HStack(spacing: 5) {
@@ -130,11 +143,22 @@ struct BoxCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                     }
+                    .frame(maxWidth: 130, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture { tap(.moves(slot)) }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+
+            HStack(spacing: 6) {
+                column(StatKey.baseKeys.map { Text($0.letter) }, alignment: .center, width: 14)
+                column(StatKey.baseKeys.map { Text("\(entry.real($0))") }, alignment: .trailing, width: 30)
+                column(StatKey.baseKeys.map { pointText($0) }, alignment: .trailing, width: 34)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture { tap(.stats) }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+
             ZStack(alignment: .bottomTrailing) {
                 SpriteView(name: entry.name, size: 92)
                     .contentShape(Rectangle())
@@ -144,32 +168,18 @@ struct BoxCard: View {
                     .offset(x: 4, y: 2)
                     .onTapGesture { tap(.item) }
             }
-            .frame(width: 96)
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(entry.ability.isEmpty ? "とくせい" : entry.ability)
-                    .font(.footnote.weight(.bold))
-                    .opacity(entry.ability.isEmpty ? 0.5 : 1)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .contentShape(Rectangle())
-                    .onTapGesture { tap(.ability) }
-                HStack(spacing: 6) {
-                    column(StatKey.baseKeys.map { Text($0.letter) }, alignment: .center, width: 14)
-                    column(StatKey.baseKeys.map { Text("\(entry.real($0))") }, alignment: .trailing, width: 30)
-                    column(StatKey.baseKeys.map { pointText($0) }, alignment: .trailing, width: 34)
-                }
-                .contentShape(Rectangle())
-                .onTapGesture { tap(.stats) }
-            }
-            .frame(width: 112, alignment: .trailing)
+            .offset(x: -4, y: 6)
         }
         .foregroundStyle(Palette.ink)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(height: Self.height)
-        .background(
-            LinearGradient(colors: [Color.washed(first, white: 0.7), Color.washed(second, white: 0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
-        )
+        .background {
+            ZStack {
+                LinearGradient(colors: [Color.washed(first, white: 0.7), Color.washed(second, white: 0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                CardGlints(seed: entry.id.hashValue)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .shadow(color: .black.opacity(0.08), radius: 14, y: 4)
     }
@@ -952,5 +962,54 @@ struct BoxImportSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+}
+
+struct CardGlints: View {
+    let seed: Int
+
+    private struct Glint {
+        let radius: CGFloat
+        let opacity: Double
+        let speedX: Double
+        let speedY: Double
+        let phaseX: Double
+        let phaseY: Double
+    }
+
+    private var glints: [Glint] {
+        var state = UInt64(bitPattern: Int64(seed)) | 1
+        func next() -> Double {
+            state = state &* 6364136223846793005 &+ 1442695040888963407
+            return Double(state >> 11) / Double(1 << 53)
+        }
+        return (0..<5).map { _ in
+            Glint(
+                radius: 22 + next() * 26,
+                opacity: 0.35 + next() * 0.35,
+                speedX: 0.08 + next() * 0.14,
+                speedY: 0.07 + next() * 0.13,
+                phaseX: next() * .pi * 2,
+                phaseY: next() * .pi * 2
+            )
+        }
+    }
+
+    var body: some View {
+        let list = glints
+        TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            Canvas { graphics, size in
+                graphics.addFilter(.blur(radius: 16))
+                for glint in list {
+                    let x = (0.5 + 0.45 * sin(time * glint.speedX + glint.phaseX) * cos(time * glint.speedX * 0.37 + glint.phaseY)) * size.width
+                    let y = (0.5 + 0.45 * sin(time * glint.speedY + glint.phaseY) * cos(time * glint.speedY * 0.53 + glint.phaseX)) * size.height
+                    let pulse = 0.75 + 0.25 * sin(time * (glint.speedX + glint.speedY) * 2 + glint.phaseX)
+                    let rect = CGRect(x: x - glint.radius, y: y - glint.radius, width: glint.radius * 2, height: glint.radius * 2)
+                    graphics.fill(Path(ellipseIn: rect), with: .color(.white.opacity(glint.opacity * pulse)))
+                }
+            }
+        }
+        .allowsHitTesting(false)
     }
 }
