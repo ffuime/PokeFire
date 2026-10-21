@@ -673,8 +673,10 @@ struct BoxMoveSheet: View {
             if let existing = item.moves.firstIndex(of: name), existing != focus { item.moves[existing] = "" }
             item.moves[focus] = name
         }
-        let moves = box.pokemon(id)?.moves ?? []
-        if let next = (focus + 1..<4).first(where: { $0 < moves.count && moves[$0].isEmpty }) ?? (0..<4).first(where: { $0 < moves.count && moves[$0].isEmpty }) {
+        let moves: [String] = box.pokemon(id)?.moves ?? []
+        let empty: [Int] = moves.indices.filter { moves[$0].isEmpty }
+        let after: Int? = empty.first { $0 > focus }
+        if let next = after ?? empty.first {
             withAnimation(.snappy(duration: 0.25)) { focus = next }
         } else {
             dismiss()
