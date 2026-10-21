@@ -358,13 +358,7 @@ struct BoxEditorBody: View {
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                     }
-                    .onMove { from, to in
-                        Haptics.play(.medium)
-                        box.update(id) { $0.moves.move(fromOffsets: from, toOffset: to) }
-                    }
-                    .deleteDisabled(true)
                 }
-                .environment(\.editMode, .constant(.active))
                 .listStyle(.plain)
                 .scrollDisabled(true)
                 .scrollContentBackground(.hidden)
