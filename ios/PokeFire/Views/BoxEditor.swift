@@ -212,7 +212,11 @@ struct BoxCard: View {
     @MainActor
     private func saveImage() async {
         Haptics.play(.heavy)
-        guard let url = entry.pokemon?.spriteURL, let sprite = await SpriteCache.shared.image(url) else {
+        var loaded = PokemonSprites.image(entry.name)
+        if loaded == nil, let url = entry.pokemon?.spriteURL {
+            loaded = await SpriteCache.shared.image(url)
+        }
+        guard let sprite = loaded else {
             Haptics.play(.error)
             return
         }

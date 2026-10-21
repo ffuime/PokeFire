@@ -80,7 +80,41 @@ final class SpriteCache {
     }
 }
 
+enum PokemonSprites {
+    static let ids: [String: String] = {
+        guard
+            let url = Bundle.main.url(forResource: "sprites", withExtension: "json"),
+            let data = try? Data(contentsOf: url),
+            let map = try? JSONDecoder().decode([String: String].self, from: data)
+        else { return [:] }
+        return map
+    }()
+
+    static func image(_ name: String, shiny: Bool = false) -> UIImage? {
+        guard let id = ids[name] else { return nil }
+        return UIImage(named: "poke_\(id)\(shiny ? "_shiny" : "")")
+    }
+}
+
 struct SpriteView: View {
+    let name: String
+    var size: CGFloat = 48
+    var shiny = false
+
+    var body: some View {
+        if let image = PokemonSprites.image(name, shiny: shiny) {
+            Image(uiImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(width: size, height: size)
+        } else {
+            RemoteSpriteView(name: name, size: size)
+        }
+    }
+}
+
+struct RemoteSpriteView: View {
     let name: String
     var size: CGFloat = 48
 

@@ -103,8 +103,8 @@ struct SettingsSheet: View {
                     Link(destination: URL(string: "https://pokeapi.co")!) {
                         LabeledContent("英語名の対応", value: "PokéAPI")
                     }
-                    Link(destination: URL(string: "https://pokesol.app")!) {
-                        LabeledContent("ポケモンの画像", value: "pokesol")
+                    Link(destination: URL(string: "https://github.com/PokeAPI/sprites")!) {
+                        LabeledContent("ポケモンの画像", value: "PokéAPI sprites")
                     }
                 }
                 Section("免責事項") {
