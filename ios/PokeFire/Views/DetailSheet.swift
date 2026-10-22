@@ -184,7 +184,7 @@ private struct MatchOverview: View {
             return text
         }
         let ability = same { orNone($0.atk?.ability) }
-        let item = same { orNone($0.atk?.item) }
+        let item = same { orNone($0.atk.map { StatsCatalog.shared.itemSprite($0.item, pokemon: $0.name) }) }
         let envText = same { entry in
             let field = entry.field ?? Field()
             let weather = Calc.weatherNames[field.weather] ?? "天候なし"
@@ -238,7 +238,7 @@ private struct MatchOverview: View {
                         } else {
                             Spacer().frame(maxWidth: .infinity)
                         }
-                        OthersBox(ability: def.ability.isEmpty ? "なし" : def.ability, item: def.item.isEmpty ? "なし" : def.item, tint: Palette.accent)
+                        OthersBox(ability: def.ability.isEmpty ? "なし" : def.ability, item: def.item.isEmpty ? "なし" : StatsCatalog.shared.itemSprite(def.item, pokemon: def.name), tint: Palette.accent)
                     }
                 }
 

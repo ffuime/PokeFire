@@ -578,7 +578,7 @@ struct SelectButton: View {
                 if translucent {
                     ZStack {
                         UnevenBox().fill(.ultraThinMaterial)
-                        UnevenBox().fill(Color.white.opacity(0.6))
+                        UnevenBox().fill(Palette.card.opacity(0.6))
                     }
                 } else {
                     UnevenBox().fill(Palette.card)

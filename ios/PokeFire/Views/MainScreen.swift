@@ -422,9 +422,9 @@ struct SideSwitcher: View {
             let lensX = dragX.map { min(max(0, $0 - side / 2), travel) } ?? settled
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.black.opacity(0.045))
+                    .fill(Palette.ink.opacity(0.06))
                 Capsule()
-                    .fill(Color.white.opacity(0.55))
+                    .fill(Palette.card.opacity(0.55))
                     .frame(width: side - 4, height: geometry.size.height - 8)
                     .glassEffect(.regular.interactive(), in: Capsule())
                     .scaleEffect(dragX == nil ? 1 : 1.08)

@@ -352,7 +352,7 @@ struct BoxEditorBody: View {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text("もちもの").sectionTitle()
-                SelectButton(text: entry.item, sprite: entry.item.isEmpty ? nil : StatsCatalog.shared.itemSprite(entry.item, pokemon: entry.name)) {
+                SelectButton(text: StatsCatalog.shared.itemSprite(entry.item, pokemon: entry.name), sprite: entry.item.isEmpty ? nil : StatsCatalog.shared.itemSprite(entry.item, pokemon: entry.name)) {
                     Haptics.play(.light)
                     sheet = .item
                 }

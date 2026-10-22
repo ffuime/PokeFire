@@ -101,7 +101,8 @@ struct SearchHeader: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
-            .background(Palette.field, in: Capsule())
+            .background(.ultraThinMaterial, in: Capsule())
+            .background(Palette.field.opacity(0.7), in: Capsule())
             .modifier(FilterButtonModifier(active: filterActive, action: onFilter))
         }
         .padding(.horizontal, 16)
@@ -306,8 +307,16 @@ struct EntrySearchSheet: View {
     private struct Row: Identifiable {
         var id: String { name }
         let name: String
+        var label: String?
         let effect: String
         let usage: String?
+
+        init(name: String, label: String? = nil, effect: String, usage: String?) {
+            self.name = name
+            self.label = label
+            self.effect = effect
+            self.usage = usage
+        }
     }
 
     private func numberText(_ value: Double) -> String {
@@ -385,10 +394,21 @@ struct EntrySearchSheet: View {
                 lists.append(("その他", names.filter { !set.contains($0) }))
             }
         }
-        return lists.compactMap { title, names in
-            let tiers = Search.rank(names.map(searchText), query: query)
+        let stone = kind == .items ? StatsCatalog.shared.megaStone(for: name) : nil
+        return lists.compactMap { title, all in
+            let names = kind == .items && stone == nil ? all.filter { $0 != UsageLoader.megaStone } : all
+            let tiers = Search.rank(names.map { item in
+                if item == UsageLoader.megaStone, let stone { return searchText(item) + " " + stone }
+                return searchText(item)
+            }, query: query)
             let order = Search.ordered(names.count, tiers: tiers) { names[$0] }
-            let rows = order.map { Row(name: names[$0], effect: effect(names[$0]), usage: percent[names[$0]]) }
+            let rows = order.map { index -> Row in
+                let item = names[index]
+                if item == UsageLoader.megaStone, let stone {
+                    return Row(name: item, label: stone, effect: StatsCatalog.shared.itemEffect(stone), usage: percent[item])
+                }
+                return Row(name: item, effect: effect(item), usage: percent[item])
+            }
             return rows.isEmpty ? nil : RowGroup(id: title, rows: rows)
         }
     }
@@ -456,7 +476,7 @@ struct EntrySearchSheet: View {
             Button {
                 select(row.name)
             } label: {
-                EntryRow(kind: kind, name: row.name, effect: row.effect, usage: row.usage, selected: row.name == selected)
+                EntryRow(kind: kind, name: row.label ?? row.name, effect: row.effect, usage: row.usage, selected: row.name == selected)
             }
             .listRowBackground(row.name == selected ? Palette.accent.opacity(0.06) : Palette.card)
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {

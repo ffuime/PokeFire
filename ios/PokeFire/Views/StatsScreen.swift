@@ -228,7 +228,7 @@ struct PokemonNameButton: View {
             .background {
                 ZStack {
                     UnevenBox(strong: 28, weak: 6).fill(.ultraThinMaterial)
-                    UnevenBox(strong: 28, weak: 6).fill(Color.white.opacity(0.6))
+                    UnevenBox(strong: 28, weak: 6).fill(Palette.card.opacity(0.6))
                 }
             }
             .overlay(UnevenBox(strong: 28, weak: 6).stroke(Palette.separator, lineWidth: 1))
@@ -585,6 +585,7 @@ struct TypeChip: View {
 
 struct TypeChartCard: View {
     @Environment(StatsModel.self) private var stats
+    @Environment(\.colorScheme) private var scheme
     let role: Role
 
     var body: some View {
@@ -614,11 +615,11 @@ struct TypeChartCard: View {
                     HStack(alignment: .center, spacing: 12) {
                         VStack(spacing: 2) {
                             Icon(name: row.icon, size: 24)
-                                .foregroundStyle(Color(hex: row.color))
+                                .foregroundStyle(scheme == .dark ? Color(hex: row.color).mix(with: .white, by: 0.35) : Color(hex: row.color))
                             Text(row.label)
                                 .font(.caption.weight(.heavy))
                                 .monospacedDigit()
-                                .foregroundStyle(Color(hex: row.color))
+                                .foregroundStyle(scheme == .dark ? Color(hex: row.color).mix(with: .white, by: 0.35) : Color(hex: row.color))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                         }
@@ -632,7 +633,7 @@ struct TypeChartCard: View {
                     }
                     .padding(.vertical, 5)
                     .padding(.horizontal, 8)
-                    .background(Color(hex: row.background), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .background(scheme == .dark ? Color(hex: row.color).opacity(0.2) : Color(hex: row.background), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
                 if TypeChart.considersAny(side.pokemon?.abilities ?? []) {
                 HStack {
@@ -708,17 +709,22 @@ struct MoveUsageRow: View {
                     Outlined(color: .white, outline: color) {
                         Icon(name: "glyph_\(id)", size: 20)
                     }
+                    .id("glyph-\(id)")
+                    .transition(.blurReplace)
                 }
                 Outlined(color: color) {
                     Text(pair.name ?? "不明なわざ")
                         .font(.subheadline.weight(.heavy))
                         .lineLimit(1)
                 }
+                .id(pair.name ?? "")
+                .transition(.blurReplace)
                 Spacer(minLength: 6)
                 Outlined(color: color) {
                     Text("\(Format.fixed1(pair.pct))%")
                         .font(.subheadline.weight(.heavy))
                         .monospacedDigit()
+                        .contentTransition(.numericText(value: pair.pct))
                 }
             }
             .padding(.horizontal, 12)
@@ -974,6 +980,8 @@ struct UsageCard: View {
                     .foregroundStyle(Palette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .id(slice.label)
+                    .transition(.blurReplace)
                 if let nature = slice.nature {
                     NatureCaption(nature: nature)
                         .font(.system(size: 9, weight: .bold))
@@ -1064,9 +1072,17 @@ struct PieChart: View {
 }
 
 struct PieSlice: Shape {
-    let start: Double
-    let end: Double
+    var start: Double
+    var end: Double
     let inner: CGFloat
+
+    var animatableData: AnimatablePair<Double, Double> {
+        get { AnimatablePair(start, end) }
+        set {
+            start = newValue.first
+            end = newValue.second
+        }
+    }
 
     func path(in rect: CGRect) -> Path {
         let center = CGPoint(x: rect.midX, y: rect.midY)

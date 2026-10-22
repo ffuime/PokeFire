@@ -185,7 +185,7 @@ struct PokemonHeader: View {
                 .background {
                     ZStack {
                         UnevenBox(strong: 28, weak: 6).fill(.ultraThinMaterial)
-                        UnevenBox(strong: 28, weak: 6).fill(Color.white.opacity(0.6))
+                        UnevenBox(strong: 28, weak: 6).fill(Palette.card.opacity(0.6))
                     }
                 }
                 .overlay(UnevenBox(strong: 28, weak: 6).stroke(Palette.separator, lineWidth: 1))
@@ -604,7 +604,7 @@ struct ItemSection: View {
         let side = model.side(role)
         VStack(alignment: .leading, spacing: 10) {
             Text("もちもの").sectionTitle()
-            SelectButton(text: side.item, sprite: StatsCatalog.shared.itemSprite(side.item, pokemon: side.name)) {
+            SelectButton(text: StatsCatalog.shared.itemSprite(side.item, pokemon: side.name), sprite: StatsCatalog.shared.itemSprite(side.item, pokemon: side.name)) {
                 Haptics.play(.light)
                 present(.item(role))
             }
