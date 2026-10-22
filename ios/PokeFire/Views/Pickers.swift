@@ -163,6 +163,25 @@ struct PokemonPicker: View {
         ].filter { !$0.rows.isEmpty }
     }
 
+    private var boxEnabled: Bool { onSelect == nil || onBoxPick != nil }
+
+    private var boxRows: [BoxPokemon] {
+        let key = Search.normalize(query)
+        return box.pokemons
+            .filter { key.isEmpty || Search.normalize($0.name + " " + $0.nickname).contains(key) }
+            .sorted { $0.updated > $1.updated }
+    }
+
+    private func pickBox(_ entry: BoxPokemon) {
+        focused = false
+        if let onBoxPick {
+            onBoxPick(entry)
+        } else {
+            model.applyBox(entry, to: role)
+        }
+        dismiss()
+    }
+
     var body: some View {
         let groups = sections
         let list = groups.flatMap(\.rows)
