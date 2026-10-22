@@ -83,6 +83,16 @@ enum Rules {
 
     static let disguiseAbility = "ばけのかわ"
 
+    static let constantAbilities: [Role: [String: String]] = [
+        .attacker: ["さめはだ": "1/8", "てつのトゲ": "1/8"],
+        .defender: ["ばけのかわ": "1/8", "サンパワー": "1/8"],
+    ]
+
+    static let constantItems: [Role: [String: String]] = [
+        .attacker: ["ゴツゴツメット": "1/6"],
+        .defender: ["いのちのたま": "1/10"],
+    ]
+
     static let intimidateReactions: [String: [(StatKey, Int)]] = [
         "きもったま": [],
         "マイペース": [],
@@ -180,7 +190,7 @@ enum Rules {
     static func abilityControl(_ role: Role, _ ability: String) -> AbilityControl {
         guard let rules = activation[role] else { return .hidden }
         if weatherAbilities[ability] != nil || fieldAbilities[ability] != nil { return .environment }
-        if role == .defender, ability == disguiseAbility { return .disguise }
+        if constantAbilities[role]?[ability] != nil { return .disguise }
         if rules.changeType.contains(ability) { return .changeType }
         if rules.always.contains(ability) { return .locked }
         if rules.toggle.contains(ability) { return .toggle }

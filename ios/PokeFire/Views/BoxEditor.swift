@@ -79,10 +79,12 @@ struct BoxEditor: View {
                     }
                     BoxEditorBody(id: id, sheet: $sheet)
                         .id(id)
+                        .transition(.opacity.combined(with: .scale(scale: 0.985)))
                         .padding(.horizontal, 20)
                         .overlay {
                             ShineFlash(trigger: current)
                         }
+                        .animation(.easeInOut(duration: 0.4), value: current)
                 }
                 .padding(.top, 8)
                 .padding(.bottom, 40)
@@ -1141,10 +1143,11 @@ struct HoldToSave: ViewModifier {
                     .frame(width: 56, height: 56)
                     .background(Circle().fill(.ultraThinMaterial))
                     .opacity(visible ? 1 : 0)
-                    .scaleEffect(visible ? 1 : 0.6)
+                    .scaleEffect(visible ? 1 : 0.85)
+                    .blur(radius: visible ? 0 : 4)
                     .allowsHitTesting(false)
             }
-            .animation(.snappy(duration: 0.2), value: visible)
+            .animation(.easeOut(duration: 0.35), value: visible)
             .onLongPressGesture(minimumDuration: duration, maximumDistance: 12) {
                 Haptics.play(.heavy)
                 visible = false
@@ -1192,7 +1195,7 @@ struct ShineFlash: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                Color.white.opacity(opacity * 0.7)
+                Color.white.opacity(opacity * 0.45)
                 LinearGradient(
                     colors: [Color.white.opacity(0), Color.white.opacity(0.95), Color.white.opacity(0)],
                     startPoint: .leading,
@@ -1207,9 +1210,9 @@ struct ShineFlash: View {
         .allowsHitTesting(false)
         .onChange(of: trigger) { _, _ in
             phase = -0.8
-            opacity = 1
-            withAnimation(.easeOut(duration: 0.55)) { phase = 1.2 }
-            withAnimation(.easeOut(duration: 0.6).delay(0.1)) { opacity = 0 }
+            withAnimation(.easeIn(duration: 0.12)) { opacity = 1 }
+            withAnimation(.easeInOut(duration: 0.7)) { phase = 1.2 }
+            withAnimation(.easeOut(duration: 0.55).delay(0.2)) { opacity = 0 }
         }
     }
 }
@@ -1218,6 +1221,10 @@ struct TeamCollage: View {
     let entries: [BoxPokemon]
     var frozen = false
     var portrait = false
+    var title = ""
+    var onTapMember: ((Int) -> Void)?
+
+    static let header: CGFloat = 52
 
     static let cardWidth: CGFloat = 380
     static let spacing: CGFloat = 12
@@ -1228,7 +1235,7 @@ struct TeamCollage: View {
         let rows: CGFloat = portrait ? 3 : 2
         return CGSize(
             width: cardWidth * columns + spacing * (columns - 1) + padding * 2,
-            height: BoxCard.height * rows + spacing * (rows - 1) + padding * 2
+            height: BoxCard.height * rows + spacing * (rows - 1) + padding * 2 + header
         )
     }
 
@@ -1236,7 +1243,12 @@ struct TeamCollage: View {
         let columns = portrait ? 2 : 3
         let rows = portrait ? 3 : 2
         let size = Self.size(portrait: portrait)
-        VStack(spacing: Self.spacing) {
+        VStack(alignment: .leading, spacing: Self.spacing) {
+            Text(title)
+                .font(.system(size: 30, weight: .heavy))
+                .foregroundStyle(Palette.ink)
+                .lineLimit(1)
+                .frame(height: Self.header - Self.spacing, alignment: .bottomLeading)
             ForEach(0..<rows, id: \.self) { row in
                 HStack(spacing: Self.spacing) {
                     ForEach(0..<columns, id: \.self) { column in
@@ -1244,6 +1256,14 @@ struct TeamCollage: View {
                         if index < entries.count {
                             BoxCard(entry: entries[index], frozen: frozen)
                                 .frame(width: Self.cardWidth)
+                                .allowsHitTesting(onTapMember == nil)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if let onTapMember {
+                                        Haptics.play(.light)
+                                        onTapMember(index)
+                                    }
+                                }
                         } else {
                             RoundedRectangle(cornerRadius: 26, style: .continuous)
                                 .fill(Palette.background)
@@ -1261,6 +1281,8 @@ struct TeamCollage: View {
 
 struct TeamCollagePreview: View {
     let entries: [BoxPokemon]
+    var title = ""
+    var onOpen: (() -> Void)?
     @AppStorage(AppSettings.portraitTeamKey) private var portrait = false
 
     var body: some View {
@@ -1269,13 +1291,187 @@ struct TeamCollagePreview: View {
             .aspectRatio(size.width / size.height, contentMode: .fit)
             .overlay(alignment: .topLeading) {
                 GeometryReader { geometry in
-                    TeamCollage(entries: entries, frozen: true, portrait: portrait)
+                    TeamCollage(entries: entries, frozen: true, portrait: portrait, title: title)
                         .scaleEffect(geometry.size.width / size.width, anchor: .topLeading)
+                        .allowsHitTesting(false)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .holdToSave {
-                CardImage.save(TeamCollage(entries: entries, frozen: true, portrait: portrait))
+            .contentShape(Rectangle())
+            .onTapGesture {
+                Haptics.play(.light)
+                onOpen?()
             }
+            .holdToSave {
+                CardImage.save(TeamCollage(entries: entries, frozen: true, portrait: portrait, title: title))
+            }
+    }
+}
+
+struct TeamViewer: View {
+    @Environment(\.dismiss) private var dismiss
+    let entries: [BoxPokemon]
+    let title: String
+    let onOpenMember: (Int) -> Void
+    @AppStorage(AppSettings.portraitTeamKey) private var portrait = false
+    @State private var scale: CGFloat = 1
+    @State private var baseScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var baseOffset: CGSize = .zero
+
+    var body: some View {
+        let size = TeamCollage.size(portrait: portrait)
+        GeometryReader { geometry in
+            let fit = min(geometry.size.width / size.width, geometry.size.height / size.height) * 0.96
+            ZStack {
+                Color.black.opacity(0.92).ignoresSafeArea()
+                TeamCollage(entries: entries, frozen: false, portrait: portrait, title: title) { index in
+                    onOpenMember(index)
+                }
+                .frame(width: size.width, height: size.height)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .scaleEffect(fit * scale)
+                .offset(offset)
+                .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+            .gesture(
+                MagnifyGesture()
+                    .onChanged { value in scale = max(1, min(5, baseScale * value.magnification)) }
+                    .onEnded { _ in
+                        baseScale = scale
+                        if scale <= 1.01 {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                                offset = .zero
+                                baseOffset = .zero
+                            }
+                        }
+                    }
+                    .simultaneously(with:
+                        DragGesture()
+                            .onChanged { value in
+                                guard scale > 1 else { return }
+                                offset = CGSize(width: baseOffset.width + value.translation.width, height: baseOffset.height + value.translation.height)
+                            }
+                            .onEnded { _ in baseOffset = offset }
+                    )
+            )
+            .onTapGesture(count: 2) {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                    if scale > 1 {
+                        scale = 1
+                        baseScale = 1
+                        offset = .zero
+                        baseOffset = .zero
+                    } else {
+                        scale = 2.5
+                        baseScale = 2.5
+                    }
+                }
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                dismiss()
+            } label: {
+                CloseButtonLabel()
+                    .foregroundStyle(Color.white)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .padding(16)
+            .accessibilityLabel("閉じる")
+        }
+        .statusBarHidden()
+    }
+}
+
+struct TeamWeaknessSections: View {
+    @Environment(AppModel.self) private var model
+    let members: [BoxPokemon]
+
+    private struct TypeRow: Identifiable {
+        var id: String { type }
+        let type: String
+        let weak: Int
+        let resist: Int
+    }
+
+    private func multiplier(_ attack: String, _ entry: BoxPokemon) -> Double {
+        TypeChart.multiplier(attack, types: entry.pokemon?.types ?? [], abilities: entry.ability.isEmpty ? [] : [entry.ability])
+    }
+
+    private var typeRows: [TypeRow] {
+        Palette.typeOrder.compactMap { attack in
+            let values = members.map { multiplier(attack, $0) }
+            let weak = values.filter { $0 > 1 }.count
+            let resist = values.filter { $0 < 1 }.count
+            guard weak >= 2, weak > resist else { return nil }
+            return TypeRow(type: attack, weak: weak, resist: resist)
+        }
+        .sorted { ($0.weak - $0.resist, $0.weak) > ($1.weak - $1.resist, $1.weak) }
+    }
+
+    private var threats: [(String, Int)] {
+        guard let usage = model.usage else { return [] }
+        let ranked = model.data.pokemonOrder
+            .filter { model.data.megaParent($0) == nil }
+            .compactMap { name in usage.pokemons[name].map { (name, $0.rank) } }
+            .sorted { $0.1 < $1.1 }
+            .prefix(40)
+        let memberNames = Set(members.map { model.data.usageName(of: $0.name) })
+        let scored: [(String, Int)] = ranked.compactMap { name, _ in
+            guard !memberNames.contains(name), let types = model.data.pokemons[name]?.types else { return nil }
+            let hits = members.filter { member in types.contains { multiplier($0, member) > 1 } }.count
+            let walls = members.filter { member in types.allSatisfy { multiplier($0, member) < 1 } }.count
+            let score = hits - walls
+            return score >= 2 ? (name, score) : nil
+        }
+        return Array(scored.sorted { $0.1 > $1.1 }.prefix(8))
+    }
+
+    var body: some View {
+        let rows = typeRows
+        let list = threats
+        if !rows.isEmpty {
+            Section("苦手なタイプ") {
+                ForEach(rows) { row in
+                    HStack(spacing: 10) {
+                        TypeChip(type: row.type, height: 26)
+                        Spacer()
+                        Text("弱点 \(row.weak)体")
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(Palette.rankUp)
+                        Text("半減 \(row.resist)体")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Palette.secondary)
+                    }
+                    .selectionDisabled()
+                }
+            }
+        }
+        if !list.isEmpty {
+            Section {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 8) {
+                    ForEach(list, id: \.0) { name, score in
+                        VStack(spacing: 2) {
+                            SpriteView(name: name, size: 52)
+                            Text("\(score)体に抜群")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Palette.rankUp)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                    }
+                }
+                .padding(.vertical, 6)
+                .selectionDisabled()
+            } header: {
+                Text("苦手なポケモン")
+            } footer: {
+                Text("使用率上位のポケモンのうち、タイプ一致わざでチームの多くに抜群を取れるものです。")
+            }
+        }
     }
 }

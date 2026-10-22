@@ -24,6 +24,11 @@ struct StatsSide: Codable, Equatable {
     }
 }
 
+struct SpeedBoost: Equatable {
+    var ability: String?
+    var rank = 0
+}
+
 struct StatsHistoryEntry: Codable, Identifiable, Equatable {
     var id: String { key }
     var key: String
@@ -57,6 +62,7 @@ final class StatsModel {
     var history: [StatsHistoryEntry] = []
     var pendingPage: Role?
     var boxAtRoot = true
+    var speedBoosts: [Role: SpeedBoost] = [:]
     @ObservationIgnored private var historyTask: Task<Void, Never>?
 
     var isStats: Bool { mode == .stats }
@@ -89,7 +95,9 @@ final class StatsModel {
 
     private func update(_ role: Role, _ body: (inout StatsSide) -> Void) {
         var side = self.side(role)
+        let before = side.name
         body(&side)
+        if side.name != before { speedBoosts[role] = nil }
         if role == .attacker {
             attacker = side
         } else {
@@ -228,6 +236,32 @@ final class StatsModel {
     func setNature(_ role: Role, _ key: StatKey, _ value: Int) {
         update(role) { $0.natures[key.rawValue] = value }
         Haptics.play(.selection)
+    }
+
+    func speedBoost(_ role: Role) -> SpeedBoost {
+        speedBoosts[role] ?? SpeedBoost()
+    }
+
+    func toggleSpeedAbility(_ role: Role, _ ability: String) {
+        var boost = speedBoost(role)
+        boost.ability = boost.ability == ability ? nil : ability
+        speedBoosts[role] = boost
+        Haptics.play(.light)
+    }
+
+    func setSpeedRank(_ role: Role, _ rank: Int) {
+        var boost = speedBoost(role)
+        boost.rank = Calc.clampRank(rank)
+        speedBoosts[role] = boost
+        Haptics.play(.selection)
+    }
+
+    func boostedSpeed(_ role: Role) -> Int {
+        let side = self.side(role)
+        let boost = speedBoost(role)
+        var mods: [Int] = []
+        if let ability = boost.ability, let rule = Calc.speedAbilities[ability] { mods.append(rule.mod) }
+        return max(1, Calc.applyMod(Calc.applyRank(side.real(.s), boost.rank), Calc.chainMods(mods)))
     }
 
     func toggleChart() {

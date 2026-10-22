@@ -168,6 +168,10 @@ enum TypeChart {
 
     private static let superReducers: Set<String> = ["ハードロック", "フィルター", "プリズムアーマー"]
 
+    static func considersAny(_ abilities: [String]) -> Bool {
+        abilities.contains { immune[$0] != nil || scaled[$0] != nil || superReducers.contains($0) || $0 == "ふしぎなまもり" }
+    }
+
     static func multiplier(_ attack: String, types: [String], abilities: [String]) -> Double {
         let base = types.reduce(1.0) { $0 * (Calc.typeChart[attack]?[$1] ?? 1) }
         var value = base

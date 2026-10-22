@@ -24,6 +24,7 @@ struct SpeedSheet: View {
     var statsMode = false
     @State private var selected: Role?
     @State private var cursor: Int?
+    @State private var lineRole: Role?
 
     private func statsFighter(_ role: Role) -> Fighter {
         let side = stats.side(role)
@@ -101,6 +102,26 @@ struct SpeedSheet: View {
                         .card(padding: 12)
                         .blur(radius: selected == nil ? 0 : 2)
                         .opacity(selected == nil ? 1 : 0.55)
+
+                    HStack(spacing: 8) {
+                        ForEach(Role.allCases, id: \.self) { role in
+                            Button {
+                                Haptics.play(.light)
+                                lineRole = role
+                            } label: {
+                                HStack(spacing: 6) {
+                                    SpriteView(name: statsMode ? stats.side(role).name : model.side(role).name, size: 26)
+                                    Text("すばやさライン")
+                                        .font(.subheadline.weight(.bold))
+                                }
+                                .foregroundStyle(Palette.stat(.s))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .glassEffect(.regular.interactive(), in: Capsule())
+                        }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 24)
@@ -144,6 +165,18 @@ struct SpeedSheet: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     CloseToolbarButton { dismiss() }
                 }
+            }
+        }
+        .sheet(item: $lineRole) { role in
+            let name = statsMode ? stats.side(role).name : model.side(role).name
+            let speed = statsMode ? stats.boostedSpeed(role) : (data.first { $0.role == role }?.now ?? 0)
+            SpeedLineSheet(currentName: name, currentSpeed: speed) { entry in
+                if statsMode {
+                    stats.applySpeedLine(role, name: entry.name, points: entry.tier.points, nature: entry.tier.nature)
+                } else {
+                    model.applySpeedLine(role, name: entry.name, points: entry.tier.points, nature: entry.tier.nature)
+                }
+                return true
             }
         }
         .presentationDetents([.large])
@@ -472,4 +505,8 @@ private struct SpeedGraph: View {
         .background(.regularMaterial, in: Capsule())
         .fixedSize()
     }
+}
+
+extension Role: Identifiable {
+    var id: String { rawValue }
 }

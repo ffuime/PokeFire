@@ -401,6 +401,11 @@ struct BoxPokemonRow: View {
                         .font(.headline)
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
+                    if entry.isShiny {
+                        SparkleShape()
+                            .fill(LinearGradient(colors: [Color(hex: 0xF7C948), Color(hex: 0xF08C33)], startPoint: .topTrailing, endPoint: .bottomLeading))
+                            .frame(width: 14, height: 14)
+                    }
                     if entry.favorite { FavoriteStar() }
                 }
                 if !entry.nickname.isEmpty {
@@ -474,6 +479,7 @@ struct TeamDetail: View {
     @State private var newName = ""
     @State private var editMode: EditMode = .inactive
     @State private var selection: Set<UUID> = []
+    @State private var showViewer = false
 
     private var editing: Bool { editMode.isEditing }
 
@@ -483,9 +489,11 @@ struct TeamDetail: View {
         List(selection: $selection) {
             if !members.isEmpty, !editing {
                 Section {
-                    TeamCollagePreview(entries: members)
-                        .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
-                        .selectionDisabled()
+                    TeamCollagePreview(entries: members, title: team?.name ?? "") {
+                        showViewer = true
+                    }
+                    .listRowInsets(EdgeInsets(top: 12, leading: 12, bottom: 12, trailing: 12))
+                    .selectionDisabled()
                 }
             }
             Section {
@@ -524,6 +532,18 @@ struct TeamDetail: View {
                         .font(.body.weight(.semibold))
                 }
             }
+            }
+            if !members.isEmpty, !editing {
+                TeamWeaknessSections(members: members)
+            }
+        }
+        .fullScreenCover(isPresented: $showViewer) {
+            TeamViewer(entries: members, title: team?.name ?? "") { index in
+                showViewer = false
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    path.append(.member(teamID, index))
+                }
             }
         }
         .listStyle(.insetGrouped)

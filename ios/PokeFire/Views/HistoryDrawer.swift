@@ -14,6 +14,36 @@ struct HistoryDrawer: View {
     @State private var rowFrames: [String: CGRect] = [:]
     @State private var dragAccepted: Bool?
     @State private var showHelp = false
+    @State private var showSettings = false
+
+    private var helpButton: some View {
+        Button {
+            Haptics.play(.light)
+            showHelp = true
+        } label: {
+            Icon(name: "help", size: 20)
+                .foregroundStyle(Color.black)
+                .frame(width: 50, height: 46)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("ヘルプ")
+    }
+
+    private var settingsButton: some View {
+        Button {
+            Haptics.play(.light)
+            showSettings = true
+        } label: {
+            Image(systemName: "gearshape")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(Color.black)
+                .frame(width: 50, height: 46)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressableStyle())
+        .accessibilityLabel("設定")
+    }
 
     private struct HistoryGroup: Identifiable {
         var id: String { title }
@@ -70,18 +100,12 @@ struct HistoryDrawer: View {
             if stats.mode == .box {
                 HStack {
                     Spacer()
-                    Button {
-                        Haptics.play(.light)
-                        showHelp = true
-                    } label: {
-                        Icon(name: "help", size: 20)
-                            .foregroundStyle(Color.black)
-                            .frame(width: 46, height: 46)
-                            .contentShape(Circle())
+                    HStack(spacing: 0) {
+                        helpButton
+                        settingsButton
                     }
-                    .buttonStyle(PressableStyle())
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    .accessibilityLabel("ヘルプ")
+                    .padding(.horizontal, 4)
+                    .glassEffect(.regular.interactive(), in: Capsule())
                 }
                 .padding(.trailing, 16)
                 .padding(.top, 8)
@@ -93,17 +117,6 @@ struct HistoryDrawer: View {
             HStack(spacing: 12) {
                 Spacer()
                 HStack(spacing: 0) {
-                Button {
-                    Haptics.play(.light)
-                    showHelp = true
-                } label: {
-                    Icon(name: "help", size: 20)
-                        .foregroundStyle(Color.black)
-                        .frame(width: 50, height: 46)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(PressableStyle())
-                .accessibilityLabel("ヘルプ")
                 Button {
                     Haptics.play(.light)
                     withAnimation(.snappy) {
@@ -129,6 +142,8 @@ struct HistoryDrawer: View {
                 }
                 .buttonStyle(PressableStyle())
                 .accessibilityLabel(searching ? "検索を閉じる" : "履歴を検索")
+                helpButton
+                settingsButton
                 }
                 .padding(.horizontal, 4)
                 .glassEffect(.regular.interactive(), in: Capsule())
@@ -205,6 +220,9 @@ struct HistoryDrawer: View {
             }
         }
         .background(Color.white.ignoresSafeArea())
+        .sheet(isPresented: $showSettings) {
+            SettingsSheet()
+        }
         .sheet(isPresented: $showHelp) {
             HelpView()
         }

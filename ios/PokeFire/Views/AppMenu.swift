@@ -45,23 +45,35 @@ struct AppMenuButton: View {
                     Label {
                         Text("PokéFire")
                     } icon: {
-                        Image("tab_attack")
+                        fixedIcon("tab_attack", size: 18)
                     }
                 }
                 .disabled(stats.mode == .fire)
                 Button { go(.stats) } label: {
-                    Label("PokéStats", systemImage: "chart.pie")
+                    Label {
+                        Text("PokéStats")
+                    } icon: {
+                        menuSymbol("chart.pie")
+                    }
                 }
                 .disabled(stats.mode == .stats)
                 Button { go(.box) } label: {
-                    Label("PokéBox", systemImage: "cube.box")
+                    Label {
+                        Text("PokéBox")
+                    } icon: {
+                        menuSymbol("cube.box")
+                    }
                 }
                 .disabled(stats.mode == .box)
             }
             Button {
                 showSettings = true
             } label: {
-                Label("設定", systemImage: "gearshape")
+                Label {
+                    Text("設定")
+                } icon: {
+                    menuSymbol("gearshape")
+                }
             }
         } label: {
             if inToolbar {
@@ -98,10 +110,10 @@ struct SettingsSheet: View {
                 Section {
                     Toggle("チームの画像を縦長にする", isOn: $portraitTeam)
                 } footer: {
-                    Text("オンにすると、チームの一枚絵が横2×縦3の並びになります。")
+                    Text("オンにすると、チームのサムネイルが横2×縦3の並びになります。")
                 }
                 Section("免責事項") {
-                    Text("Pokélett は個人が作成した非公式のツールで、任天堂・クリーチャーズ・ゲームフリーク・株式会社ポケモンとは関係ありません。")
+                    Text("Pokéloot は個人が作成した非公式のツールで、任天堂・クリーチャーズ・ゲームフリーク・株式会社ポケモンとは関係ありません。")
                     Text("ポケモンの名前・画像などの著作権は各権利者に帰属します。")
                     Text("計算結果や使用率などのデータの正確さは保証できません。ご利用は自己責任でお願いします。")
                 }
@@ -130,4 +142,10 @@ func fixedIcon(_ name: String, size: CGFloat) -> Image {
         base.draw(in: CGRect(x: 0, y: 0, width: size, height: size))
     }
     return Image(uiImage: rendered.withRenderingMode(.alwaysTemplate))
+}
+
+func menuSymbol(_ name: String) -> Image {
+    let config = UIImage.SymbolConfiguration(pointSize: 17, weight: .semibold)
+    guard let image = UIImage(systemName: name, withConfiguration: config) else { return Image(systemName: name) }
+    return Image(uiImage: image.withRenderingMode(.alwaysTemplate))
 }

@@ -89,7 +89,7 @@ struct DetailSheet: View {
                     }
 
                     VStack(spacing: 6) {
-                        Text("Pokélett は非公式のファンツールです。株式会社ポケモン・任天堂・クリーチャーズ・ゲームフリークとは関係ありません。")
+                        Text("Pokéloot は非公式のファンツールです。株式会社ポケモン・任天堂・クリーチャーズ・ゲームフリークとは関係ありません。")
                             .font(.caption2)
                             .foregroundStyle(Palette.secondary)
                             .multilineTextAlignment(.center)
@@ -117,7 +117,7 @@ struct DetailSheet: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     if let url = model.shareURL() {
-                        ShareLink(item: url, preview: SharePreview("Pokélett の計算条件")) {
+                        ShareLink(item: url, preview: SharePreview("Pokéloot の計算条件")) {
                             Icon(name: "share", size: 19)
                                 .foregroundStyle(Palette.ink)
                         }

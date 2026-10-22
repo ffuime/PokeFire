@@ -152,7 +152,7 @@ struct MainScreen: View {
         case .statsSpeed:
             SpeedSheet(statsMode: true)
         case .speedLine(let role):
-            SpeedLineSheet(currentName: stats.side(role).name, currentSpeed: stats.side(role).real(.s)) { entry in
+            SpeedLineSheet(currentName: stats.side(role).name, currentSpeed: stats.boostedSpeed(role)) { entry in
                 stats.applySpeedLine(role, name: entry.name, points: entry.tier.points, nature: entry.tier.nature)
                 return true
             }

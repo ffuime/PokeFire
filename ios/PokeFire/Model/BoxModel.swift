@@ -153,6 +153,18 @@ final class BoxModel {
         return entry
     }
 
+    func addFromStats(_ side: StatsSide, usage: UsageData?) {
+        let entry = create(side.name, usage: usage)
+        update(entry.id) { item in
+            for key in StatKey.baseKeys {
+                item.points[key.rawValue] = side.point(key)
+                if side.nature(key) == 11 { item.up = key }
+                if side.nature(key) == 9 { item.down = key }
+            }
+            item.shiny = side.isShiny ? true : nil
+        }
+    }
+
     func changeSpecies(_ id: UUID, to name: String, usage: UsageData?) {
         let data = GameData.shared
         update(id) { entry in

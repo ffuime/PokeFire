@@ -594,6 +594,15 @@ struct ItemSection: View {
                 Haptics.play(.light)
                 present(.item(role))
             }
+            if let ratio = model.itemConstantRatio(role) {
+                ToggleChip(title: "発動", isOn: model.constantActive(ratio)) {
+                    model.toggleConstant(ratio, label: side.item)
+                }
+                .disabled(model.isConstantActive)
+                .opacity(model.isConstantActive ? 0.45 : 1)
+                .fixedSize()
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
             if role == .attacker, model.showsMetronome {
                 CountPill(title: "連続攻撃回数", range: 1...6, value: side.metronome, openEnded: true) { model.setMetronome($0) }
                     .transition(.opacity.combined(with: .move(edge: .top)))

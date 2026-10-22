@@ -118,6 +118,18 @@ final class AppModel {
         return learnsets[en]
     }
 
+    func applySpeedLine(_ role: Role, name: String, points: Int, nature: Int) {
+        if side(role).name != name {
+            selectPokemon(role, name)
+        }
+        update(role) { side in
+            var value = side.evs[.s] ?? EVState(points: 0)
+            value.points = points
+            value.nature = nature
+            side.evs[.s] = value
+        }
+    }
+
     func applyBox(_ entry: BoxPokemon, to role: Role) {
         if side(role).name != entry.name {
             selectPokemon(role, entry.name)
@@ -234,7 +246,7 @@ final class AppModel {
             if let key = Rules.fieldAbilities[side.ability] { return field == key }
             return false
         case .disguise:
-            return disguiseTabIndex != nil
+            return Rules.constantAbilities[role]?[side.ability].map { constantTabIndex($0) != nil } ?? false
         default: return false
         }
     }
@@ -794,36 +806,46 @@ final class AppModel {
                 setField(key)
             }
         case .disguise:
-            toggleDisguise()
+            if let ratio = Rules.constantAbilities[role]?[side(role).ability] {
+                toggleConstant(ratio, label: side(role).ability)
+            }
         default:
             break
         }
     }
 
-    private var disguiseTabIndex: Int? {
+    func itemConstantRatio(_ role: Role) -> String? {
+        Rules.constantItems[role]?[side(role).item]
+    }
+
+    func constantActive(_ ratio: String) -> Bool {
+        constantTabIndex(ratio) != nil
+    }
+
+    private func constantTabIndex(_ ratio: String) -> Int? {
         let index = active - 1
         guard tabs.indices.contains(active), tabs[active].kind == .attack, tabs.indices.contains(index) else { return nil }
         let constant = tabs[index].constant
         guard tabs[index].kind == .damage,
-              constant.ratios.filter({ $0.value > 0 }) == ["1/8": 1],
+              constant.ratios.filter({ $0.value > 0 }) == [ratio: 1],
               constant.toxic.values.allSatisfy({ $0 == 0 }),
               constant.fixed == 0,
               constant.inputs.allSatisfy({ $0.count == 0 }) else { return nil }
         return index
     }
 
-    private func toggleDisguise() {
+    func toggleConstant(_ ratio: String, label: String) {
         guard tabs.indices.contains(active), tabs[active].kind == .attack else { return }
-        if let index = disguiseTabIndex {
+        if let index = constantTabIndex(ratio) {
             tabs.remove(at: index)
             active -= 1
-            showToast("ばけのかわ：1/8ダメージを外しました")
+            showToast("\(label)：\(ratio)ダメージを外しました")
         } else {
             var tab = newTab(.damage)
-            tab.constant.ratios["1/8"] = 1
+            tab.constant.ratios[ratio] = 1
             tabs.insert(tab, at: active)
             active += 1
-            showToast("ばけのかわ：直前に1/8ダメージを追加")
+            showToast("\(label)：直前に\(ratio)ダメージを追加")
         }
         historyArmed = true
         Haptics.play(.medium)

@@ -26,7 +26,7 @@ private let helpTopics: [HelpTopic] = [
             HelpItem(term: "攻撃側・防御側", text: "左右にスワイプするか、上部の切り替えバーをタップしてパネルを切り替えます。"),
             HelpItem(term: "攻守交代", text: "切り替えバー中央の ⇄ で攻撃側と防御側のポケモンを入れ替えます。調整はそれぞれのポケモンに付いたまま入れ替わります。定数のタブを選んでいる間は使えません。"),
             HelpItem(term: "履歴", text: "左上のボタンか、画面の左端から右へスワイプすると開きます。"),
-            HelpItem(term: "PokéStats", text: "ポケモンの画像を長押しするか、パネルのいちばん下からさらに引っ張ると、使用率やタイプ相性を見る PokéStats に切り替わります。戻るときも同じ操作です。PokéStats で変えたポケモンや能力ポイントはダメージ計算には反映されません。"),
+            HelpItem(term: "PokéStats", text: "ポケモンの画像を長押しするか、パネルのいちばん上からさらに引っ張って離すと、使用率やタイプ相性を見る PokéStats に切り替わります。戻るときも同じ操作です。PokéStats で変えたポケモンや能力ポイントはダメージ計算には反映されません。"),
             HelpItem(term: "結果カード", text: "いつも画面下に表示されている計算結果です。タップで詳細、長押しで共有などのメニューが開きます。"),
         ]
     ),
@@ -150,15 +150,150 @@ private let helpTopics: [HelpTopic] = [
         id: "data",
         title: "データの出典",
         icon: "share",
-        lead: "Pokélett は非公式のファンツールです。株式会社ポケモン・任天堂・クリーチャーズ・ゲームフリークとは関係ありません。",
+        lead: "Pokéloot は非公式のファンツールです。株式会社ポケモン・任天堂・クリーチャーズ・ゲームフリークとは関係ありません。",
         points: [
             "わざ・とくせい・もちもの・ポケモンのデータは、GameWith の攻略情報をもとにしています。",
-            "ポケモンの画像と検索用の略称は、ポケソルのデータを使用しています。",
+            "ポケモンの画像は PokéAPI のスプライト、検索用の略称はポケソルのデータを使用しています。",
             "使用率は Pokémon Champions Battle Data のシングルのデータを使用しています（Battle data provided by Pokémon Champions Battle Data）。",
             "英語名と日本語名の対応には PokéAPI のデータを使用しています。",
         ]
     ),
 ]
+
+private let statsTopics: [HelpTopic] = [
+    HelpTopic(
+        id: "stats-screen",
+        title: "画面と切り替え",
+        icon: "help",
+        lead: "PokéStats は、ポケモンの種族値・タイプ相性・使用率をまとめて見るための画面です。攻撃側と防御側の2体を左右にスワイプして見比べられます。",
+        items: [
+            HelpItem(term: "切り替え", text: "ポケモンの画像を長押しするか、パネルの一番上からさらに下へ引っ張り、ゲージがいっぱいの状態で指を離すと PokéFire に戻ります。左上のメニューやサイドバーからも切り替えられます。"),
+            HelpItem(term: "ダメ計との関係", text: "PokéStats で変えたポケモンや能力ポイントは、ダメージ計算には反映されません。「このポケモンでダメ計する」を押すと、その内容で PokéFire に移ります。"),
+            HelpItem(term: "履歴", text: "PokéStats で見た2体の組み合わせは、ダメ計とは別の履歴に残ります。"),
+        ]
+    ),
+    HelpTopic(
+        id: "stats-base",
+        title: "種族値と調整",
+        icon: "edit",
+        lead: "種族値の下に、能力ポイントと性格補正を反映した実数値が「176(+32↑)」の形で表示されます。",
+        points: [
+            "種族値をタップすると吹き出しが開き、能力ポイントと性格補正を変えられます。",
+            "すばやさの吹き出しでは、素早さ特性とランクを指定できます。これは吹き出しの中の実数値とすばやさラインだけに反映されます。",
+            "「PokéBoxに追加」で、今の調整のまま PokéBox に登録できます。",
+        ]
+    ),
+    HelpTopic(
+        id: "stats-type",
+        title: "とくせい・タイプ相性",
+        icon: "shield",
+        lead: "とくせいをタップすると効果と、そのとくせいを持つポケモンが使用率順に並びます。ポケモンをタップするとそのポケモンに切り替わります。",
+        points: [
+            "タイプ相性は、受けるダメージの倍率ごとにタイプが並びます。見出しをタップすると最小化できます。",
+            "「とくせいを考慮」をオンにすると、ふゆう・ちょすい・あついしぼうなど、相性が変わるとくせいを反映します。該当するとくせいがないポケモンでは表示されません。",
+        ]
+    ),
+    HelpTopic(
+        id: "stats-usage",
+        title: "バトルデータ",
+        icon: "speed",
+        lead: "Pokémon Champions Battle Data のシングルのデータをもとに、わざ・とくせい・もちもの・能力補正・能力ポイントの採用率を表示します。",
+        points: [
+            "わざをタップすると、タイプ・分類・威力・命中・PP・効果を確認できます。",
+            "円グラフをタップすると項目名が出て、そこをタップすると詳細が開きます。円グラフ以外をタップすると一覧が開きます。",
+            "のうりょくポイントの行をタップすると、その配分をお手本として反映できます。",
+        ]
+    ),
+    HelpTopic(
+        id: "stats-speed",
+        title: "すばやさライン",
+        icon: "speed",
+        lead: "すばやさの吹き出しや、すばやさ比較の画面から開けます。実数値ごとに、どのポケモンがどの配分でその値になるかが並びます。",
+        points: [
+            "最遅は青、無振は灰、準速は緑、最速は赤で表示します。スカーフ・素早さ特性・すばやさを上げる積み技も含みます。",
+            "開いたときは、今のポケモンの実数値の位置まで自動でスクロールします。",
+            "行をタップすると、そのポケモンと配分に切り替わります。",
+            "右下のスイッチで、使用率TOP50だけに絞り込めます。",
+        ]
+    ),
+    HelpTopic(
+        id: "stats-learnset",
+        title: "覚えるわざ",
+        icon: "search",
+        lead: "「覚えるわざを見る」から、そのポケモンが覚えるわざの一覧を開けます。行をタップすると詳細が開きます。",
+        points: [
+            "検索欄の右のボタンから、タイプ・分類・威力・命中・PP・優先度・対象・追加効果などで絞り込めます。",
+            "同じ見出しの中でオンにした条件は「どれか」、見出しどうしは「すべて」に当てはまるものが残ります。",
+        ]
+    ),
+]
+
+private let boxTopics: [HelpTopic] = [
+    HelpTopic(
+        id: "box-home",
+        title: "ボックスとチーム",
+        icon: "help",
+        lead: "PokéBox では、育成したポケモンを登録してチームを組めます。下のタブで「ボックス」と「チーム」を切り替えます。",
+        points: [
+            "右下の＋で、ボックスではポケモンを、チームではチームを作成します。",
+            "検索欄にポケモン名を入れると、そのポケモンを含むものに絞り込めます。",
+            "右上のボタンで並び替えと選択ができます。選択中はまとめて削除でき、ボックスでは6体以下を選ぶとチームを作れます。",
+            "行を左にスワイプで削除、右にスワイプでお気に入り・複製です。長押しでも同じ操作ができます。",
+        ]
+    ),
+    HelpTopic(
+        id: "box-edit",
+        title: "ポケモンの編集",
+        icon: "edit",
+        lead: "ポケモンを選ぶと編集画面が開きます。とくせいには使用率1位、メガシンカならもちものにメガストーンが自動で入ります。",
+        points: [
+            "種族値をタップすると能力ポイントの調整が開きます。合計は66まで、各能力は32までです。上部の配分ボタンで使用率上位の配分を入れられます。",
+            "性格補正は×1.1と×0.9がそれぞれ1つまでです。片方だけ決めると、使用率が一番高い組み合わせが自動で入ります。",
+            "わざは4つまで選べます。わざ選択の画面で「三」をドラッグすると並び替えられます。",
+            "ニックネーム欄の右の輝きボタンで、色違いを切り替えられます。",
+        ]
+    ),
+    HelpTopic(
+        id: "box-thumbnail",
+        title: "サムネイル",
+        icon: "share",
+        lead: "編集画面の上部に、ポケモンの情報をまとめたサムネイルが表示されます。",
+        points: [
+            "サムネイルの各部分をタップすると、その項目の編集が開きます。",
+            "長押しすると、サムネイルを画像として写真に保存できます。",
+        ]
+    ),
+    HelpTopic(
+        id: "box-team",
+        title: "チーム",
+        icon: "tab_attack",
+        lead: "チームには、ボックスのポケモンを最大6体まで入れられます。チームのポケモンはボックスの個体と同じもので、編集するとボックスにも反映されます。",
+        points: [
+            "チームのサムネイルをタップすると拡大して見られます。ピンチで拡大し、ポケモンをタップするとそのポケモンの編集に移ります。",
+            "チームのサムネイルを長押しすると、画像として保存できます。設定で縦長の並びにもできます。",
+            "チームのポケモンの編集中は、サムネイルを横にスワイプすると隣のポケモンに移れます。",
+            "下部には、チームが苦手なタイプと、苦手なポケモンが表示されます。",
+        ]
+    ),
+]
+
+private struct HelpService: Identifiable {
+    let id: String
+    let title: String
+    let symbol: String?
+    let image: String?
+    let tint: Color
+    let summary: String
+    let topics: [HelpTopic]
+}
+
+private let helpServices: [HelpService] = [
+    HelpService(id: "fire", title: "PokéFire", symbol: nil, image: "tab_attack", tint: Palette.attack, summary: "ダメージと火力指数を計算します。乱数・確定数・加算計算・反動や回復までまとめて確認できます。", topics: helpTopics.filter { $0.id != "data" }),
+    HelpService(id: "stats", title: "PokéStats", symbol: "chart.pie", image: nil, tint: Palette.accent, summary: "種族値・タイプ相性・使用率・すばやさラインなど、ポケモンの情報を見比べます。", topics: statsTopics),
+    HelpService(id: "box", title: "PokéBox", symbol: "cube.box", image: nil, tint: Color(hex: 0x20A6A6), summary: "育成したポケモンを登録してチームを組み、サムネイル画像として保存できます。", topics: boxTopics),
+]
+
+private let allTopics: [HelpTopic] = helpTopics + statsTopics + boxTopics
 
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
@@ -168,29 +303,54 @@ struct HelpView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("PokéFire")
+                        Text("Pokéloot")
                             .font(.largeTitle.weight(.bold))
                             .foregroundStyle(Palette.ink)
-                        Text("ポケモンチャンピオンズのダメージと火力指数を計算するアプリです。シングルバトルを前提に、乱数・確定数・加算計算・反動や回復までまとめて確認できます。")
+                        Text("ポケモンチャンピオンズのシングルバトルのためのツールです。ダメージ計算の PokéFire、ポケモンの情報を見る PokéStats、育成したポケモンとチームを管理する PokéBox の3つのサービスがあり、左上のメニューやサイドバーから切り替えられます。")
                             .font(.subheadline)
                             .foregroundStyle(Palette.secondary)
                     }
                     .padding(.vertical, 8)
                 }
-                Section("もくじ") {
-                    ForEach(helpTopics) { topic in
-                        NavigationLink(value: topic.id) {
-                            Label {
-                                Text(topic.title)
-                                    .foregroundStyle(Palette.ink)
-                            } icon: {
-                                Icon(name: topic.icon, size: 20)
-                                    .foregroundStyle(Palette.accent)
+                Section("サービス") {
+                    ForEach(helpServices) { service in
+                        NavigationLink(value: "service:" + service.id) {
+                            HStack(alignment: .top, spacing: 12) {
+                                Group {
+                                    if let image = service.image {
+                                        Icon(name: image, size: 18)
+                                    } else if let symbol = service.symbol {
+                                        Image(systemName: symbol)
+                                            .font(.system(size: 17, weight: .semibold))
+                                    }
+                                }
+                                .foregroundStyle(service.tint)
+                                .frame(width: 36, height: 36)
+                                .background(Circle().fill(service.tint.opacity(0.12)))
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(service.title)
+                                        .font(.headline)
+                                        .foregroundStyle(Palette.ink)
+                                    Text(service.summary)
+                                        .font(.caption)
+                                        .foregroundStyle(Palette.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                             }
+                            .padding(.vertical, 4)
                         }
                     }
                 }
                 Section {
+                    NavigationLink(value: "topic:data") {
+                        Label {
+                            Text("データの出典")
+                                .foregroundStyle(Palette.ink)
+                        } icon: {
+                            Icon(name: "share", size: 20)
+                                .foregroundStyle(Palette.accent)
+                        }
+                    }
                     Link(destination: URL(string: "https://ffui.me/poke/fire/")!) {
                         Label {
                             Text("Web版を開く")
@@ -202,8 +362,10 @@ struct HelpView: View {
                     Text("© 2026 fifth.")
                 }
             }
-            .navigationDestination(for: String.self) { id in
-                if let topic = helpTopics.first(where: { $0.id == id }) {
+            .navigationDestination(for: String.self) { value in
+                if value.hasPrefix("service:"), let service = helpServices.first(where: { "service:" + $0.id == value }) {
+                    HelpServiceView(service: service)
+                } else if let topic = allTopics.first(where: { "topic:" + $0.id == value }) {
                     HelpTopicView(topic: topic)
                 }
             }
@@ -216,6 +378,36 @@ struct HelpView: View {
             }
         }
         .presentationDragIndicator(.visible)
+    }
+}
+
+private struct HelpServiceView: View {
+    let service: HelpService
+
+    var body: some View {
+        List {
+            Section {
+                Text(service.summary)
+                    .font(.subheadline)
+                    .foregroundStyle(Palette.secondary)
+                    .padding(.vertical, 4)
+            }
+            Section("もくじ") {
+                ForEach(service.topics) { topic in
+                    NavigationLink(value: "topic:" + topic.id) {
+                        Label {
+                            Text(topic.title)
+                                .foregroundStyle(Palette.ink)
+                        } icon: {
+                            Icon(name: topic.icon, size: 20)
+                                .foregroundStyle(service.tint)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle(service.title)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

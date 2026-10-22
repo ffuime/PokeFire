@@ -13,8 +13,11 @@ struct StatsPanel: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 26) {
                 StatsHeader(role: role, present: present)
-                StatsBaseRow(role: role, editing: $editing, present: present)
-                    .zIndex(2)
+                VStack(alignment: .trailing, spacing: 10) {
+                    StatsBaseRow(role: role, editing: $editing, present: present)
+                    AddToBoxButton(role: role)
+                }
+                .zIndex(2)
                 StatsAbilityRow(role: role, present: present)
                 TypeChartCard(role: role)
                 if let entry, !entry.moves.isEmpty {
@@ -322,13 +325,14 @@ struct StatsStatFields: View {
     var body: some View {
         let side = stats.side(role)
         let color = Palette.stat(key)
+        let shown = key == .s ? stats.boostedSpeed(role) : side.real(key)
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(key.title).sectionTitle()
                 Spacer()
-                NumberText(side.real(key))
+                NumberText(shown)
                     .font(.system(size: 26, weight: .bold))
-                    .foregroundStyle(color)
+                    .foregroundStyle(shown != side.real(key) ? Palette.boosted : color)
             }
             HStack(spacing: 12) {
                 SegmentBar(count: 32, value: side.point(key), color: color) { value in
@@ -344,7 +348,48 @@ struct StatsStatFields: View {
                     withAnimation(.snappy(duration: 0.25)) { stats.setNature(role, key, value) }
                 }
             }
+            if key == .s {
+                let boost = stats.speedBoost(role)
+                let abilities = (side.pokemon?.abilities ?? []).filter { Calc.speedAbilities[$0] != nil }
+                HStack(spacing: 8) {
+                    ForEach(abilities, id: \.self) { ability in
+                        ToggleChip(title: ability, isOn: boost.ability == ability) {
+                            withAnimation(.snappy(duration: 0.25)) { stats.toggleSpeedAbility(role, ability) }
+                        }
+                        .fixedSize()
+                    }
+                    Spacer(minLength: 0)
+                    RankControl(
+                        rank: boost.rank,
+                        onStep: { step in withAnimation(.snappy(duration: 0.25)) { stats.setSpeedRank(role, boost.rank + step) } },
+                        onSet: { value in withAnimation(.snappy(duration: 0.25)) { stats.setSpeedRank(role, value) } }
+                    )
+                }
+            }
         }
+    }
+}
+
+struct AddToBoxButton: View {
+    @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
+    @Environment(BoxModel.self) private var box
+    let role: Role
+
+    var body: some View {
+        Button {
+            Haptics.play(.success)
+            box.addFromStats(stats.side(role), usage: model.usage)
+            NotificationCenter.default.post(name: .pokefireToast, object: "PokéBoxに追加しました")
+        } label: {
+            Label("PokéBoxに追加", systemImage: "cube.box")
+                .font(.footnote.weight(.bold))
+                .foregroundStyle(Palette.accent)
+                .padding(.horizontal, 12)
+                .frame(height: 32)
+                .background(Palette.accent.opacity(0.08), in: Capsule())
+        }
+        .buttonStyle(PressableStyle())
     }
 }
 
@@ -544,6 +589,7 @@ struct TypeChartCard: View {
                     .padding(.horizontal, 8)
                     .background(Color(hex: row.background), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
+                if TypeChart.considersAny(side.pokemon?.abilities ?? []) {
                 HStack {
                     Spacer()
                     Toggle("とくせいを考慮", isOn: $stats.considerAbilities)
@@ -551,6 +597,7 @@ struct TypeChartCard: View {
                         .foregroundStyle(Palette.secondary)
                         .fixedSize()
                         .padding(.trailing, 2)
+                }
                 }
             }
             .animation(.snappy(duration: 0.3), value: stats.considerAbilities)
