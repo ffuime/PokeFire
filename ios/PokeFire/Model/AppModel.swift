@@ -67,6 +67,9 @@ final class AppModel {
     var output = CalcOutput()
     var usage: UsageData?
     var learnsets: [String: [String]]?
+    var seasons: [SeasonInfo] = []
+    var season: String?
+    var loadingSeason = false
     var toast: ToastMessage?
     var history: [HistoryEntry] = Storage.history
     var isLoadingShare = false
@@ -107,10 +110,59 @@ final class AppModel {
             let loaded = await LearnsetLoader.load()
             self?.learnsets = loaded
         }
+        Task { [weak self] in
+            let list = await UsageLoader.seasons()
+            self?.seasons = list
+        }
         NotificationCenter.default.addObserver(forName: .pokefireToast, object: nil, queue: .main) { [weak self] note in
             guard let text = note.object as? String else { return }
             MainActor.assumeIsolated { self?.showToast(text) }
         }
+    }
+
+    func selectSeason(_ name: String) {
+        guard name != (season ?? usage?.season) else { return }
+        season = name
+        loadingSeason = true
+        Haptics.play(.selection)
+        Task { [weak self] in
+            let loaded = await UsageLoader.load(season: name)
+            guard let self, self.season == name else { return }
+            if let loaded { self.usage = loaded }
+            self.loadingSeason = false
+        }
+    }
+
+    func applyTopSet(_ role: Role) {
+        let name = side(role).name
+        guard let entry = usage?.pokemons[name] else {
+            showToast("このポケモンの使用率データがありません")
+            Haptics.play(.warning)
+            return
+        }
+        update(role) { side in
+            if let spread = entry.spreads.first {
+                for (index, key) in StatKey.baseKeys.enumerated() where Rules.statKeys(role).contains(key) && index < spread.points.count {
+                    side.evs[key, default: EVState(points: 0)].points = spread.points[index]
+                }
+            }
+            if let nature = entry.natures.first {
+                for key in Rules.statKeys(role) where key.hasNature && key != .vsa {
+                    side.evs[key, default: EVState(points: 0)].nature = key == nature.up ? 11 : key == nature.down ? 9 : 10
+                }
+            }
+        }
+        if let ability = usageAbilities(name).compactMap(\.name).first(where: { data.abilities[$0] != nil }) {
+            selectAbility(role, ability)
+        }
+        if let item = entry.items.compactMap(\.name).first(where: { data.items[$0] != nil }) {
+            selectItem(role, item)
+        }
+        if role == .attacker, let move = entry.moves.compactMap(\.name).first(where: { data.moves[$0] != nil }) {
+            selectMove(move)
+        }
+        showToast("\(name)：使用率上位の型を入れました")
+        Haptics.play(.success)
     }
 
     func learnset(_ name: String) -> [String]? {

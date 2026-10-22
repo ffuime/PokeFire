@@ -26,6 +26,7 @@ struct SidePanel: View {
 
     var body: some View {
         ScrollView {
+            PullTopMarker()
             VStack(alignment: .leading, spacing: 26) {
                 if role == .attacker, model.isConstantActive {
                     ConstantPanel()
@@ -53,7 +54,7 @@ struct SidePanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 ZStack(alignment: .topTrailing) {
-                    PanelShape(role: role).fill(Color.white)
+                    PanelShape(role: role).fill(Palette.card)
                     Icon(name: role == .attacker ? "watermark_attack" : "watermark_defense", size: 190)
                         .foregroundStyle(role == .attacker ? Color(hex: 0xD65F5F, opacity: 0.2) : Color(hex: 0x508ACB, opacity: 0.2))
                         .padding(.top, 6)
@@ -142,7 +143,20 @@ struct PokemonHeader: View {
                 .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
             }
 
-            BaseStatsRow(role: role, present: present)
+            VStack(alignment: .trailing, spacing: 10) {
+                BaseStatsRow(role: role, present: present)
+                Button {
+                    model.applyTopSet(role)
+                } label: {
+                    Label("上位の型を入れる", systemImage: "wand.and.stars")
+                        .font(.footnote.weight(.bold))
+                        .foregroundStyle(Palette.accent)
+                        .padding(.horizontal, 12)
+                        .frame(height: 32)
+                        .background(Palette.accent.opacity(0.08), in: Capsule())
+                }
+                .buttonStyle(PressableStyle())
+            }
         }
         .onChange(of: side.name) { _, _ in
             showForms = false
@@ -158,7 +172,7 @@ struct PokemonHeader: View {
                 HStack(spacing: 10) {
                     Text(side.name)
                         .font(.body)
-                        .foregroundStyle(Color.black)
+                        .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)
                         .contentTransition(.opacity)
@@ -174,7 +188,7 @@ struct PokemonHeader: View {
                         UnevenBox(strong: 28, weak: 6).fill(Color.white.opacity(0.6))
                     }
                 }
-                .overlay(UnevenBox(strong: 28, weak: 6).stroke(Color(hex: 0xDADADA), lineWidth: 1))
+                .overlay(UnevenBox(strong: 28, weak: 6).stroke(Palette.separator, lineWidth: 1))
                 .contentShape(UnevenBox(strong: 28, weak: 6))
             }
             .buttonStyle(PressableStyle())

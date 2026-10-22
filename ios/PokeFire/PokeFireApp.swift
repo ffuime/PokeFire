@@ -5,6 +5,7 @@ struct PokeFireApp: App {
     @State private var model = AppModel()
     @State private var stats = StatsModel()
     @State private var box = BoxModel()
+    @AppStorage(AppSettings.appearanceKey) private var appearance = "system"
 
     var body: some Scene {
         WindowGroup {
@@ -15,7 +16,7 @@ struct PokeFireApp: App {
                 .onAppear {
                     AppSettings.applyAutoSleep(UserDefaults.standard.object(forKey: AppSettings.autoSleepKey) as? Bool ?? true)
                 }
-                .preferredColorScheme(.light)
+                .preferredColorScheme(AppSettings.scheme(appearance))
                 .tint(Palette.accent)
                 .onOpenURL { url in
                     model.open(url)

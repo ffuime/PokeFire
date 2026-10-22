@@ -633,7 +633,7 @@ struct TeamNameSheet: View {
                 .onSubmit(confirm)
                 .padding(.horizontal, 16)
                 .frame(height: 48)
-                .background(Color(hex: 0xEEEEF1), in: Capsule())
+                .background(Palette.field, in: Capsule())
             HStack(spacing: 10) {
                 Button {
                     dismiss()

@@ -7,7 +7,7 @@ const html = readFileSync(join(root, "index.html"), "utf8");
 const app = readFileSync(join(root, "app.js"), "utf8");
 
 for (const dir of readdirSync(out)) {
-    if (dir.endsWith(".imageset") && !dir.startsWith("sprite_")) rmSync(join(out, dir), { recursive: true });
+    if (dir.endsWith(".imageset") && !dir.startsWith("sprite_") && !dir.startsWith("poke_")) rmSync(join(out, dir), { recursive: true });
 }
 
 const symbols = {};
@@ -72,7 +72,7 @@ for (const m of app.matchAll(/\["(\w+)", "([^"]+)", "(#[0-9a-f]{6})", '(.*?)'\],
     icons[`glyph_${id}`] = { viewBox: "0 0 76.71 76.71", attrs: 'fill="#000000"', body: shapes.replace(/fill="#?[0-9a-fA-F]{3,6}"/g, "") };
 }
 
-icons.category_status = stroke('<circle cx="12" cy="12" r="9"/><path d="M12 3a4.5 4.5 0 0 1 0 9a4.5 4.5 0 0 0 0 9"/><circle cx="12" cy="7.5" r="0.6"/><circle cx="12" cy="16.5" r="0.6"/>');
+icons.category_status = { viewBox: "0 0 24 24", attrs: 'fill="#000000"', body: '<circle cx="12" cy="12" r="9.2" fill="none" stroke="#000000" stroke-width="2"/><path d="M12 2.8A9.2 9.2 0 0 1 12 21.2A4.6 4.6 0 0 0 12 12A4.6 4.6 0 0 1 12 2.8Z"/>' };
 icons.eff_x4 = fill('<path d="M12 2.2l2.95 6.3 6.85.8-5.1 4.7 1.4 6.8L12 17.4l-6.1 3.4 1.4-6.8-5.1-4.7 6.85-.8z"/>');
 icons.eff_x2 = stroke('<circle cx="12" cy="12" r="9.2"/><circle cx="12" cy="12" r="4.6"/>', 2.2);
 icons.eff_half = stroke('<path d="M12 4.2 21 19.8H3z"/>', 2.2);

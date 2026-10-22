@@ -153,7 +153,7 @@ struct BoxCard: View {
                             Text("?")
                                 .font(.system(size: 11, weight: .heavy))
                                 .frame(width: 16, height: 16)
-                                .background(Color.white, in: RoundedRectangle(cornerRadius: 3))
+                                .background(Palette.card, in: RoundedRectangle(cornerRadius: 3))
                         }
                         Text(move.isEmpty ? "わざを入力" : move)
                             .font(.caption.weight(.semibold))
@@ -201,6 +201,7 @@ struct BoxCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .shadow(color: .black.opacity(frozen ? 0 : 0.08), radius: 14, y: 4)
+        .environment(\.colorScheme, .light)
     }
 
     private var spriteImage: some View {
@@ -436,7 +437,7 @@ struct BoxBaseRow: View {
                 }
             }
             .padding(.vertical, 8)
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             .contentShape(Rectangle())
         }
         .buttonStyle(PressableStyle())
@@ -468,7 +469,7 @@ struct BoxMoveButton: View {
                         .frame(width: 22)
                 }
                 Text(move.isEmpty ? "わざを選択" : move)
-                    .foregroundStyle(move.isEmpty ? Palette.secondary : Color.black)
+                    .foregroundStyle(move.isEmpty ? Palette.secondary : Palette.ink)
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if let info {
@@ -482,8 +483,8 @@ struct BoxMoveButton: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 46)
-            .background(UnevenBox().fill(Color.white))
-            .overlay(UnevenBox().stroke(Color(hex: 0xDDDDDD), lineWidth: 1))
+            .background(UnevenBox().fill(Palette.card))
+            .overlay(UnevenBox().stroke(Palette.separator, lineWidth: 1))
             .contentShape(UnevenBox())
         }
         .buttonStyle(PressableStyle())
@@ -567,8 +568,8 @@ struct BoxStatsSheet: View {
                                         .foregroundStyle(Palette.ink)
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 8)
-                                        .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color(hex: 0xDDDDDD), lineWidth: 1))
+                                        .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Palette.separator, lineWidth: 1))
                                     }
                                     .buttonStyle(PressableStyle())
                                 }
@@ -872,7 +873,7 @@ struct BoxMoveSheet: View {
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 44)
-                .background(Color(hex: 0xEEEEF1), in: Capsule())
+                .background(Palette.field, in: Capsule())
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 List {
@@ -966,7 +967,7 @@ struct BoxMoveSheet: View {
         .frame(height: 40)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(active ? Color.white : Palette.background)
+                .fill(active ? Palette.card : Palette.background)
                 .shadow(color: active ? Palette.accent.opacity(0.18) : .clear, radius: 8, y: 2)
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(active ? Palette.accent.opacity(0.5) : .clear, lineWidth: 1))
         )
@@ -1276,6 +1277,7 @@ struct TeamCollage: View {
         .padding(Self.padding)
         .frame(width: size.width, height: size.height)
         .background(Color.white)
+        .environment(\.colorScheme, .light)
     }
 }
 
@@ -1413,20 +1415,35 @@ struct TeamWeaknessSections: View {
         .sorted { ($0.weak - $0.resist, $0.weak) > ($1.weak - $1.resist, $1.weak) }
     }
 
+    private func attackTypes(_ entry: BoxPokemon) -> [String] {
+        let catalog = StatsCatalog.shared
+        let types = entry.filledMoves.compactMap { catalog.moveInfo($0) }.filter { $0.category != "変化" }.map(\.type)
+        return types.isEmpty ? entry.pokemon?.types ?? [] : Array(Set(types))
+    }
+
     private var threats: [(String, Int)] {
         guard let usage = model.usage else { return [] }
+        let catalog = StatsCatalog.shared
         let ranked = model.data.pokemonOrder
             .filter { model.data.megaParent($0) == nil }
-            .compactMap { name in usage.pokemons[name].map { (name, $0.rank) } }
-            .sorted { $0.1 < $1.1 }
+            .compactMap { name in usage.pokemons[name].map { (name, $0) } }
+            .sorted { $0.1.rank < $1.1.rank }
             .prefix(40)
         let memberNames = Set(members.map { model.data.usageName(of: $0.name) })
-        let scored: [(String, Int)] = ranked.compactMap { name, _ in
-            guard !memberNames.contains(name), let types = model.data.pokemons[name]?.types else { return nil }
-            let hits = members.filter { member in types.contains { multiplier($0, member) > 1 } }.count
-            let walls = members.filter { member in types.allSatisfy { multiplier($0, member) < 1 } }.count
-            let score = hits - walls
-            return score >= 2 ? (name, score) : nil
+        let scored: [(String, Int)] = ranked.compactMap { name, entry in
+            guard !memberNames.contains(name), let pokemon = model.data.pokemons[name] else { return nil }
+            var moveTypes = entry.moves.compactMap(\.name).compactMap { catalog.moveInfo($0) }.filter { $0.category != "変化" }.prefix(4).map(\.type)
+            if moveTypes.isEmpty { moveTypes = pokemon.types }
+            let threatened = members.filter { member in moveTypes.contains { multiplier($0, member) > 1 } }.count
+            let answers = members.filter { member in
+                let hits = attackTypes(member).contains { attack in
+                    TypeChart.multiplier(attack, types: pokemon.types, abilities: []) > 1
+                }
+                let walls = moveTypes.allSatisfy { multiplier($0, member) < 1 }
+                return hits || walls
+            }.count
+            let score = threatened - answers
+            return score >= 1 && threatened >= 2 ? (name, score) : nil
         }
         return Array(scored.sorted { $0.1 > $1.1 }.prefix(8))
     }
@@ -1457,7 +1474,7 @@ struct TeamWeaknessSections: View {
                     ForEach(list, id: \.0) { name, score in
                         VStack(spacing: 2) {
                             SpriteView(name: name, size: 52)
-                            Text("\(score)体に抜群")
+                            Text("+\(score)")
                                 .font(.system(size: 9, weight: .bold))
                                 .foregroundStyle(Palette.rankUp)
                                 .lineLimit(1)
@@ -1470,7 +1487,7 @@ struct TeamWeaknessSections: View {
             } header: {
                 Text("苦手なポケモン")
             } footer: {
-                Text("使用率上位のポケモンのうち、タイプ一致わざでチームの多くに抜群を取れるものです。")
+                Text("使用率上位40体について、よく使われる攻撃わざで抜群を取れるメンバーの数から、抜群を返せるか全わざを半減以下で受けられるメンバーの数を引いた値です。値が大きいほど苦手です。")
             }
         }
     }

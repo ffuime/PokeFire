@@ -11,6 +11,7 @@ struct StatsPanel: View {
         let side = stats.side(role)
         let entry = model.usage?.pokemons[side.name]
         ScrollView {
+            PullTopMarker()
             VStack(alignment: .leading, spacing: 26) {
                 StatsHeader(role: role, present: present)
                 VStack(alignment: .trailing, spacing: 10) {
@@ -20,8 +21,16 @@ struct StatsPanel: View {
                 .zIndex(2)
                 StatsAbilityRow(role: role, present: present)
                 TypeChartCard(role: role)
-                if let entry, !entry.moves.isEmpty {
-                    MoveUsageSection(pairs: Array(entry.moves.prefix(10)), present: present)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("バトルデータ").sectionTitle()
+                    SeasonPicker()
+                    if let entry, !entry.moves.isEmpty {
+                        MoveUsageSection(pairs: Array(entry.moves.prefix(10)), present: present)
+                    } else if model.usage != nil {
+                        Text("このシーズンのデータはありません")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundStyle(Palette.secondary)
+                    }
                 }
                 if entry != nil {
                     UsageCarousel(role: role, present: present)
@@ -41,7 +50,7 @@ struct StatsPanel: View {
                     .foregroundStyle(Palette.ink)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
-                    .background(UnevenBox().fill(Color(hex: 0xF0F0F3)))
+                    .background(UnevenBox().fill(Palette.field))
                     .contentShape(UnevenBox())
                 }
                 .buttonStyle(PressableStyle())
@@ -54,7 +63,7 @@ struct StatsPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 PanelShape(role: role)
-                    .fill(Color.white)
+                    .fill(Palette.card)
                     .shadow(color: .black.opacity(0.1), radius: 18, y: 4)
             }
             .padding(.leading, role == .attacker ? 0 : 16)
@@ -163,7 +172,7 @@ struct ModeSprite: View {
                     .rotationEffect(.degrees(Double(spin) * -360))
                     .animation(.spring(response: 0.6, dampingFraction: 0.7), value: spin)
                     .frame(width: 30, height: 30)
-                    .background(Circle().fill(Color.white).shadow(color: .black.opacity(0.15), radius: 6, y: 1))
+                    .background(Circle().fill(Palette.card).shadow(color: .black.opacity(0.15), radius: 6, y: 1))
             }
         }
         .scaleEffect(pressing ? 0.92 : 1)
@@ -206,7 +215,7 @@ struct PokemonNameButton: View {
             HStack(spacing: 10) {
                 Text(name)
                     .font(.body)
-                    .foregroundStyle(Color.black)
+                    .foregroundStyle(Palette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .contentTransition(.opacity)
@@ -222,7 +231,7 @@ struct PokemonNameButton: View {
                     UnevenBox(strong: 28, weak: 6).fill(Color.white.opacity(0.6))
                 }
             }
-            .overlay(UnevenBox(strong: 28, weak: 6).stroke(Color(hex: 0xDADADA), lineWidth: 1))
+            .overlay(UnevenBox(strong: 28, weak: 6).stroke(Palette.separator, lineWidth: 1))
             .contentShape(UnevenBox(strong: 28, weak: 6))
         }
         .buttonStyle(PressableStyle())
@@ -370,6 +379,42 @@ struct StatsStatFields: View {
     }
 }
 
+struct SeasonPicker: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let current = model.season ?? model.usage?.season ?? model.seasons.first?.name ?? ""
+        let label = model.seasons.first { $0.name == current }?.label ?? current
+        Menu {
+            Picker("シーズン", selection: Binding(get: { current }, set: { model.selectSeason($0) })) {
+                ForEach(model.seasons) { season in
+                    Text(season.label).tag(season.name)
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Text(label.isEmpty ? "シーズン" : label)
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Palette.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Spacer(minLength: 4)
+                if model.loadingSeason {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Icon(name: "chevron_down", size: 14)
+                        .foregroundStyle(Palette.secondary)
+                }
+            }
+            .padding(.horizontal, 14)
+            .frame(height: 38)
+            .background(UnevenBox(strong: 16, weak: 5).fill(Palette.card))
+            .overlay(UnevenBox(strong: 16, weak: 5).stroke(Palette.separator, lineWidth: 1))
+        }
+        .disabled(model.seasons.isEmpty)
+    }
+}
+
 struct AddToBoxButton: View {
     @Environment(AppModel.self) private var model
     @Environment(StatsModel.self) private var stats
@@ -443,7 +488,7 @@ struct StatsBubble: View {
         .padding(18)
         .background(
             StatsBubbleShape(tailRatio: tailRatio)
-                .fill(Color.white)
+                .fill(Palette.card)
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
                 .animation(.spring(response: 0.42, dampingFraction: 0.78), value: key)
         )
@@ -502,8 +547,8 @@ struct StatsAbilityRow: View {
                                 .foregroundStyle(Palette.ink)
                                 .padding(.horizontal, 14)
                                 .frame(height: 36)
-                                .background(UnevenBox(strong: 16, weak: 5).fill(Color.white))
-                                .overlay(UnevenBox(strong: 16, weak: 5).stroke(Color(hex: 0xDDDDDD), lineWidth: 1))
+                                .background(UnevenBox(strong: 16, weak: 5).fill(Palette.card))
+                                .overlay(UnevenBox(strong: 16, weak: 5).stroke(Palette.separator, lineWidth: 1))
                                 .contentShape(UnevenBox(strong: 16, weak: 5))
                         }
                         .buttonStyle(PressableStyle())
@@ -611,7 +656,7 @@ struct TypeChartCard: View {
 
 struct Outlined<Content: View>: View {
     let color: Color
-    var outline = Color(hex: 0xEAEAEA)
+    var outline = Palette.bar
     var width: CGFloat = 1.2
     @ViewBuilder let content: () -> Content
 
@@ -635,7 +680,6 @@ struct MoveUsageSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("バトルデータ").sectionTitle()
             VStack(spacing: 6) {
                 ForEach(Array(pairs.enumerated()), id: \.offset) { _, pair in
                     MoveUsageRow(pair: pair) {
@@ -682,7 +726,7 @@ struct MoveUsageRow: View {
             .background {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
-                        Color(hex: 0xEAEAEA)
+                        Palette.bar
                         color.frame(width: geometry.size.width * ratio)
                     }
                 }
@@ -891,7 +935,7 @@ struct UsageCard: View {
         .minimumScaleFactor(0.7)
         .padding(.horizontal, 10)
         .frame(height: 28)
-        .background(Capsule().fill(Color.white).shadow(color: .black.opacity(0.16), radius: 8, y: 2))
+        .background(Capsule().fill(Palette.card).shadow(color: .black.opacity(0.16), radius: 8, y: 2))
         if kind != .natures, slice.name != nil {
             Button {
                 Haptics.play(.light)
@@ -1129,6 +1173,27 @@ struct SpreadSection: View {
     }
 }
 
+struct PullTopKey: PreferenceKey {
+    static var defaultValue: CGFloat?
+
+    static func reduce(value: inout CGFloat?, nextValue: () -> CGFloat?) {
+        value = nextValue() ?? value
+    }
+}
+
+struct PullTopMarker: View {
+    var body: some View {
+        Color.clear
+            .frame(height: 0)
+            .frame(maxWidth: .infinity)
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(key: PullTopKey.self, value: geometry.frame(in: .named("modePull")).minY)
+                }
+            }
+    }
+}
+
 struct ModeSwitchPull: ViewModifier {
     let label: String
     let icon: String
@@ -1141,6 +1206,7 @@ struct ModeSwitchPull: ViewModifier {
 
     @State private var armed = false
     @State private var pullAmount: CGFloat = 0
+    @State private var topY: CGFloat?
 
     private let deadZone: CGFloat = 110
 
@@ -1174,6 +1240,10 @@ struct ModeSwitchPull: ViewModifier {
     func body(content: Content) -> some View {
         content
             .scrollBounceBehavior(.always, axes: .vertical)
+            .coordinateSpace(.named("modePull"))
+            .onPreferenceChange(PullTopKey.self) { value in
+                topY = value
+            }
             .onScrollGeometryChange(for: [CGFloat].self) { geometry in
                 [-(geometry.contentOffset.y + geometry.contentInsets.top), geometry.contentInsets.top]
             } action: { _, values in
@@ -1204,7 +1274,7 @@ struct ModeSwitchPull: ViewModifier {
                 .opacity(Double(min(1, progress * 3)))
                 .scaleEffect(0.7 + 0.3 * progress)
                 .frame(maxWidth: .infinity)
-                .offset(y: visibleTop + 8)
+                .offset(y: max(0, (topY.map { $0 - pullAmount / 2 } ?? (visibleTop + pullAmount / 2)) - 36))
                 .allowsHitTesting(false)
             }
     }

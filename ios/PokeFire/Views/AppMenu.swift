@@ -4,6 +4,15 @@ import UIKit
 enum AppSettings {
     static let autoSleepKey = "pokefire-auto-sleep"
     static let portraitTeamKey = "pokefire-team-portrait"
+    static let appearanceKey = "pokefire-appearance"
+
+    static func scheme(_ value: String) -> ColorScheme? {
+        switch value {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
 
     static func applyAutoSleep(_ on: Bool) {
         UIApplication.shared.isIdleTimerDisabled = !on
@@ -98,10 +107,19 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(AppSettings.autoSleepKey) private var autoSleep = true
     @AppStorage(AppSettings.portraitTeamKey) private var portraitTeam = false
+    @AppStorage(AppSettings.appearanceKey) private var appearance = "system"
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("外観") {
+                    Picker("外観", selection: $appearance) {
+                        Text("システム").tag("system")
+                        Text("ライト").tag("light")
+                        Text("ダーク").tag("dark")
+                    }
+                    .pickerStyle(.segmented)
+                }
                 Section {
                     Toggle("自動スリープ", isOn: $autoSleep)
                 } footer: {

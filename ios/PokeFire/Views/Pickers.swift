@@ -101,7 +101,7 @@ struct SearchHeader: View {
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
-            .background(Color(hex: 0xEEEEF1), in: Capsule())
+            .background(Palette.field, in: Capsule())
             .modifier(FilterButtonModifier(active: filterActive, action: onFilter))
         }
         .padding(.horizontal, 16)
@@ -167,7 +167,7 @@ struct PokemonPicker: View {
                         PokemonRow(name: row.name, nested: row.nested, selected: row.name == current, rank: model.usage?.pokemons[row.name]?.rank)
                     }
                     .listRowInsets(EdgeInsets(top: 4, leading: row.nested ? 34 : 16, bottom: 4, trailing: 16))
-                    .listRowBackground(row.name == current ? Palette.accent.opacity(0.06) : Color.white)
+                    .listRowBackground(row.name == current ? Palette.accent.opacity(0.06) : Palette.card)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         if mode == 1 {
                             Button(role: .destructive) {
@@ -458,7 +458,7 @@ struct EntrySearchSheet: View {
             } label: {
                 EntryRow(kind: kind, name: row.name, effect: row.effect, usage: row.usage, selected: row.name == selected)
             }
-            .listRowBackground(row.name == selected ? Palette.accent.opacity(0.06) : Color.white)
+            .listRowBackground(row.name == selected ? Palette.accent.opacity(0.06) : Palette.card)
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if mode == 1, kind.hasHistory {
                     Button(role: .destructive) {

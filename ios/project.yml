@@ -37,7 +37,6 @@ targets:
     info:
       path: PokeFire/Info.plist
       properties:
-        UIUserInterfaceStyle: Light
         NSPhotoLibraryAddUsageDescription: ポケモンのカード画像を写真に保存するために使用します。
         CFBundleURLTypes:
           - CFBundleURLName: me.ffui.pokefire

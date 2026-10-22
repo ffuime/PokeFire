@@ -274,7 +274,7 @@ private struct SpeedEditor: View {
         .padding(18)
         .background(
             BubbleShape(tailRatio: role == .attacker ? 0.25 : 0.75)
-                .fill(Color.white)
+                .fill(Palette.card)
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
                 .animation(.spring(response: 0.42, dampingFraction: 0.78), value: role)
         )

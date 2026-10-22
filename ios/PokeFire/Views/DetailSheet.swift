@@ -65,6 +65,15 @@ struct DetailSheet: View {
                             ConstantOverview(entry: view.constant)
                         } else if let first = view.list.first {
                             MatchOverview(view: view, first: first)
+                                .holdToSave {
+                                    CardImage.save(
+                                        MatchOverview(view: view, first: first)
+                                            .padding(20)
+                                            .frame(width: 390)
+                                            .background(Palette.card)
+                                            .environment(model)
+                                    )
+                                }
                         }
 
                         FlowList(view: view) { next in
@@ -268,7 +277,7 @@ private struct FighterColumn: View {
                     ForEach(types, id: \.self) { type in
                         TypeIcon(type: type, size: 18)
                             .padding(2)
-                            .background(Color.white, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .background(Palette.card, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                 }
             }
@@ -449,7 +458,7 @@ private struct FlowList: View {
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(selected ? Color.white : Palette.background)
+                        .fill(selected ? Palette.card : Palette.background)
                         .shadow(color: selected ? Palette.accent.opacity(0.22) : .clear, radius: 12, y: 4)
                         .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.accent.opacity(0.45) : Color.clear, lineWidth: 0.75))
                 )
@@ -508,7 +517,7 @@ private struct FlowItem: View {
         .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(selected ? Color.white : Palette.background)
+                .fill(selected ? Palette.card : Palette.background)
                 .shadow(color: selected ? Palette.tab(entry.kind).opacity(0.22) : .clear, radius: 12, y: 4)
                 .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).strokeBorder(selected ? Palette.tab(entry.kind).opacity(0.45) : Color.clear, lineWidth: 0.75))
         )
@@ -629,7 +638,7 @@ private struct AttackBreakdown: View {
                         }
                     }
                     .padding(12)
-                    .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
                 .scrollIndicators(.hidden)
             }
@@ -768,35 +777,98 @@ private struct FirepowerCard: View {
 private struct AdjustSection: View {
     let entry: CalcEntry
     let key: String
+    var preset: AdjustTable?
     @State private var table: AdjustTable?
     @State private var loadedKey = ""
+
+    init(entry: CalcEntry, key: String, preset: AdjustTable? = nil) {
+        self.entry = entry
+        self.key = key
+        self.preset = preset
+        _table = State(initialValue: preset)
+        _loadedKey = State(initialValue: preset == nil ? "" : key)
+    }
+
+    @ViewBuilder
+    private func line(_ cell: AdjustCell?, key: StatKey, up: Bool, letter: Bool = false) -> some View {
+        HStack(spacing: 6) {
+            Text(letter ? (key == .h ? "H" : "\(key.letter)\(up ? "×1.1" : "×1.0")") : (up ? "×1.1" : "×1.0"))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Palette.secondary)
+                .frame(minWidth: letter ? 40 : 30, alignment: .leading)
+            if let cell, let points = cell.points {
+                Text("\(cell.real)")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Palette.ink)
+                Text("(+\(points)\(up ? "↑" : ""))")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(up ? Palette.rankUp : Palette.secondary)
+            } else {
+                Text("不可")
+                    .font(.footnote.weight(.bold))
+                    .foregroundStyle(Palette.minus)
+            }
+        }
+        .monospacedDigit()
+    }
 
     var body: some View {
         Group {
             if let table, loadedKey == key {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 12) {
                     Text("調整ライン").sectionTitle()
-                    Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
-                        GridRow {
-                            Text("\(table.offenseKey.letter) 確定1発")
-                            Text("H 確定耐え")
-                            Text("\(table.defenseKey.letter) 確定耐え")
-                        }
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(Palette.secondary)
-                        ForEach(Array(table.rows.enumerated()), id: \.offset) { _, row in
-                            GridRow {
-                                cell(row.ko, dash: table.offenseKey == .vsa)
-                                cell(row.h, dash: false)
-                                cell(row.wall, dash: false)
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 5) {
+                                Icon(name: "tab_attack", size: 15)
+                                    .foregroundStyle(Palette.attack)
+                                Text("確定1発")
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(Palette.ink)
+                            }
+                            if table.offenseKey == .vsa {
+                                Text("-")
+                                    .font(.footnote)
+                                    .foregroundStyle(Palette.secondary)
+                            } else {
+                                ForEach(Array(table.rows.enumerated()), id: \.offset) { index, row in
+                                    line(row.ko, key: table.offenseKey, up: index == 1)
+                                }
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        Divider()
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(spacing: 5) {
+                                Icon(name: "shield", size: 15)
+                                    .foregroundStyle(Palette.accent)
+                                Text("確定耐え")
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(Palette.ink)
+                            }
+                            if let h = table.rows.first?.h {
+                                line(h, key: .h, up: false, letter: true)
+                            }
+                            ForEach(Array(table.rows.enumerated()), id: \.offset) { index, row in
+                                line(row.wall, key: table.defenseKey, up: index == 1, letter: true)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .card()
+                .holdToSave {
+                    CardImage.save(
+                        AdjustSection(entry: entry, key: key, preset: table)
+                            .padding(12)
+                            .frame(width: 390)
+                            .background(Palette.background)
+                    )
+                }
             }
         }
         .task(id: key) {
+            guard preset == nil else { return }
             await Task.yield()
             table = Calc.adjustTable(entry)
             loadedKey = key

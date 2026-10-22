@@ -121,7 +121,7 @@ struct MoveDetailContent: View {
                 Text("威力 \(info.powerText) / 命中 \(info.accuracyText) / PP \(info.ppText)")
                     .font(.subheadline.weight(.semibold))
                     .monospacedDigit()
-                    .foregroundStyle(Color(hex: 0x777777))
+                    .foregroundStyle(Palette.secondary)
                     .fixedSize()
                     .frame(height: 26)
             }
@@ -325,7 +325,7 @@ struct LearnsetRow: View {
         .padding(.horizontal, 12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(open ? Color.white : Color.clear)
+                .fill(open ? Palette.card : Color.clear)
                 .shadow(color: open ? .black.opacity(0.08) : .clear, radius: 10, y: 3)
         )
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))

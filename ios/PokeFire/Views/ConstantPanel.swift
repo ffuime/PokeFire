@@ -84,7 +84,7 @@ struct ConstantPanel: View {
                                 .monospacedDigit()
                                 .padding(.horizontal, 12)
                                 .frame(width: 96, height: 40)
-                                .background(Color.white, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                                 Text(info.unit)
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(Palette.secondary)
@@ -225,7 +225,7 @@ struct ConstantCounter: View {
             .buttonStyle(PressableStyle())
         }
         .foregroundStyle(count > 0 ? tint : Palette.ink)
-        .background(Capsule().fill(count > 0 ? tint.opacity(0.12) : Color.white))
+        .background(Capsule().fill(count > 0 ? tint.opacity(0.12) : Palette.card))
         .accessibilityElement(children: .combine)
         .accessibilityValue("\(count)回")
         .accessibilityAdjustableAction { direction in

@@ -203,7 +203,7 @@ struct EnvironmentPanel: View {
         .padding(.bottom, 10)
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(Color.white)
+                .fill(Palette.card)
                 .shadow(color: .black.opacity(0.16), radius: 28, y: 10)
         )
         .offset(y: min(0, dragY))

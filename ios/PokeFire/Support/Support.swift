@@ -154,13 +154,35 @@ struct RemoteSpriteView: View {
     }
 }
 
+extension UIColor {
+    convenience init(hex: UInt32) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255,
+            green: CGFloat((hex >> 8) & 0xFF) / 255,
+            blue: CGFloat(hex & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
+extension Color {
+    static func dynamic(_ light: UInt32, _ dark: UInt32) -> Color {
+        Color(UIColor { traits in
+            UIColor(hex: traits.userInterfaceStyle == .dark ? dark : light)
+        })
+    }
+}
+
 enum Palette {
-    static let background = Color(hex: 0xF0F0F0)
-    static let card = Color.white
+    static let background = Color.dynamic(0xF0F0F0, 0x0E0E11)
+    static let card = Color.dynamic(0xFFFFFF, 0x1C1C1F)
     static let accent = Color(hex: 0x535CA8)
-    static let ink = Color(hex: 0x2E3140)
-    static let secondary = Color(hex: 0x777777)
-    static let track = Color(hex: 0xE5E5EA)
+    static let ink = Color.dynamic(0x2E3140, 0xECEDF2)
+    static let secondary = Color.dynamic(0x777777, 0x9B9CA4)
+    static let track = Color.dynamic(0xE5E5EA, 0x38383C)
+    static let separator = Color.dynamic(0xDDDDDD, 0x3A3A3E)
+    static let field = Color.dynamic(0xEEEEF1, 0x2A2A2E)
+    static let bar = Color.dynamic(0xEAEAEA, 0x2C2C30)
     static let plus = Color(hex: 0x27845A)
     static let minus = Color(hex: 0xB64646)
     static let rankUp = Color(hex: 0xC74747)

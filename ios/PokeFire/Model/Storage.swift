@@ -144,6 +144,40 @@ enum Storage {
     }
 }
 
+struct SeasonInfo: Identifiable, Equatable {
+    var id: String { name }
+    let name: String
+    let dates: [String]
+
+    private static let known: [Int: (start: String, regulation: String)] = [
+        1: ("2026.04.08", "M-A"), 2: ("2026.05.13", "M-A"), 3: ("2026.06.17", "M-B"), 4: ("2026.07.08", "M-B"),
+        5: ("2026.08.05", "M-B"), 6: ("2026.09.09", "M-C"), 7: ("2026.10.07", "M-C"),
+    ]
+
+    var number: Int? { Int(name.drop { !$0.isNumber }) }
+
+    var title: String {
+        guard let number else { return name }
+        return "シーズンM-\(number)"
+    }
+
+    private static func dotted(_ raw: String) -> String {
+        let parts = raw.split(separator: "_")
+        guard parts.count == 3 else { return raw }
+        return "\(parts[2]).\(parts[1]).\(parts[0])"
+    }
+
+    var label: String {
+        guard let number else { return name }
+        let start = Self.known[number]?.start ?? dates.last.map(Self.dotted) ?? ""
+        let end = Self.known[number + 1]?.start ?? ""
+        var text = title
+        if let regulation = Self.known[number]?.regulation { text += " (\(regulation))" }
+        if !start.isEmpty { text += " \(start)~\(end)" }
+        return text
+    }
+}
+
 enum UsageLoader {
     static let source = URL(string: "https://championsbattledata.com")!
     static let megaStone = "メガストーン"
@@ -151,7 +185,18 @@ enum UsageLoader {
 
     static var nowMillis: Double { Date().timeIntervalSince1970 * 1000 }
 
-    static func load() async -> UsageData? {
+    private static var seasonCache: [String: UsageData] = [:]
+
+    static func load(season: String? = nil) async -> UsageData? {
+        if let season {
+            if let hit = seasonCache[season] { return hit }
+            if let cached = Storage.usage, cached.season == season, nowMillis - cached.fetchedAt < ttl { return cached }
+            if let fresh = try? await fetch(season: season) {
+                seasonCache[season] = fresh
+                return fresh
+            }
+            return nil
+        }
         let cached = Storage.usage
         if let cached, nowMillis - cached.fetchedAt < ttl { return cached }
         do {
@@ -163,6 +208,15 @@ enum UsageLoader {
         }
     }
 
+    static func seasons() async -> [SeasonInfo] {
+        guard let index = try? await getJSON("/data/meta/index.json") else { return [] }
+        return (index["seasons"]?.array ?? []).compactMap { season in
+            guard season["formats"]?.stringList.contains("Singles") ?? false,
+                  let name = season["season"].flatMap({ $0.string ?? $0.int.map(String.init) }) else { return nil }
+            return SeasonInfo(name: name, dates: season["dates"]?.stringList ?? [])
+        }
+    }
+
     private static func getJSON(_ path: String) async throws -> JSON {
         guard let url = URL(string: path, relativeTo: source) else { throw URLError(.badURL) }
         let (data, response) = try await URLSession.shared.data(from: url)
@@ -170,7 +224,7 @@ enum UsageLoader {
         return try JSON.parse(data)
     }
 
-    private static func fetch() async throws -> UsageData {
+    private static func fetch(season wanted: String? = nil) async throws -> UsageData {
         let names = GameData.shared.usageNames
         let catalog = StatsCatalog.shared
         var fireItems = names.items
@@ -180,6 +234,7 @@ enum UsageLoader {
         let index = try await getJSON("/data/meta/index.json")
         guard let season = index["seasons"]?.array?.first(where: { season in
             (season["formats"]?.stringList.contains("Singles") ?? false) && !(season["dates"]?.array?.isEmpty ?? true)
+                && (wanted == nil || season["season"]?.string == wanted)
         }), let seasonName = season["season"].flatMap({ $0.string ?? $0.int.map(String.init) }),
               let date = season["dates"]?.array?.first?.string else { throw URLError(.cannotParseResponse) }
         let day = try await getJSON("/data/meta/\(seasonName)/\(date)/Singles.json")

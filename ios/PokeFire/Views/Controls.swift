@@ -421,7 +421,7 @@ struct PillLabel: View {
         .foregroundStyle(Palette.accent)
         .padding(.horizontal, 13)
         .frame(height: 30)
-        .background(Capsule().fill(Color.white))
+        .background(Capsule().fill(Palette.card))
         .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 1))
         .contentShape(Capsule())
     }
@@ -457,7 +457,7 @@ struct CountPill: View {
         .foregroundStyle(Palette.accent)
         .padding(.horizontal, 13)
         .frame(height: 30)
-        .background(Capsule().fill(Color.white))
+        .background(Capsule().fill(Palette.card))
         .overlay(Capsule().strokeBorder(Palette.accent, lineWidth: 1))
         .contentShape(Capsule())
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = max(1, $0) }
@@ -564,7 +564,7 @@ struct SelectButton: View {
                 }
                 Text(text.isEmpty ? placeholder : text)
                     .font(font)
-                    .foregroundStyle(Color.black)
+                    .foregroundStyle(Palette.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .contentTransition(.opacity)
@@ -581,10 +581,10 @@ struct SelectButton: View {
                         UnevenBox().fill(Color.white.opacity(0.6))
                     }
                 } else {
-                    UnevenBox().fill(Color.white)
+                    UnevenBox().fill(Palette.card)
                 }
             }
-            .overlay(UnevenBox().stroke(Color(hex: 0xDDDDDD).opacity(translucent ? 0.7 : 1), lineWidth: 1))
+            .overlay(UnevenBox().stroke(Palette.separator.opacity(translucent ? 0.7 : 1), lineWidth: 1))
             .contentShape(UnevenBox())
         }
         .buttonStyle(PressableStyle())

@@ -29,7 +29,7 @@ struct RootView: View {
             let progress = width > 0 ? offset / width : 0
 
             ZStack(alignment: .topLeading) {
-                Color.white.ignoresSafeArea()
+                Palette.card.ignoresSafeArea()
 
                 HistoryDrawer(
                     isOpen: drawerOpen,

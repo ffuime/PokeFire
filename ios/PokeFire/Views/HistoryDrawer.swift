@@ -22,7 +22,7 @@ struct HistoryDrawer: View {
             showHelp = true
         } label: {
             Icon(name: "help", size: 20)
-                .foregroundStyle(Color.black)
+                .foregroundStyle(Palette.ink)
                 .frame(width: 50, height: 46)
                 .contentShape(Rectangle())
         }
@@ -37,7 +37,7 @@ struct HistoryDrawer: View {
         } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: 19, weight: .medium))
-                .foregroundStyle(Color.black)
+                .foregroundStyle(Palette.ink)
                 .frame(width: 50, height: 46)
                 .contentShape(Rectangle())
         }
@@ -136,7 +136,7 @@ struct HistoryDrawer: View {
                             Icon(name: "search", size: 20)
                         }
                     }
-                    .foregroundStyle(Color.black)
+                    .foregroundStyle(Palette.ink)
                         .frame(width: 50, height: 46)
                         .contentShape(Rectangle())
                 }
@@ -159,7 +159,7 @@ struct HistoryDrawer: View {
 
             Text("履歴")
                 .font(.system(size: 30, weight: .bold))
-                .foregroundStyle(Color.black)
+                .foregroundStyle(Palette.ink)
                 .padding(.leading, 24)
                 .padding(.bottom, 8)
 
@@ -183,7 +183,7 @@ struct HistoryDrawer: View {
                 }
                 .padding(.horizontal, 14)
                 .frame(height: 42)
-                .background(Color(hex: 0xF2F2F4), in: Capsule())
+                .background(Palette.field, in: Capsule())
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -219,7 +219,7 @@ struct HistoryDrawer: View {
             }
             }
         }
-        .background(Color.white.ignoresSafeArea())
+        .background(Palette.card.ignoresSafeArea())
         .sheet(isPresented: $showSettings) {
             SettingsSheet()
         }
@@ -322,7 +322,7 @@ struct HistoryDrawer: View {
                 VStack(spacing: 3) {
                     Text(entry.title)
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.black)
+                        .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     HStack(spacing: 4) {
@@ -398,7 +398,7 @@ struct HistoryDrawer: View {
                 VStack(spacing: 3) {
                     Text(entry.moves.joined(separator: "・"))
                         .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.black)
+                        .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     HStack(spacing: 4) {
@@ -536,7 +536,7 @@ private struct HistoryPreview: View {
         }
         .padding(20)
         .frame(width: 300, alignment: .leading)
-        .background(Color.white)
+        .background(Palette.card)
     }
 }
 
@@ -595,7 +595,7 @@ struct ModeSwitcherList: View {
                         VStack(alignment: .leading, spacing: 1) {
                             Text(item.title)
                                 .font(.headline)
-                                .foregroundStyle(Color.black)
+                                .foregroundStyle(Palette.ink)
                             Text(item.subtitle)
                                 .font(.caption)
                                 .foregroundStyle(Palette.secondary)
@@ -606,7 +606,7 @@ struct ModeSwitcherList: View {
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(current ? Color(hex: 0xF2F2F4) : Color.clear)
+                            .fill(current ? Palette.field : Color.clear)
                     )
                     .contentShape(Rectangle())
                 }
