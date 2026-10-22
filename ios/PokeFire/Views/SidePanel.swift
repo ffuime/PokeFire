@@ -575,7 +575,10 @@ struct AbilitySection: View {
                     Haptics.play(.light)
                     present(.ability(role))
                 }
-                if control != .hidden {
+                if model.data.isUnimplemented(ability: side.ability) {
+                    UnimplementedChip(kind: "とくせい")
+                        .transition(.scale(scale: 0.8).combined(with: .opacity))
+                } else if control != .hidden {
                     ToggleChip(
                         title: control.label,
                         isOn: model.abilityActive(role),
@@ -607,7 +610,10 @@ struct ItemSection: View {
                 Haptics.play(.light)
                 present(.item(role))
             }
-            if let ratio = model.itemConstantRatio(role) {
+            if model.data.isUnimplemented(item: side.item) {
+                UnimplementedChip(kind: "もちもの")
+                    .transition(.scale(scale: 0.8).combined(with: .opacity))
+            } else if let ratio = model.itemConstantRatio(role) {
                 ToggleChip(title: "発動", isOn: model.constantActive(ratio)) {
                     model.toggleConstant(ratio, label: side.item)
                 }
@@ -642,5 +648,47 @@ struct ConditionSection: View {
                 }
             }
         }
+    }
+}
+
+struct UnimplementedChip: View {
+    let kind: String
+    @State private var showing = false
+
+    var body: some View {
+        Button {
+            Haptics.play(.light)
+            showing = true
+        } label: {
+            HStack(spacing: 4) {
+                Icon(name: "lock", size: 13)
+                Text("発動")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .padding(.horizontal, 13)
+            .frame(height: 30)
+            .foregroundStyle(Palette.secondary)
+            .overlay(Capsule().strokeBorder(Palette.secondary.opacity(0.4), lineWidth: 1))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(PressableStyle())
+        .fixedSize()
+        .popover(isPresented: $showing, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+            Label("この\(kind)は未実装です", systemImage: "exclamationmark.triangle.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Palette.ink)
+                .padding(14)
+                .presentationCompactAdaptation(.popover)
+        }
+        .accessibilityLabel("この\(kind)は未実装です")
+    }
+}
+
+struct UnimplementedMark: View {
+    var body: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color(hex: 0xE8A317))
+            .accessibilityLabel("未実装")
     }
 }

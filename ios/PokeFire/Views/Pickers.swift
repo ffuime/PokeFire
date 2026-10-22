@@ -619,6 +619,9 @@ struct EntryRow: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
+                    if kind == .items ? GameData.shared.isUnimplemented(item: name) : kind == .abilities ? GameData.shared.isUnimplemented(ability: name) : false {
+                        UnimplementedMark()
+                    }
                     Text(name)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(selected ? Palette.accent : Palette.ink)

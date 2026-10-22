@@ -106,6 +106,11 @@ final class GameData {
     let unreleasedAbilityOrder: [String]
     let unreleasedItemOrder: [String]
     var allPokemonOrder: [String] { pokemonOrder + unreleasedPokemonOrder }
+    private lazy var unimplementedAbilities = Set(unreleasedAbilityOrder)
+    private lazy var unimplementedItems = Set(unreleasedItemOrder)
+
+    func isUnimplemented(ability: String) -> Bool { unimplementedAbilities.contains(ability) }
+    func isUnimplemented(item: String) -> Bool { unimplementedItems.contains(item) }
     let moves: [String: Move]
     let moveOrder: [String]
     let abilities: [String: Effect]
