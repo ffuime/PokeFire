@@ -26,6 +26,7 @@ struct StatsPanel: View {
                     SeasonPicker()
                     if let entry, !entry.moves.isEmpty {
                         MoveUsageSection(pairs: Array(entry.moves.prefix(10)), present: present)
+                            .animation(.spring(response: 0.5, dampingFraction: 0.86), value: model.usage?.season)
                     } else if model.usage != nil {
                         Text("このシーズンのデータはありません")
                             .font(.footnote.weight(.semibold))
@@ -34,6 +35,7 @@ struct StatsPanel: View {
                 }
                 if entry != nil {
                     UsageCarousel(role: role, present: present)
+                        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: model.usage?.season)
                 }
                 if let entry, !entry.spreads.isEmpty {
                     SpreadSection(role: role, spreads: entry.spreads)
@@ -384,6 +386,8 @@ struct SeasonPicker: View {
     var body: some View {
         let current = model.season ?? model.usage?.season ?? model.seasons.first?.name ?? ""
         let label = model.seasons.first { $0.name == current }?.label ?? current
+        let latest = model.seasons.first?.name
+        HStack(spacing: 8) {
         Menu {
             Picker("シーズン", selection: Binding(get: { current }, set: { model.selectSeason($0) })) {
                 ForEach(model.seasons) { season in
@@ -411,6 +415,22 @@ struct SeasonPicker: View {
             .overlay(UnevenBox(strong: 16, weak: 5).stroke(Palette.separator, lineWidth: 1))
         }
         .disabled(model.seasons.isEmpty)
+        if let latest, latest != current {
+            Button {
+                model.selectSeason(latest)
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Palette.accent)
+                    .frame(width: 38, height: 38)
+                    .background(Circle().fill(Palette.accent.opacity(0.1)))
+            }
+            .buttonStyle(PressableStyle())
+            .accessibilityLabel("現在のシーズンに戻す")
+            .transition(.scale(scale: 0.6).combined(with: .opacity))
+        }
+        }
+        .animation(.snappy(duration: 0.25), value: latest == current)
     }
 }
 
@@ -662,8 +682,8 @@ struct Outlined<Content: View>: View {
 
     var body: some View {
         ZStack {
-            ForEach(0..<8, id: \.self) { index in
-                let angle = Double(index) * .pi / 4
+            ForEach(0..<4, id: \.self) { index in
+                let angle = Double(index) * .pi / 2 + .pi / 4
                 content()
                     .foregroundStyle(outline)
                     .offset(x: cos(angle) * width, y: sin(angle) * width)
@@ -671,6 +691,9 @@ struct Outlined<Content: View>: View {
             content()
                 .foregroundStyle(color)
         }
+        .padding(width)
+        .drawingGroup()
+        .padding(-width)
     }
 }
 
@@ -708,8 +731,6 @@ struct MoveUsageRow: View {
                     Outlined(color: .white, outline: color) {
                         Icon(name: "glyph_\(id)", size: 20)
                     }
-                    .id("glyph-\(id)")
-                    .transition(.blurReplace)
                 }
                 Outlined(color: color) {
                     Text(pair.name ?? "不明なわざ")

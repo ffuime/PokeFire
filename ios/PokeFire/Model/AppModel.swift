@@ -129,9 +129,7 @@ final class AppModel {
         Task { [weak self] in
             let loaded = await UsageLoader.load(season: name)
             guard let self, self.season == name else { return }
-            if let loaded {
-                withAnimation(.spring(response: 0.55, dampingFraction: 0.86)) { self.usage = loaded }
-            }
+            if let loaded { self.usage = loaded }
             self.loadingSeason = false
         }
     }

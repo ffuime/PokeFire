@@ -122,26 +122,39 @@ struct PokesolImportSheet: View {
         NavigationStack {
             List {
                 Section {
-                    TextEditor(text: $text)
-                        .focused($focused)
-                        .font(.callout.monospaced())
-                        .frame(minHeight: 180)
-                        .overlay(alignment: .topLeading) {
-                            if text.isEmpty {
-                                Text("セグレイブ @ セグレイブナイト\nテラスタイプ: ゴースト\n特性: ねつこうかん\n能力補正: いじっぱり\n222(32)-216(32)-112-85-106-109(2)\nこおりのつぶて / きょけんとつげき / じしん / つるぎのまい")
-                                    .font(.callout.monospaced())
-                                    .foregroundStyle(Palette.secondary.opacity(0.6))
-                                    .padding(.top, 8)
-                                    .padding(.leading, 5)
-                                    .allowsHitTesting(false)
-                            }
-                        }
-                    PasteButton(payloadType: String.self) { strings in
-                        if let pasted = strings.first {
-                            text = pasted
-                            Haptics.play(.light)
+                    ZStack(alignment: .topLeading) {
+                        TextEditor(text: $text)
+                            .focused($focused)
+                            .font(.callout)
+                            .scrollContentBackground(.hidden)
+                            .padding(.horizontal, 12)
+                            .padding(.top, 10)
+                            .padding(.bottom, 60)
+                        if text.isEmpty {
+                            Text("ガブリアス@オボンのみ\n特性: さめはだ\n能力補正: いじっぱり\n100(2)-100(32)-100-100-100-100(32)\nじしん/げきりん/ドラゴンテール/ステルスロック")
+                                .font(.callout)
+                                .foregroundStyle(Palette.secondary.opacity(0.55))
+                                .padding(.horizontal, 17)
+                                .padding(.top, 18)
+                                .allowsHitTesting(false)
                         }
                     }
+                    .frame(minHeight: 260)
+                    .background(Palette.field, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                    .overlay(alignment: .bottomTrailing) {
+                        PasteButton(payloadType: String.self) { strings in
+                            if let pasted = strings.first {
+                                text = pasted
+                                Haptics.play(.light)
+                            }
+                        }
+                        .labelStyle(.titleAndIcon)
+                        .buttonBorderShape(.capsule)
+                        .tint(Palette.accent)
+                        .padding(10)
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 } footer: {
                     Text("ポケソルの「テキストで共有」の形式に対応しています。空行で区切ると複数体をまとめて追加できます。テラスタイプは読み込みますが、今は使われません。")
                 }

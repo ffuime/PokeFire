@@ -1225,6 +1225,8 @@ struct TeamCollage: View {
     var frozen = false
     var portrait = false
     var title = ""
+    var background: Color = .white
+    var titleColor: Color = Palette.ink
     var onTapMember: ((Int) -> Void)?
 
     static let header: CGFloat = 52
@@ -1249,7 +1251,7 @@ struct TeamCollage: View {
         VStack(alignment: .leading, spacing: Self.spacing) {
             Text(title)
                 .font(.system(size: 30, weight: .heavy))
-                .foregroundStyle(Palette.ink)
+                .foregroundStyle(titleColor)
                 .lineLimit(1)
                 .frame(height: Self.header - Self.spacing, alignment: .bottomLeading)
             ForEach(0..<rows, id: \.self) { row in
@@ -1278,7 +1280,7 @@ struct TeamCollage: View {
         }
         .padding(Self.padding)
         .frame(width: size.width, height: size.height)
-        .background(Color.white)
+        .background(background)
         .environment(\.colorScheme, .light)
     }
 }
@@ -1318,6 +1320,7 @@ struct TeamViewer: View {
     let title: String
     let onOpenMember: (Int) -> Void
     @AppStorage(AppSettings.portraitTeamKey) private var portrait = false
+    @Environment(\.colorScheme) private var scheme
     @State private var image: UIImage?
 
     private func member(at point: CGPoint) -> Int? {
@@ -1364,8 +1367,16 @@ struct TeamViewer: View {
             .padding(16)
             .accessibilityLabel("閉じる")
         }
-        .task {
-            let renderer = ImageRenderer(content: TeamCollage(entries: entries, frozen: true, portrait: portrait, title: title))
+        .task(id: scheme) {
+            let dark = scheme == .dark
+            let renderer = ImageRenderer(content: TeamCollage(
+                entries: entries,
+                frozen: true,
+                portrait: portrait,
+                title: title,
+                background: Color(hex: dark ? 0x08080C : 0xF0F0F0),
+                titleColor: dark ? Color(hex: 0xEEEFF5) : Color(hex: 0x2E3140)
+            ))
             renderer.scale = 3
             image = renderer.uiImage
         }
