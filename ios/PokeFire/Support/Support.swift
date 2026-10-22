@@ -92,6 +92,9 @@ enum PokemonSprites {
 
     static func image(_ name: String, shiny: Bool = false) -> UIImage? {
         guard let id = ids[name] else { return nil }
+        if id.hasPrefix("sv") {
+            return UIImage(named: "pokesv_\(id.dropFirst(2))")
+        }
         return UIImage(named: "poke_\(id)\(shiny ? "_shiny" : "")")
     }
 }

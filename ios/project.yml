@@ -33,6 +33,9 @@ targets:
       - path: Data/sprites.json
         group: Data
         buildPhase: resources
+      - path: Data/unreleased.json
+        group: Data
+        buildPhase: resources
     scheme: {}
     info:
       path: PokeFire/Info.plist

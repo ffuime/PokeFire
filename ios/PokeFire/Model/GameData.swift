@@ -102,6 +102,10 @@ final class GameData {
 
     let pokemons: [String: Pokemon]
     let pokemonOrder: [String]
+    let unreleasedPokemonOrder: [String]
+    let unreleasedAbilityOrder: [String]
+    let unreleasedItemOrder: [String]
+    var allPokemonOrder: [String] { pokemonOrder + unreleasedPokemonOrder }
     let moves: [String: Move]
     let moveOrder: [String]
     let abilities: [String: Effect]
@@ -150,6 +154,28 @@ final class GameData {
         }
         self.pokemons = pokemons
         self.pokemonOrder = pokemonOrder
+        var unreleased: [String] = []
+        for (name, value) in load("unreleased").object?.entries ?? [] where pokemons[name] == nil {
+            let stats = value["basestats"]
+            pokemons[name] = Pokemon(
+                name: name,
+                num: value["num"]?.string ?? "",
+                types: value["types"]?.stringList ?? [],
+                abilities: value["abilities"]?.stringList ?? [],
+                base: BaseStats(
+                    h: stats?["h"]?.int ?? 0,
+                    a: stats?["a"]?.int ?? 0,
+                    b: stats?["b"]?.int ?? 0,
+                    c: stats?["c"]?.int ?? 0,
+                    d: stats?["d"]?.int ?? 0,
+                    s: stats?["s"]?.int ?? 0
+                ),
+                weight: value["weight"]?.double ?? 0,
+                form: value["form"]?.int
+            )
+            unreleased.append(name)
+        }
+        self.unreleasedPokemonOrder = unreleased
 
         var moves: [String: Move] = [:]
         var moveOrder: [String] = []
@@ -182,16 +208,29 @@ final class GameData {
             }
             return (map, order)
         }
-        let abilityData = effects("abilities")
+        let statsJSON = load("stats")
+        var abilityData = effects("abilities")
+        var unreleasedAbilities: [String] = []
+        for (name, value) in statsJSON["unreleasedAbilities"]?.object?.entries ?? [] where abilityData.0[name] == nil {
+            abilityData.0[name] = Effect(name: name, effect: value["effect"]?.string ?? "")
+            unreleasedAbilities.append(name)
+        }
         abilities = abilityData.0
         abilityOrder = abilityData.1
+        unreleasedAbilityOrder = unreleasedAbilities
         var itemData = effects("items")
-        for (name, value) in load("stats")["items"]?.object?.entries ?? [] where itemData.0[name] == nil && value["mega"] == nil {
+        for (name, value) in statsJSON["items"]?.object?.entries ?? [] where itemData.0[name] == nil && value["mega"] == nil {
             itemData.0[name] = Effect(name: name, effect: value["effect"]?.string ?? "")
             itemData.1.append(name)
         }
+        var unreleasedItems: [String] = []
+        for (name, value) in statsJSON["unreleasedItems"]?.object?.entries ?? [] where itemData.0[name] == nil {
+            itemData.0[name] = Effect(name: name, effect: value["effect"]?.string ?? "")
+            unreleasedItems.append(name)
+        }
         items = itemData.0
         itemOrder = itemData.1
+        unreleasedItemOrder = unreleasedItems
 
         var aliases: [String: [String: [String]]] = [:]
         for (kind, table) in load("aliases").object?.entries ?? [] {
@@ -236,7 +275,7 @@ final class GameData {
         guard name.hasPrefix("メガ"), let pokemon = pokemons[name] else { return nil }
         if let cached = megaParentCache[name] { return cached.isEmpty ? nil : cached }
         let rest = String(name.dropFirst(2))
-        let candidates = pokemonOrder.filter { other in
+        let candidates = allPokemonOrder.filter { other in
             other != name && pokemons[other]?.num == pokemon.num && GameData.baseName(other) == GameData.baseName(rest)
         }
         let parent = candidates.first(where: { $0 == rest }) ?? candidates.first
@@ -259,7 +298,7 @@ final class GameData {
     func otherForms(of name: String) -> [String] {
         guard let current = pokemons[name] else { return [] }
         if let cached = formsCache[name] { return cached }
-        let forms = pokemonOrder.filter { $0 != name && pokemons[$0]?.num == current.num }
+        let forms = allPokemonOrder.filter { $0 != name && pokemons[$0]?.num == current.num }
         formsCache[name] = forms
         return forms
     }

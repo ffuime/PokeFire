@@ -132,49 +132,45 @@ struct PokemonPicker: View {
         let nested: Bool
     }
 
-    private var rows: [Row] {
-        _ = revision
+    private struct Section: Identifiable {
+        let id: String
+        let rows: [Row]
+    }
+
+    private func nestedRows(_ base: [String], nest: Bool) -> [Row] {
         let data = model.data
-        let base: [String] = mode == 0
-            ? model.pokemonOrder()
-            : Storage.pokemonHistory.filter { data.pokemons[$0] != nil }
         let tiers = Search.rank(base.map { data.pokemonSearchText($0) }, query: query)
         let order = Search.ordered(base.count, tiers: tiers) { index in
-            mode == 0 ? (data.groupParent(base[index]) ?? base[index]) : base[index]
+            nest ? (data.groupParent(base[index]) ?? base[index]) : base[index]
         }
         let names = order.map { base[$0] }
         let visible = Set(names)
         return names.map { name in
-            Row(name: name, nested: mode == 0 && (data.groupParent(name).map { visible.contains($0) } ?? false))
+            Row(name: name, nested: nest && (data.groupParent(name).map { visible.contains($0) } ?? false))
         }
     }
 
-    private var boxEnabled: Bool { onSelect == nil || onBoxPick != nil }
-
-    private var boxRows: [BoxPokemon] {
-        let key = Search.normalize(query)
-        return box.pokemons
-            .filter { key.isEmpty || Search.normalize($0.name + " " + $0.nickname).contains(key) }
-            .sorted { $0.updated > $1.updated }
-    }
-
-    private func pickBox(_ entry: BoxPokemon) {
-        focused = false
-        if let onBoxPick {
-            onBoxPick(entry)
-        } else {
-            model.applyBox(entry, to: role)
+    private var sections: [Section] {
+        _ = revision
+        let data = model.data
+        if mode == 1 {
+            let rows = nestedRows(Storage.pokemonHistory.filter { data.pokemons[$0] != nil }, nest: false)
+            return rows.isEmpty ? [] : [Section(id: "", rows: rows)]
         }
-        dismiss()
+        return [
+            Section(id: "使用率", rows: nestedRows(model.pokemonOrder(), nest: true)),
+            Section(id: "未内定", rows: nestedRows(data.unreleasedPokemonOrder, nest: true)),
+        ].filter { !$0.rows.isEmpty }
     }
 
     var body: some View {
-        let list = rows
+        let groups = sections
+        let list = groups.flatMap(\.rows)
         let current = currentName ?? model.side(role).name
         VStack(spacing: 0) {
             SearchHeader(
                 title: "\(role.title)のポケモン",
-                modes: boxEnabled ? ["使用率", "履歴", "PokéBox"] : ["使用率", "履歴"],
+                modes: boxEnabled ? ["すべて", "履歴", "PokéBox"] : ["すべて", "履歴"],
                 mode: $mode,
                 query: $query,
                 focused: $focused,
@@ -205,7 +201,9 @@ struct PokemonPicker: View {
                 }
             } else {
             List {
-                ForEach(list) { row in
+                ForEach(groups) { group in
+                SwiftUI.Section {
+                ForEach(group.rows) { row in
                     Button {
                         select(row.name)
                     } label: {
@@ -227,6 +225,14 @@ struct PokemonPicker: View {
                             .tint(.red)
                         }
                     }
+                }
+                } header: {
+                    if !group.id.isEmpty {
+                        Text(group.id)
+                            .font(.footnote.weight(.bold))
+                            .foregroundStyle(Palette.secondary)
+                    }
+                }
                 }
                 if !list.isEmpty {
                     UsageCredit()
@@ -446,9 +452,14 @@ struct EntrySearchSheet: View {
                 let set = Set(learnable)
                 lists.append(("覚えるわざ", names.filter { set.contains($0) }))
                 lists.append(("その他", names.filter { !set.contains($0) }))
-            } else {
+            } else if kind == .moves {
                 let set = Set(used)
                 lists.append(("その他", names.filter { !set.contains($0) }))
+            } else {
+                let set = Set(used)
+                let unreleased = kind == .items ? data.unreleasedItemOrder : data.unreleasedAbilityOrder
+                lists.append(("実装済み", names.filter { !set.contains($0) }))
+                lists.append(("未実装", unreleased.filter { !set.contains($0) }))
             }
         }
         let stone = kind == .items ? StatsCatalog.shared.megaStone(for: name) : nil
