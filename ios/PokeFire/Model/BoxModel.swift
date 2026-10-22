@@ -42,6 +42,8 @@ struct BoxPokemon: Codable, Identifiable, Equatable {
     var up: StatKey?
     var down: StatKey?
     var neutral = false
+    var neutralName: String?
+    var teraType: String?
     var moves: [String] = ["", "", "", ""] {
         didSet {
             while moves.count < 4 { moves.append("") }
@@ -77,11 +79,11 @@ struct BoxPokemon: Codable, Identifiable, Equatable {
 
     var natureName: String {
         if let name = NatureTable.name(up: up, down: down) { return name }
-        if neutral, up == nil, down == nil { return "まじめ" }
+        if up == nil, down == nil { return neutralName ?? "すなお" }
         var parts: [String] = []
         if let up { parts.append("\(up.letter)↑") }
         if let down { parts.append("\(down.letter)↓") }
-        return parts.isEmpty ? "" : parts.joined(separator: " ")
+        return parts.joined(separator: " ")
     }
 
     var filledMoves: [String] { moves.filter { !$0.isEmpty } }
@@ -163,6 +165,20 @@ final class BoxModel {
             }
             item.shiny = side.isShiny ? true : nil
         }
+    }
+
+    @discardableResult
+    func add(_ entries: [BoxPokemon]) -> [UUID] {
+        var ids: [UUID] = []
+        for var entry in entries {
+            entry.id = UUID()
+            entry.created = Date().timeIntervalSince1970
+            entry.updated = entry.created
+            pokemons.append(entry)
+            ids.append(entry.id)
+        }
+        save()
+        return ids
     }
 
     func changeSpecies(_ id: UUID, to name: String, usage: UsageData?) {
@@ -271,6 +287,7 @@ final class BoxModel {
             entry.up = info.up
             entry.down = info.down
             entry.neutral = info.up == nil
+            entry.neutralName = info.up == nil ? info.name : nil
         }
     }
 

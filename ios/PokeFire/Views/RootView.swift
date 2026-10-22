@@ -19,6 +19,9 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: model.isLoadingShare)
+        .onChange(of: stats.drawerRequests) { _, _ in
+            setDrawer(true)
+        }
     }
 
     private var mainContent: some View {

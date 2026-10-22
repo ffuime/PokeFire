@@ -14,9 +14,9 @@ struct PokeFireApp: App {
                 .environment(stats)
                 .environment(box)
                 .onAppear {
+                    AppSettings.applyAppearance(appearance)
                     AppSettings.applyAutoSleep(UserDefaults.standard.object(forKey: AppSettings.autoSleepKey) as? Bool ?? true)
                 }
-                .preferredColorScheme(AppSettings.scheme(appearance))
                 .tint(Palette.accent)
                 .onOpenURL { url in
                     model.open(url)

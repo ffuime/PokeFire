@@ -62,6 +62,7 @@ final class StatsModel {
     var history: [StatsHistoryEntry] = []
     var pendingPage: Role?
     var boxAtRoot = true
+    var drawerRequests = 0
     var speedBoosts: [Role: SpeedBoost] = [:]
     @ObservationIgnored private var historyTask: Task<Void, Never>?
 

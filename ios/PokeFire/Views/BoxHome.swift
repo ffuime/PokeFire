@@ -23,7 +23,9 @@ struct BoxRoot: View {
     @Environment(AppModel.self) private var model
     @Environment(BoxModel.self) private var box
     @State private var path: [BoxRoute] = []
-    @State private var tab = 0
+    @AppStorage("pokefire-box-tab") private var tab = 0
+    @State private var showImport = false
+    @State private var importNotice = false
     @State private var query = ""
     @AppStorage("pokefire-box-sort") private var boxSort = BoxSort.created.rawValue
     @AppStorage("pokefire-team-sort") private var teamSort = BoxSort.created.rawValue
@@ -118,7 +120,14 @@ struct BoxRoot: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    AppMenuButton(inToolbar: true)
+                    Button {
+                        Haptics.play(.light)
+                        stats.drawerRequests += 1
+                    } label: {
+                        fixedIcon("menu", size: 20)
+                            .foregroundStyle(Palette.ink)
+                    }
+                    .accessibilityLabel("サイドバー")
                 }
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     sortMenu
@@ -154,9 +163,24 @@ struct BoxRoot: View {
             }
         }
         .sheet(isPresented: $showPicker) {
-            PokemonPicker(role: .attacker, currentName: "") { name in
+            PokemonPicker(role: .attacker, currentName: "", onSelect: { name in
                 let entry = box.create(name, usage: model.usage)
                 path.append(.pokemon(entry.id))
+            }, onPokesol: {
+                showPicker = false
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(450))
+                    showImport = true
+                }
+            })
+        }
+        .sheet(isPresented: $showImport) {
+            PokesolImportSheet(limit: nil) { entries in
+                let ids = box.add(entries)
+                if ids.count == 1, let id = ids.first {
+                    path.append(.pokemon(id))
+                }
+                NotificationCenter.default.post(name: .pokefireToast, object: "\(ids.count)体を PokéBox に追加しました")
             }
         }
         .sheet(isPresented: $askTeamName) {
@@ -296,6 +320,7 @@ struct BoxRoot: View {
             }
         }
         .listStyle(.plain)
+        .contentMargins(.bottom, 96, for: .scrollContent)
         .environment(\.editMode, $editMode)
         .onChange(of: selection) { _, value in
             if !editing, !value.isEmpty { selection = [] }
@@ -360,6 +385,7 @@ struct BoxRoot: View {
             }
         }
         .listStyle(.plain)
+        .contentMargins(.bottom, 96, for: .scrollContent)
         .environment(\.editMode, $editMode)
         .onChange(of: selection) { _, value in
             if !editing, !value.isEmpty { selection = [] }
@@ -537,7 +563,7 @@ struct TeamDetail: View {
                 TeamWeaknessSections(members: members)
             }
         }
-        .fullScreenCover(isPresented: $showViewer) {
+        .sheet(isPresented: $showViewer) {
             TeamViewer(entries: members, title: team?.name ?? "") { index in
                 showViewer = false
                 Task { @MainActor in
@@ -679,6 +705,7 @@ struct MemberPicker: View {
     let onCreated: (UUID) -> Void
     @State private var picked: [UUID] = []
     @State private var showPicker = false
+    @State private var showImport = false
 
     var body: some View {
         let team = box.team(teamID)
@@ -690,10 +717,17 @@ struct MemberPicker: View {
                 Button {
                     showPicker = true
                 } label: {
-                    Label("あたらしいポケモンを作成", systemImage: "plus.circle.fill")
+                    Label("あたらしいポケモンを追加", systemImage: "plus.circle.fill")
                         .font(.body.weight(.semibold))
                 }
                 .disabled(room <= 0)
+                Button {
+                    showImport = true
+                } label: {
+                    Label("ポケソルテキストで追加", systemImage: "doc.on.clipboard")
+                        .font(.body.weight(.semibold))
+                }
+                .disabled(room - picked.count <= 0)
                 Section {
                     ForEach(candidates) { entry in
                         let selected = picked.contains(entry.id)
@@ -741,6 +775,13 @@ struct MemberPicker: View {
                 box.updateTeam(teamID) { $0.members.append(contentsOf: picked + [entry.id]) }
                 dismiss()
                 onCreated(entry.id)
+            }
+        }
+        .sheet(isPresented: $showImport) {
+            PokesolImportSheet(limit: max(0, room - picked.count)) { entries in
+                let ids = box.add(entries)
+                box.updateTeam(teamID) { $0.members.append(contentsOf: picked + ids) }
+                dismiss()
             }
         }
     }

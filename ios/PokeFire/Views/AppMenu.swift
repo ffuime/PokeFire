@@ -6,6 +6,21 @@ enum AppSettings {
     static let portraitTeamKey = "pokefire-team-portrait"
     static let appearanceKey = "pokefire-appearance"
 
+    static func applyAppearance(_ value: String) {
+        let style: UIUserInterfaceStyle
+        switch value {
+        case "light": style = .light
+        case "dark": style = .dark
+        default: style = .unspecified
+        }
+        for scene in UIApplication.shared.connectedScenes {
+            guard let scene = scene as? UIWindowScene else { continue }
+            for window in scene.windows {
+                window.overrideUserInterfaceStyle = style
+            }
+        }
+    }
+
     static func scheme(_ value: String) -> ColorScheme? {
         switch value {
         case "light": return .light
@@ -148,6 +163,9 @@ struct SettingsSheet: View {
         }
         .onChange(of: autoSleep) { _, value in
             AppSettings.applyAutoSleep(value)
+        }
+        .onChange(of: appearance) { _, value in
+            AppSettings.applyAppearance(value)
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)

@@ -140,7 +140,7 @@ struct MainScreen: View {
         case .item(let role):
             EntrySearchSheet(kind: .items, role: role)
         case .statsPokemon(let role):
-            PokemonPicker(role: role, currentName: stats.side(role).name) { stats.select(role, $0) }
+            PokemonPicker(role: role, currentName: stats.side(role).name, onSelect: { stats.select(role, $0) }, onBoxPick: { stats.applyBox(role, $0) })
         case .abilityInfo(let role, let name):
             AbilityInfoSheet(role: role, name: name)
         case .moveInfo(let name):
@@ -280,7 +280,7 @@ struct MainHeader: View {
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 10) {
-                AppMenuButton(openHistory: openDrawer)
+                CircleIconButton(icon: "menu", label: "サイドバー", action: openDrawer)
                 Spacer(minLength: 0)
                 if stats.isStats {
                     Text("PokéStats")

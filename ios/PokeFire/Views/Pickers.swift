@@ -117,6 +117,9 @@ struct PokemonPicker: View {
     let role: Role
     var currentName: String?
     var onSelect: ((String) -> Void)?
+    var onBoxPick: ((BoxPokemon) -> Void)?
+    var onPokesol: (() -> Void)?
+    @Environment(BoxModel.self) private var box
 
     @State private var query = ""
     @State private var mode = 0
@@ -146,13 +149,32 @@ struct PokemonPicker: View {
         }
     }
 
+    private var boxEnabled: Bool { onSelect == nil || onBoxPick != nil }
+
+    private var boxRows: [BoxPokemon] {
+        let key = Search.normalize(query)
+        return box.pokemons
+            .filter { key.isEmpty || Search.normalize($0.name + " " + $0.nickname).contains(key) }
+            .sorted { $0.updated > $1.updated }
+    }
+
+    private func pickBox(_ entry: BoxPokemon) {
+        focused = false
+        if let onBoxPick {
+            onBoxPick(entry)
+        } else {
+            model.applyBox(entry, to: role)
+        }
+        dismiss()
+    }
+
     var body: some View {
         let list = rows
         let current = currentName ?? model.side(role).name
         VStack(spacing: 0) {
             SearchHeader(
                 title: "\(role.title)のポケモン",
-                modes: ["使用率", "履歴"],
+                modes: boxEnabled ? ["使用率", "履歴", "PokéBox"] : ["使用率", "履歴"],
                 mode: $mode,
                 query: $query,
                 focused: $focused,
@@ -160,6 +182,28 @@ struct PokemonPicker: View {
                 onSubmit: { if let first = list.first { select(first.name) } },
                 onClose: { dismiss() }
             )
+            if mode == 2 {
+                let entries = boxRows
+                List {
+                    ForEach(entries) { entry in
+                        Button {
+                            pickBox(entry)
+                        } label: {
+                            BoxPokemonRow(entry: entry)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .listStyle(.plain)
+                .scrollDismissesKeyboard(.immediately)
+                .overlay {
+                    if entries.isEmpty {
+                        EmptyResult(text: box.pokemons.isEmpty ? "PokéBox にポケモンがいません" : "見つかりません")
+                    }
+                }
+            } else {
             List {
                 ForEach(list) { row in
                     Button {
@@ -196,6 +240,19 @@ struct PokemonPicker: View {
                 if list.isEmpty {
                     EmptyResult(text: mode == 1 && Storage.pokemonHistory.isEmpty ? "履歴はまだありません" : "見つかりません")
                 }
+            }
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if let onPokesol {
+                Button(action: onPokesol) {
+                    Label("ポケソルテキストで追加", systemImage: "doc.on.clipboard")
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 6)
+                        .frame(height: 36)
+                }
+                .buttonStyle(.glassProminent)
+                .padding(20)
             }
         }
         .onChange(of: mode) { _, _ in Haptics.play(.selection) }

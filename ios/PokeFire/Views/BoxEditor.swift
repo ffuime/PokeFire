@@ -725,6 +725,8 @@ struct NatureSheet: View {
                         .foregroundStyle(Palette.accent)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -1316,59 +1318,36 @@ struct TeamViewer: View {
     let title: String
     let onOpenMember: (Int) -> Void
     @AppStorage(AppSettings.portraitTeamKey) private var portrait = false
-    @State private var scale: CGFloat = 1
-    @State private var baseScale: CGFloat = 1
-    @State private var offset: CGSize = .zero
-    @State private var baseOffset: CGSize = .zero
+    @State private var image: UIImage?
+
+    private func member(at point: CGPoint) -> Int? {
+        let columns = portrait ? 2 : 3
+        let rows = portrait ? 3 : 2
+        let x = point.x - TeamCollage.padding
+        let y = point.y - TeamCollage.padding - TeamCollage.header
+        guard x >= 0, y >= 0 else { return nil }
+        let column = Int(x / (TeamCollage.cardWidth + TeamCollage.spacing))
+        let row = Int(y / (BoxCard.height + TeamCollage.spacing))
+        guard column < columns, row < rows,
+              x - CGFloat(column) * (TeamCollage.cardWidth + TeamCollage.spacing) <= TeamCollage.cardWidth,
+              y - CGFloat(row) * (BoxCard.height + TeamCollage.spacing) <= BoxCard.height else { return nil }
+        let index = row * columns + column
+        return index < entries.count ? index : nil
+    }
 
     var body: some View {
-        let size = TeamCollage.size(portrait: portrait)
-        GeometryReader { geometry in
-            let fit = min(geometry.size.width / size.width, geometry.size.height / size.height) * 0.96
-            ZStack {
-                Color.black.opacity(0.92).ignoresSafeArea()
-                TeamCollage(entries: entries, frozen: false, portrait: portrait, title: title) { index in
-                    onOpenMember(index)
-                }
-                .frame(width: size.width, height: size.height)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .scaleEffect(fit * scale)
-                .offset(offset)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-            }
-            .gesture(
-                MagnifyGesture()
-                    .onChanged { value in scale = max(1, min(5, baseScale * value.magnification)) }
-                    .onEnded { _ in
-                        baseScale = scale
-                        if scale <= 1.01 {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                                offset = .zero
-                                baseOffset = .zero
-                            }
-                        }
-                    }
-                    .simultaneously(with:
-                        DragGesture()
-                            .onChanged { value in
-                                guard scale > 1 else { return }
-                                offset = CGSize(width: baseOffset.width + value.translation.width, height: baseOffset.height + value.translation.height)
-                            }
-                            .onEnded { _ in baseOffset = offset }
-                    )
-            )
-            .onTapGesture(count: 2) {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                    if scale > 1 {
-                        scale = 1
-                        baseScale = 1
-                        offset = .zero
-                        baseOffset = .zero
-                    } else {
-                        scale = 2.5
-                        baseScale = 2.5
+        ZStack {
+            Palette.background.ignoresSafeArea()
+            if let image {
+                ZoomableImage(image: image) { point in
+                    if let index = member(at: point) {
+                        Haptics.play(.light)
+                        onOpenMember(index)
                     }
                 }
+                .ignoresSafeArea(edges: .bottom)
+            } else {
+                ProgressView()
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -1376,7 +1355,7 @@ struct TeamViewer: View {
                 dismiss()
             } label: {
                 CloseButtonLabel()
-                    .foregroundStyle(Color.white)
+                    .foregroundStyle(Palette.ink)
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
             }
@@ -1385,7 +1364,108 @@ struct TeamViewer: View {
             .padding(16)
             .accessibilityLabel("閉じる")
         }
-        .statusBarHidden()
+        .task {
+            let renderer = ImageRenderer(content: TeamCollage(entries: entries, frozen: true, portrait: portrait, title: title))
+            renderer.scale = 3
+            image = renderer.uiImage
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+struct ZoomableImage: UIViewRepresentable {
+    let image: UIImage
+    let onTap: (CGPoint) -> Void
+
+    final class ZoomView: UIScrollView, UIScrollViewDelegate {
+        let imageView = UIImageView()
+        var onTap: ((CGPoint) -> Void)?
+        private var lastSize: CGSize = .zero
+
+        init(image: UIImage) {
+            super.init(frame: .zero)
+            imageView.image = image
+            imageView.contentMode = .scaleAspectFit
+            imageView.isUserInteractionEnabled = true
+            addSubview(imageView)
+            delegate = self
+            minimumZoomScale = 1
+            maximumZoomScale = 5
+            bouncesZoom = true
+            showsHorizontalScrollIndicator = false
+            showsVerticalScrollIndicator = false
+            decelerationRate = .fast
+            contentInsetAdjustmentBehavior = .never
+            let double = UITapGestureRecognizer(target: self, action: #selector(doubleTapped(_:)))
+            double.numberOfTapsRequired = 2
+            addGestureRecognizer(double)
+            let single = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
+            single.require(toFail: double)
+            addGestureRecognizer(single)
+        }
+
+        required init?(coder: NSCoder) { nil }
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            if bounds.size != lastSize {
+                lastSize = bounds.size
+                fit()
+            }
+            center()
+        }
+
+        private func fit() {
+            guard let size = imageView.image?.size, size.width > 0, size.height > 0, bounds.width > 0 else { return }
+            zoomScale = 1
+            let scale = min(bounds.width / size.width, bounds.height / size.height)
+            imageView.frame = CGRect(x: 0, y: 0, width: size.width * scale, height: size.height * scale)
+            contentSize = imageView.frame.size
+        }
+
+        private func center() {
+            let x = max(0, (bounds.width - contentSize.width) / 2)
+            let y = max(0, (bounds.height - contentSize.height) / 2)
+            imageView.center = CGPoint(x: contentSize.width / 2 + x, y: contentSize.height / 2 + y)
+        }
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { imageView }
+
+        func scrollViewDidZoom(_ scrollView: UIScrollView) { center() }
+
+        @objc private func doubleTapped(_ gesture: UITapGestureRecognizer) {
+            if zoomScale > 1.01 {
+                setZoomScale(1, animated: true)
+            } else {
+                let point = gesture.location(in: imageView)
+                let scale: CGFloat = 2.5
+                let size = CGSize(width: bounds.width / scale, height: bounds.height / scale)
+                zoom(to: CGRect(x: point.x - size.width / 2, y: point.y - size.height / 2, width: size.width, height: size.height), animated: true)
+            }
+        }
+
+        @objc private func tapped(_ gesture: UITapGestureRecognizer) {
+            guard let size = imageView.image?.size else { return }
+            let point = gesture.location(in: imageView)
+            let bounds = imageView.bounds
+            guard bounds.contains(point), bounds.width > 0 else { return }
+            onTap?(CGPoint(x: point.x / bounds.width * size.width, y: point.y / bounds.height * size.height))
+        }
+    }
+
+    func makeUIView(context: Context) -> ZoomView {
+        let view = ZoomView(image: image)
+        view.onTap = onTap
+        return view
+    }
+
+    func updateUIView(_ view: ZoomView, context: Context) {
+        view.onTap = onTap
+        if view.imageView.image !== image {
+            view.imageView.image = image
+            view.setNeedsLayout()
+        }
     }
 }
 
