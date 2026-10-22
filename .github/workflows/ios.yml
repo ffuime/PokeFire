@@ -64,13 +64,26 @@ jobs:
       - name: Package IPA
         run: |
           cd ios
-          rm -rf Payload PokeFire.ipa
+          rm -rf Payload Pokeloot.ipa
           mkdir Payload
           cp -R build/Build/Products/Release-iphoneos/PokeFire.app Payload/
-          zip -qry PokeFire.ipa Payload
+          zip -qry Pokeloot.ipa Payload
+
+      - name: Publish IPA
+        if: github.ref != 'refs/heads/main'
+        run: |
+          mkdir -p /tmp/ipa
+          cp ios/Pokeloot.ipa /tmp/ipa/
+          echo "${{ github.sha }}" > /tmp/ipa/commit.txt
+          cd /tmp/ipa
+          git init -q
+          git checkout -q -b ipa
+          git add .
+          git -c user.name=ci -c user.email=ci@users.noreply.github.com commit -qm "ipa ${{ github.sha }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ipa
 
       - uses: actions/upload-artifact@v4
         with:
-          name: PokeFire-ipa
-          path: ios/PokeFire.ipa
+          name: Pokeloot-ipa
+          path: ios/Pokeloot.ipa
           retention-days: 30
