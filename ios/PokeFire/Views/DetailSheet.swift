@@ -274,9 +274,16 @@ private struct FighterColumn: View {
                 }
                 .frame(height: 72)
                 HStack(spacing: 2) {
-                    ForEach(types, id: \.self) { type in
+                    ForEach(Array(types.prefix(2)), id: \.self) { type in
                         TypeIcon(type: type, size: 18)
                             .padding(2)
+                            .background(Palette.card, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    }
+                    if types.count > 2 {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(Palette.secondary)
+                            .frame(width: 22, height: 22)
                             .background(Palette.card, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                     }
                 }

@@ -122,40 +122,53 @@ struct DataHome: View {
         let maxY = points.map(\.y).max() ?? 0
         let width = maxX - minX
         let height = maxY - minY
+        let size = min(width, height) * (kind == .pokemon ? 0.62 : kind == .move ? 0.5 : 0.5)
+        let centerX = minX + width * (kind == .item ? 0.58 : 0.5)
+        let centerY = minY + height * (kind == .pokemon ? 0.46 : kind == .move ? 0.5 : kind == .ability ? 0.48 : 0.56)
+        DataIcon(kind: kind)
+            .frame(width: size, height: size)
+            .foregroundStyle(Color.white)
+            .position(x: centerX, y: centerY)
+    }
+}
+
+struct DataIcon: View {
+    let kind: DataKind
+
+    var body: some View {
         switch kind {
         case .pokemon:
-            Text(kind.title)
-                .font(.system(size: min(96, width * 0.24), weight: .black))
-                .foregroundStyle(Color.white)
-                .lineLimit(1)
-                .fixedSize()
-                .offset(x: minX + 18, y: minY + height * 0.18)
-        case .move:
-            VStack(spacing: -12) {
-                ForEach(Array(kind.title), id: \.self) { char in
-                    Text(String(char))
-                        .font(.system(size: min(120, width * 0.62), weight: .black))
+            GeometryReader { geometry in
+                let size = min(geometry.size.width, geometry.size.height)
+                let line = size * 0.09
+                let inner = size * 0.34
+                ZStack {
+                    Circle().strokeBorder(lineWidth: line)
+                    HStack(spacing: inner) {
+                        Rectangle().frame(height: line)
+                        Rectangle().frame(height: line)
+                    }
+                    .padding(.horizontal, line / 2)
+                    Circle().strokeBorder(lineWidth: line).frame(width: inner, height: inner)
+                    Circle().frame(width: inner * 0.32, height: inner * 0.32)
                 }
+                .frame(width: size, height: size)
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
-            .foregroundStyle(Color.white)
-            .fixedSize()
-            .offset(x: minX + 14, y: minY + height * 0.2)
+        case .move:
+            Image("tab_attack")
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
         case .ability:
-            Text(kind.title)
-                .font(.system(size: min(64, width * 0.34), weight: .black))
-                .foregroundStyle(Color.white)
-                .lineLimit(1)
-                .fixedSize()
-                .rotationEffect(.degrees(-6), anchor: .leading)
-                .offset(x: minX + 22, y: minY + height * 0.32)
+            Image(systemName: "sparkles")
+                .resizable()
+                .scaledToFit()
+                .fontWeight(.bold)
         case .item:
-            Text(kind.title)
-                .font(.system(size: min(48, width * 0.26), weight: .black))
-                .foregroundStyle(Color.white)
-                .lineLimit(1)
-                .fixedSize()
-                .rotationEffect(.degrees(-6), anchor: .leading)
-                .offset(x: minX + 26, y: minY + height * 0.45)
+            Image(systemName: "bag.fill")
+                .resizable()
+                .scaledToFit()
         }
     }
 }
@@ -233,6 +246,7 @@ struct DataPokemonSheet: View {
     @State private var query = ""
     @State private var filter = PokemonFilter()
     @State private var showFilter = false
+    @State private var expanded: Set<String> = []
     @FocusState private var focused: Bool
 
     private func value(_ key: String, _ pokemon: Pokemon) -> Double {
@@ -347,15 +361,19 @@ struct DataPokemonSheet: View {
             .padding(.bottom, 6)
             List {
                 ForEach(list, id: \.self) { name in
-                    Button {
+                    DataPokemonRow(name: name, sort: filter.sort, open: expanded.contains(name)) {
                         focused = false
                         stats.select(.attacker, name)
                         withAnimation(.easeInOut(duration: 0.35)) { stats.openStats() }
                         dismiss()
-                    } label: {
-                        DataPokemonRow(name: name, sort: filter.sort)
                     }
-                    .buttonStyle(.plain)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        Haptics.play(.light)
+                        withAnimation(.snappy(duration: 0.28)) {
+                            if expanded.contains(name) { expanded.remove(name) } else { expanded.insert(name) }
+                        }
+                    }
                 }
             }
             .listStyle(.plain)
@@ -375,48 +393,67 @@ struct DataPokemonSheet: View {
 struct DataPokemonRow: View {
     let name: String
     let sort: PokemonFilter.Sort
+    var open = false
+    var openStats: () -> Void = {}
 
     var body: some View {
         let pokemon = GameData.shared.pokemons[name]
         let base = pokemon?.base ?? BaseStats()
-        HStack(spacing: 12) {
-            SpriteView(name: name, size: 44)
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                SpriteView(name: name, size: 44)
+                VStack(alignment: .leading, spacing: 2) {
                     Text(name)
                         .font(.body.weight(.semibold))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    if GameData.shared.isUnreleased(name) {
-                        Text("未内定")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(Palette.secondary)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Palette.secondary.opacity(0.12), in: Capsule())
-                    }
-                }
-                HStack(spacing: 6) {
-                    ForEach(StatKey.baseKeys, id: \.self) { key in
-                        Text("\(key.letter)\(base[key])")
-                            .font(.system(size: 10, weight: .heavy))
-                            .monospacedDigit()
-                            .foregroundStyle(sort.rawValue == key.letter ? Palette.stat(key) : Palette.secondary)
-                    }
-                    Text("計\(base.h + base.a + base.b + base.c + base.d + base.s)")
-                        .font(.system(size: 10, weight: .heavy))
+                    Text(StatKey.baseKeys.map { String(base[$0]) }.joined(separator: "-"))
+                        .font(.caption.weight(.semibold))
                         .monospacedDigit()
-                        .foregroundStyle(sort == .total ? Palette.accent : Palette.secondary)
+                        .foregroundStyle(Palette.secondary)
+                }
+                Spacer(minLength: 4)
+                HStack(spacing: 3) {
+                    ForEach(pokemon?.types ?? [], id: \.self) { TypeIcon(type: $0, size: 20) }
                 }
             }
-            Spacer(minLength: 4)
-            HStack(spacing: 3) {
-                ForEach(pokemon?.types ?? [], id: \.self) { TypeIcon(type: $0, size: 20) }
+            if open {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("とくせい")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Palette.secondary)
+                            .frame(width: 48, alignment: .leading)
+                        Text((pokemon?.abilities ?? []).joined(separator: " / "))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Palette.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("重さ")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Palette.secondary)
+                            .frame(width: 48, alignment: .leading)
+                        Text(String(format: "%gkg", pokemon?.weight ?? 0))
+                            .font(.subheadline.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.ink)
+                    }
+                    Button(action: openStats) {
+                        Label("PokéStatsで見る", systemImage: "chart.pie")
+                            .font(.subheadline.weight(.bold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .padding(.top, 2)
+                }
+                .padding(.leading, 56)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.vertical, 2)
-        .contentShape(Rectangle())
     }
 }
 
@@ -522,7 +559,7 @@ struct DataMoveSheet: View {
     @State private var query = ""
     @State private var filter = MoveFilter()
     @State private var showFilter = false
-    @State private var expanded: Set<String> = []
+    @State private var learnersOf: String?
     @FocusState private var focused: Bool
 
     private func searchText(_ info: MoveInfo) -> String {
@@ -579,11 +616,9 @@ struct DataMoveSheet: View {
                             .padding(.top, index == 0 ? 4 : 14)
                             .padding(.leading, 6)
                         }
-                        LearnsetRow(info: info, open: expanded.contains(info.name)) {
+                        LearnsetRow(info: info, open: false) {
                             Haptics.play(.light)
-                            withAnimation(.snappy(duration: 0.28)) {
-                                if expanded.contains(info.name) { expanded.remove(info.name) } else { expanded.insert(info.name) }
-                            }
+                            learnersOf = info.name
                         }
                     }
                 }
@@ -597,6 +632,11 @@ struct DataMoveSheet: View {
         }
         .sheet(isPresented: $showFilter) {
             MoveFilterSheet(filter: $filter)
+        }
+        .sheet(item: Binding(get: { learnersOf.map { MoveRef(name: $0) } }, set: { learnersOf = $0?.name })) { ref in
+            MoveLearnersSheet(name: ref.name) {
+                dismiss()
+            }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
@@ -612,8 +652,10 @@ struct DataEntryRow: View {
     var holders: [String] = []
     var onPokemon: ((String) -> Void)?
 
+    var expandable = true
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 8) {
                 if let sprite {
                     SpriteIcon(name: sprite, size: 28)
@@ -623,16 +665,17 @@ struct DataEntryRow: View {
                     .font(.body.weight(.semibold))
                     .foregroundStyle(Palette.ink)
                 Spacer(minLength: 4)
-                Icon(name: "chevron_down", size: 14)
-                    .foregroundStyle(Palette.secondary.opacity(0.6))
-                    .rotationEffect(.degrees(open ? 180 : 0))
+                if expandable {
+                    Icon(name: "chevron_down", size: 14)
+                        .foregroundStyle(Palette.secondary.opacity(0.6))
+                        .rotationEffect(.degrees(open ? 180 : 0))
+                }
             }
-            .frame(minHeight: 40)
             Text(effect.isEmpty ? "説明はありません" : effect)
                 .font(.footnote)
                 .foregroundStyle(Palette.secondary)
-                .lineLimit(open ? nil : 1)
-                .fixedSize(horizontal: false, vertical: open)
+                .lineLimit(open || !expandable ? nil : 1)
+                .fixedSize(horizontal: false, vertical: open || !expandable)
             if open, !holders.isEmpty {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 48), spacing: 4)], spacing: 4) {
                     ForEach(holders, id: \.self) { holder in
@@ -648,7 +691,7 @@ struct DataEntryRow: View {
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(open ? Palette.card : Color.clear)
@@ -791,20 +834,15 @@ struct DataItemSheet: View {
             ScrollView {
                 LazyVStack(spacing: 2) {
                     ForEach(list, id: \.self) { name in
-                        let open = expanded.contains(name)
                         DataEntryRow(
                             name: name,
                             effect: effect(name),
                             unimplemented: model.data.isUnimplemented(item: name),
-                            open: open,
-                            sprite: name
+                            open: false,
+                            sprite: name,
+                            expandable: false
                         )
-                        .onTapGesture {
-                            Haptics.play(.light)
-                            withAnimation(.snappy(duration: 0.28)) {
-                                if open { expanded.remove(name) } else { expanded.insert(name) }
-                            }
-                        }
+                        Divider().padding(.leading, 12)
                     }
                 }
                 .padding(.horizontal, 12)
@@ -816,6 +854,75 @@ struct DataItemSheet: View {
             }
         }
         .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+struct MoveRef: Identifiable {
+    var id: String { name }
+    let name: String
+}
+
+struct MoveLearnersSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
+    @Environment(\.dismiss) private var dismiss
+    let name: String
+    let closeParent: () -> Void
+
+    private var learners: [String] {
+        guard let learnsets = model.learnsets else { return [] }
+        let data = model.data
+        let english = Set(learnsets.filter { $0.value.contains(name) }.map(\.key))
+        return data.pokemonOrder.filter { pokemon in
+            guard let en = data.usageNames.pokemons[pokemon] else { return false }
+            return english.contains(en)
+        }
+    }
+
+    var body: some View {
+        let list = learners
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(name)
+                    .font(.title.weight(.bold))
+                    .foregroundStyle(Palette.ink)
+                if let info = StatsCatalog.shared.moveInfo(name) {
+                    MoveDetailContent(info: info)
+                }
+                Text("覚えるポケモン（\(list.count)）")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(Palette.secondary)
+                    .padding(.top, 4)
+                if model.learnsets == nil {
+                    ProgressView()
+                } else if list.isEmpty {
+                    Text("覚えるポケモンのデータはありません")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.secondary)
+                }
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60, maximum: 72), spacing: 8)], alignment: .leading, spacing: 8) {
+                    ForEach(list, id: \.self) { pokemon in
+                        Button {
+                            stats.select(.attacker, pokemon)
+                            withAnimation(.easeInOut(duration: 0.35)) { stats.openStats() }
+                            dismiss()
+                            closeParent()
+                        } label: {
+                            SpriteView(name: pokemon, size: 52)
+                                .frame(width: 60, height: 60)
+                                .background(Palette.background, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                        .buttonStyle(PressableStyle())
+                        .accessibilityLabel(pokemon)
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+            .padding(.bottom, 24)
+        }
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
 }

@@ -95,6 +95,9 @@ enum PokemonSprites {
         if id.hasPrefix("sv") {
             return UIImage(named: "pokesv_\(id.dropFirst(2))")
         }
+        if id.hasPrefix("home") {
+            return UIImage(named: "pokehome_\(id.dropFirst(4))")
+        }
         return UIImage(named: "poke_\(id)\(shiny ? "_shiny" : "")")
     }
 }

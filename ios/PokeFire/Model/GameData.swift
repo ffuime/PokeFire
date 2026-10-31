@@ -160,7 +160,6 @@ final class GameData {
             )
             pokemonOrder.append(name)
         }
-        self.pokemons = pokemons
         self.pokemonOrder = pokemonOrder
         var unreleased: [String] = []
         for (name, value) in load("unreleased").object?.entries ?? [] where pokemons[name] == nil {
@@ -184,6 +183,7 @@ final class GameData {
             unreleased.append(name)
         }
         self.unreleasedPokemonOrder = unreleased
+        self.pokemons = pokemons
 
         var moves: [String: Move] = [:]
         var moveOrder: [String] = []
