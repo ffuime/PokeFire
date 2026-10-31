@@ -97,6 +97,23 @@ final class StatsCatalog {
         return MoveInfo(name: name, type: move.type, category: move.category, power: move.power, accuracy: nil, pp: nil, effect: move.effect, target: "", remarks: move.remarks)
     }
 
+    static func sortedMoves(_ names: [String]) -> [String] {
+        let catalog = StatsCatalog.shared
+        let typeIndex = Dictionary(uniqueKeysWithValues: Palette.typeOrder.enumerated().map { ($1, $0) })
+        let categoryIndex = ["物理": 0, "特殊": 1, "変化": 2]
+        return names.sorted { lhs, rhs in
+            let left = catalog.moveInfo(lhs)
+            let right = catalog.moveInfo(rhs)
+            let lt = typeIndex[left?.type ?? ""] ?? 99
+            let rt = typeIndex[right?.type ?? ""] ?? 99
+            if lt != rt { return lt < rt }
+            let lc = categoryIndex[left?.category ?? ""] ?? 9
+            let rc = categoryIndex[right?.category ?? ""] ?? 9
+            if lc != rc { return lc < rc }
+            return lhs.compare(rhs, locale: Locale(identifier: "ja_JP")) == .orderedAscending
+        }
+    }
+
     func megaStone(for pokemon: String) -> String? {
         let data = GameData.shared
         guard let parent = data.megaParent(pokemon) else { return nil }

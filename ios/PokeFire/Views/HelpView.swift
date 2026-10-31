@@ -277,6 +277,20 @@ private let boxTopics: [HelpTopic] = [
     ),
 ]
 
+private let dataTopics: [HelpTopic] = [
+    HelpTopic(
+        id: "data-home",
+        title: "PokéData の使い方",
+        icon: "search",
+        lead: "4つのボタンから、ポケモン・わざ・とくせい・もちものの検索画面を開きます。",
+        points: [
+            "ポケモンは、タイプ・内定かどうか・メガシンカ・とくせい・覚えるわざ・種族値・重さで絞り込み、図鑑番号・使用率・各種族値などで並べ替えられます。タップするとそのポケモンを PokéStats で開きます。",
+            "わざは、タイプ・分類・威力・命中・PP・優先度・対象・追加効果で絞り込めます。タップすると詳細が開きます。",
+            "とくせいともちものは、実装済みかどうかで絞り込めます。とくせいはタップすると効果と持っているポケモンが表示されます。",
+        ]
+    ),
+]
+
 private struct HelpService: Identifiable {
     let id: String
     let title: String
@@ -290,10 +304,11 @@ private struct HelpService: Identifiable {
 private let helpServices: [HelpService] = [
     HelpService(id: "fire", title: "PokéFire", symbol: nil, image: "tab_attack", tint: Palette.attack, summary: "ダメージと火力指数を計算します。乱数・確定数・加算計算・反動や回復までまとめて確認できます。", topics: helpTopics.filter { $0.id != "data" }),
     HelpService(id: "stats", title: "PokéStats", symbol: "chart.pie", image: nil, tint: Palette.accent, summary: "種族値・タイプ相性・使用率・すばやさラインなど、ポケモンの情報を見比べます。", topics: statsTopics),
+    HelpService(id: "data", title: "PokéData", symbol: "books.vertical", image: nil, tint: Color(hex: 0xE09A1B), summary: "ポケモン・わざ・とくせい・もちものを、細かい条件で検索できる図鑑です。", topics: dataTopics),
     HelpService(id: "box", title: "PokéBox", symbol: "cube.box", image: nil, tint: Color(hex: 0x20A6A6), summary: "育成したポケモンを登録してチームを組み、サムネイル画像として保存できます。", topics: boxTopics),
 ]
 
-private let allTopics: [HelpTopic] = helpTopics + statsTopics + boxTopics
+private let allTopics: [HelpTopic] = helpTopics + statsTopics + dataTopics + boxTopics
 
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
@@ -306,7 +321,7 @@ struct HelpView: View {
                         Text("Pokéloot")
                             .font(.largeTitle.weight(.bold))
                             .foregroundStyle(Palette.ink)
-                        Text("ポケモンチャンピオンズのシングルバトルのためのツールです。ダメージ計算の PokéFire、ポケモンの情報を見る PokéStats、育成したポケモンとチームを管理する PokéBox の3つのサービスがあり、左上のメニューやサイドバーから切り替えられます。")
+                        Text("ポケモンチャンピオンズのシングルバトルのためのツールです。ダメージ計算の PokéFire、ポケモンの情報を見る PokéStats、図鑑検索の PokéData、育成したポケモンとチームを管理する PokéBox の4つのサービスがあり、左上のメニューやサイドバーから切り替えられます。")
                             .font(.subheadline)
                             .foregroundStyle(Palette.secondary)
                     }

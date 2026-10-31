@@ -561,6 +561,17 @@ struct TeamDetail: View {
             }
             if !members.isEmpty, !editing {
                 TeamWeaknessSections(members: members)
+                Section {
+                    Button {
+                        UIPasteboard.general.string = PokesolExport.text(members)
+                        Haptics.play(.success)
+                        NotificationCenter.default.post(name: .pokefireToast, object: "ポケソルテキストをコピーしました")
+                    } label: {
+                        Label("ポケソルテキストでコピー", systemImage: "doc.on.doc")
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
             }
         }
         .sheet(isPresented: $showViewer) {

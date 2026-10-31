@@ -54,12 +54,15 @@ struct RootView: View {
                     if stats.mode == .box {
                         BoxRoot()
                             .transition(.opacity)
+                    } else if stats.mode == .data {
+                        DataHome()
+                            .transition(.opacity)
                     } else {
                         MainScreen(openDrawer: { setDrawer(true) })
                             .transition(.opacity)
                     }
                 }
-                .animation(.easeInOut(duration: 0.3), value: stats.mode == .box)
+                .animation(.easeInOut(duration: 0.3), value: stats.mode)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .allowsHitTesting(progress < 0.01)
                     .overlay {

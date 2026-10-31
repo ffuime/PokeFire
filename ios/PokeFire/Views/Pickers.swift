@@ -219,6 +219,7 @@ struct PokemonPicker: View {
                     }
                 }
             } else {
+            ScrollViewReader { proxy in
             List {
                 ForEach(groups) { group in
                 SwiftUI.Section {
@@ -228,6 +229,7 @@ struct PokemonPicker: View {
                     } label: {
                         PokemonRow(name: row.name, nested: row.nested, selected: row.name == current, rank: model.usage?.pokemons[row.name]?.rank)
                     }
+                    .id(row.name)
                     .listRowInsets(EdgeInsets(top: 4, leading: row.nested ? 34 : 16, bottom: 4, trailing: 16))
                     .listRowBackground(row.name == current ? Palette.accent.opacity(0.06) : Palette.card)
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -265,6 +267,11 @@ struct PokemonPicker: View {
                 if list.isEmpty {
                     EmptyResult(text: mode == 1 && Storage.pokemonHistory.isEmpty ? "履歴はまだありません" : "見つかりません")
                 }
+            }
+            .task {
+                guard list.contains(where: { $0.name == current }) else { return }
+                proxy.scrollTo(current, anchor: .center)
+            }
             }
             }
         }
@@ -462,7 +469,7 @@ struct EntrySearchSheet: View {
         } else {
             let names: [String]
             switch kind {
-            case .moves: names = data.moveOrder
+            case .moves: names = StatsCatalog.sortedMoves(data.moveOrder)
             case .abilities: names = data.abilityOrder
             case .items: names = data.itemOrder
             }
@@ -524,10 +531,11 @@ struct EntrySearchSheet: View {
                 onSubmit: { if let first { select(first.name) } },
                 onClose: { dismiss() }
             )
+            ScrollViewReader { proxy in
             List {
                 ForEach(sections) { group in
                     Section {
-                        rows(group.rows, selected: selected)
+                        rows(group.rows, selected: selected, group: group.id)
                     } header: {
                         if !group.id.isEmpty {
                             Text(group.id)
@@ -549,6 +557,11 @@ struct EntrySearchSheet: View {
                     EmptyResult(text: mode == 1 && kind.history.isEmpty ? "履歴はまだありません" : "見つかりません")
                 }
             }
+            .task {
+                guard let group = sections.first(where: { $0.rows.contains { $0.name == selected } }) else { return }
+                proxy.scrollTo(group.id + "|" + selected, anchor: .center)
+            }
+            }
         }
         .onChange(of: mode) { _, _ in Haptics.play(.selection) }
         .task {
@@ -558,7 +571,7 @@ struct EntrySearchSheet: View {
         .presentationDragIndicator(.visible)
     }
 
-    private func rows(_ list: [Row], selected: String) -> some View {
+    private func rows(_ list: [Row], selected: String, group: String) -> some View {
         ForEach(list) { row in
             Button {
                 select(row.name)
@@ -566,6 +579,7 @@ struct EntrySearchSheet: View {
                 EntryRow(kind: kind, name: row.label ?? row.name, effect: row.effect, usage: row.usage, selected: row.name == selected)
             }
             .listRowBackground(row.name == selected ? Palette.accent.opacity(0.06) : Palette.card)
+            .id(group + "|" + row.name)
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if mode == 1, kind.hasHistory {
                     Button(role: .destructive) {

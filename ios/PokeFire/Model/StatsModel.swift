@@ -2,7 +2,7 @@ import Foundation
 import Observation
 
 enum AppMode: String {
-    case fire, stats, box
+    case fire, stats, data, box
 }
 
 struct StatsSide: Codable, Equatable {
@@ -132,6 +132,16 @@ final class StatsModel {
 
     func openBox() {
         mode = .box
+        save()
+    }
+
+    func openData() {
+        mode = .data
+        save()
+    }
+
+    func openStats() {
+        mode = .stats
         save()
     }
 

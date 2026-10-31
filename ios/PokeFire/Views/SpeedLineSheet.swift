@@ -110,6 +110,52 @@ struct SpeedLineSheet: View {
     let onPick: (SpeedLineEntry) -> Bool
     @State private var top50 = false
     @State private var lines: [Int: [SpeedLineEntry]] = [:]
+    @State private var tuning = false
+    @State private var tuned = false
+    @State private var points = 32
+    @State private var nature = 10
+    @State private var rank = 0
+    @State private var scarf = false
+    @State private var abilityOn = false
+    @State private var tailwind = false
+    @State private var paralysis = false
+
+    private var base: Int { GameData.shared.pokemons[currentName]?.base.s ?? 0 }
+
+    private var speedAbility: (name: String, mod: Int)? {
+        for ability in GameData.shared.pokemons[currentName]?.abilities ?? [] {
+            if let rule = Calc.speedAbilities[ability] { return (ability, rule.mod) }
+        }
+        return nil
+    }
+
+    private var tunedSpeed: Int {
+        var mods: [Int] = []
+        if scarf { mods.append(6144) }
+        if abilityOn, let ability = speedAbility { mods.append(ability.mod) }
+        if tailwind { mods.append(8192) }
+        var value = Calc.applyMod(Calc.applyRank(Calc.realStat(base, points, nature), rank), Calc.chainMods(mods))
+        if paralysis, speedAbility?.name != "はやあし" || !abilityOn { value /= 2 }
+        return max(1, value)
+    }
+
+    private var shownSpeed: Int { tuned ? tunedSpeed : currentSpeed }
+
+    private func seed() {
+        for nature in [10, 11, 9] {
+            if let points = (0...32).first(where: { Calc.realStat(base, $0, nature) == currentSpeed }) {
+                self.points = points
+                self.nature = nature
+                return
+            }
+        }
+    }
+
+    private func edit(_ body: () -> Void) {
+        body()
+        tuned = true
+        Haptics.play(.selection)
+    }
 
     private static let abilityColor = Color(hex: 0x4A90E2)
     private static let moveColor = Color(hex: 0xC99A06)
@@ -154,10 +200,17 @@ struct SpeedLineSheet: View {
                     }
                     .padding(.bottom, 80)
                 }
+                .onChange(of: shownSpeed) { _, target in
+                    let keys = lines.keys.sorted(by: >)
+                    if let nearest = keys.min(by: { abs($0 - target) < abs($1 - target) }) {
+                        withAnimation(.snappy(duration: 0.3)) { proxy.scrollTo(nearest, anchor: .center) }
+                    }
+                }
                 .task(id: top50) {
+                    if !tuned { seed() }
                     lines = SpeedLine.build(model: model, top50: top50)
                     try? await Task.sleep(for: .milliseconds(80))
-                    let target = currentSpeed
+                    let target = shownSpeed
                     let keys = lines.keys.sorted(by: >)
                     if let nearest = keys.min(by: { abs($0 - target) < abs($1 - target) }) {
                         proxy.scrollTo(nearest, anchor: .center)
@@ -167,19 +220,33 @@ struct SpeedLineSheet: View {
             .overlay(alignment: .bottomTrailing) {
                 GlassEffectContainer(spacing: 8) {
                     VStack(alignment: .trailing, spacing: 0) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            SpriteView(name: currentName, size: 30)
-                                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
-                            Text("S")
-                                .font(.caption.weight(.heavy))
-                                .foregroundStyle(Palette.stat(.s))
-                            NumberText(currentSpeed)
-                                .font(.title2.weight(.bold))
-                                .foregroundStyle(Palette.ink)
+                        Button {
+                            Haptics.play(.light)
+                            tuning = true
+                        } label: {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                SpriteView(name: currentName, size: 30)
+                                    .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 6 }
+                                Text("S")
+                                    .font(.caption.weight(.heavy))
+                                    .foregroundStyle(Palette.stat(.s))
+                                NumberText(shownSpeed)
+                                    .font(.title2.weight(.bold))
+                                    .foregroundStyle(tuned && tunedSpeed != Calc.realStat(base, points, nature) ? Palette.boosted : Palette.ink)
+                                Image(systemName: "slider.horizontal.3")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Palette.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .frame(height: 52)
+                            .contentShape(Rectangle())
                         }
-                        .padding(.horizontal, 16)
-                        .frame(height: 52)
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive(), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .popover(isPresented: $tuning, attachmentAnchor: .rect(.bounds), arrowEdge: .bottom) {
+                            tuner
+                                .presentationCompactAdaptation(.popover)
+                        }
                         Toggle("使用率TOP50まで", isOn: $top50)
                             .font(.footnote.weight(.bold))
                             .foregroundStyle(Palette.ink)
@@ -202,6 +269,44 @@ struct SpeedLineSheet: View {
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
+    }
+
+    private var tuner: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("すばやさ").sectionTitle()
+                Spacer()
+                NumberText(tunedSpeed)
+                    .font(.system(size: 26, weight: .bold))
+                    .foregroundStyle(Palette.stat(.s))
+            }
+            HStack(spacing: 12) {
+                SegmentBar(count: 32, value: points, color: Palette.stat(.s)) { value in edit { points = value } }
+                NumberText(points)
+                    .font(.headline)
+                    .foregroundStyle(Palette.ink)
+                    .frame(width: 30, alignment: .trailing)
+            }
+            HStack(spacing: 10) {
+                NatureControl(nature: nature) { value in edit { nature = value } }
+                Spacer(minLength: 0)
+                RankControl(
+                    rank: rank,
+                    onStep: { step in edit { rank = Calc.clampRank(rank + step) } },
+                    onSet: { value in edit { rank = Calc.clampRank(value) } }
+                )
+            }
+            FlowLayout(spacing: 6) {
+                ToggleChip(title: "スカーフ", isOn: scarf) { edit { scarf.toggle() } }
+                if let ability = speedAbility {
+                    ToggleChip(title: ability.name, isOn: abilityOn) { edit { abilityOn.toggle() } }
+                }
+                ToggleChip(title: "おいかぜ", isOn: tailwind) { edit { tailwind.toggle() } }
+                ToggleChip(title: "まひ", isOn: paralysis) { edit { paralysis.toggle() } }
+            }
+        }
+        .padding(18)
+        .frame(width: 340)
     }
 
     private func row(_ entry: SpeedLineEntry, highlighted: Bool) -> some View {

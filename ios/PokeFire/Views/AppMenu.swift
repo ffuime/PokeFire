@@ -49,6 +49,7 @@ struct AppMenuButton: View {
             case .fire: stats.exit()
             case .stats: stats.enter(from: model)
             case .box: stats.openBox()
+            case .data: stats.openData()
             }
         }
     }

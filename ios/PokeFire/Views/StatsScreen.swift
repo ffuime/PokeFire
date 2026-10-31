@@ -16,6 +16,7 @@ struct StatsPanel: View {
                 StatsHeader(role: role, present: present)
                 VStack(alignment: .trailing, spacing: 10) {
                     StatsBaseRow(role: role, editing: $editing, present: present)
+                        .zIndex(1)
                     AddToBoxButton(role: role)
                 }
                 .zIndex(2)

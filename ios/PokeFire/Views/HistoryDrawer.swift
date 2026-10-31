@@ -97,7 +97,7 @@ struct HistoryDrawer: View {
     var body: some View {
         let sections = groups
         VStack(alignment: .leading, spacing: 0) {
-            if stats.mode == .box {
+            if stats.mode == .box || stats.mode == .data {
                 HStack {
                     Spacer()
                     HStack(spacing: 0) {
@@ -383,7 +383,7 @@ struct HistoryDrawer: View {
 
     private func row(_ entry: HistoryEntry) -> some View {
         let judge = entry.judge.isEmpty ? "" : entry.judge + (entry.rate.isEmpty ? "" : "（\(entry.rate)）")
-        let sub = [Self.timeText(entry), entry.moves.joined(separator: "・"), judge].filter { !$0.isEmpty }.joined(separator: " ・ ")
+        let sub = [Self.timeText(entry), entry.moves.count > 1 ? "\(entry.moves[0]) 他\(entry.moves.count - 1)" : entry.moves.first ?? "", judge].filter { !$0.isEmpty }.joined(separator: " ・ ")
         return Button {
             close()
             model.applyHistory(entry)
@@ -396,7 +396,7 @@ struct HistoryDrawer: View {
                 }
                 .frame(minWidth: 46, alignment: .leading)
                 VStack(spacing: 3) {
-                    Text(entry.moves.joined(separator: "・"))
+                    Text(entry.moves.count > 1 ? "\(entry.moves[0]) 他\(entry.moves.count - 1)" : entry.moves.first ?? "")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
@@ -557,6 +557,7 @@ struct ModeSwitcherList: View {
     private let items: [Item] = [
         Item(id: .fire, title: "PokéFire", subtitle: "ダメージ計算", symbol: nil, image: "tab_attack", tint: Palette.attack),
         Item(id: .stats, title: "PokéStats", subtitle: "使用率・ステータス", symbol: "chart.pie", image: nil, tint: Palette.accent),
+        Item(id: .data, title: "PokéData", subtitle: "ポケモン・わざ・とくせい・もちもの図鑑", symbol: "books.vertical", image: nil, tint: Color(hex: 0xE09A1B)),
         Item(id: .box, title: "PokéBox", subtitle: "ポケモン・チーム管理", symbol: "cube.box", image: nil, tint: Color(hex: 0x20A6A6)),
     ]
 
@@ -569,6 +570,7 @@ struct ModeSwitcherList: View {
             case .fire: stats.exit()
             case .stats: stats.enter(from: model)
             case .box: stats.openBox()
+            case .data: stats.openData()
             }
         }
     }

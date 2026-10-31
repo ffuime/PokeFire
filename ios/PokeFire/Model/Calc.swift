@@ -314,7 +314,27 @@ enum Calc {
         "カシブのみ": "ゴースト", "ハバンのみ": "ドラゴン", "ナモのみ": "あく", "リリバのみ": "はがね", "ロゼルのみ": "フェアリー", "ホズのみ": "ノーマル",
     ]
     static let ragingBullTypes = ["パルデアケンタロス(かくとう)": "かくとう", "パルデアケンタロス(ほのお)": "ほのお", "パルデアケンタロス(みず)": "みず"]
-    static let skinAbilities = ["スカイスキン": "ひこう", "フェアリースキン": "フェアリー", "フリーズスキン": "こおり", "ドラゴンスキン": "ドラゴン"]
+    static let skinAbilities = ["スカイスキン": "ひこう", "フェアリースキン": "フェアリー", "フリーズスキン": "こおり", "ドラゴンスキン": "ドラゴン", "エレキスキン": "でんき"]
+    static let plateItems: [String: String] = [
+        "ひのたまプレート": "ほのお", "しずくプレート": "みず", "いかずちプレート": "でんき", "みどりのプレート": "くさ", "つららのプレート": "こおり",
+        "こぶしのプレート": "かくとう", "もうどくプレート": "どく", "だいちのプレート": "じめん", "あおぞらプレート": "ひこう", "ふしぎのプレート": "エスパー",
+        "たまむしプレート": "むし", "がんせきプレート": "いわ", "もののけプレート": "ゴースト", "りゅうのプレート": "ドラゴン", "こわもてプレート": "あく",
+        "こうてつプレート": "はがね", "せいれいプレート": "フェアリー",
+    ]
+    static let orbItems: [String: (owner: String, types: [String])] = [
+        "こころのしずく": ("ラティ", ["エスパー", "ドラゴン"]),
+        "こんごうだま": ("ディアルガ", ["ドラゴン", "はがね"]), "だいこんごうだま": ("ディアルガ", ["ドラゴン", "はがね"]),
+        "しらたま": ("パルキア", ["ドラゴン", "みず"]), "だいしらたま": ("パルキア", ["ドラゴン", "みず"]),
+        "はっきんだま": ("ギラティナ", ["ドラゴン", "ゴースト"]), "だいはっきんだま": ("ギラティナ", ["ドラゴン", "ゴースト"]),
+    ]
+
+    static func highestStat(_ p: Fighter) -> StatKey {
+        let keys: [StatKey] = [.a, .b, .c, .d, .s]
+        func value(_ key: StatKey) -> Int { p.evs[key]?.real ?? realStat(p.base[key], 0, 10) }
+        var best = StatKey.a
+        for key in keys where value(key) > value(best) { best = key }
+        return best
+    }
     static let typeBoostItems: [String: String] = [
         "シルクのスカーフ": "ノーマル", "もくたん": "ほのお", "しんぴのしずく": "みず", "きせきのタネ": "くさ", "じしゃく": "でんき",
         "とけないこおり": "こおり", "くろおび": "かくとう", "どくバリ": "どく", "やわらかいすな": "じめん", "するどいくちばし": "ひこう",
@@ -544,7 +564,7 @@ enum Calc {
 
         let moldBreaker = atk.ability == "かたやぶり"
         let defAbility = moldBreaker ? "" : def.ability
-        let weather = [atk.ability, def.ability].contains("ノーてんき") ? "" : field.weather
+        let weather = [atk.ability, def.ability].contains(where: { $0 == "ノーてんき" || $0 == "エアロック" }) ? "" : field.weather
         let moveWeather = atk.ability == "メガソーラー" ? "はれ" : weather
         let terrain = field.terrain
         let terrainName = "\(terrain)フィールド"
@@ -566,6 +586,10 @@ enum Calc {
             moveType = skin
             skinBoost = true
         }
+        if atk.ability == "ノーマルスキン", moveType != "ノーマル" {
+            moveType = "ノーマル"
+            skinBoost = true
+        }
         if atk.ability == "うるおいボイス", has("音") { moveType = "みず" }
         if atk.move == "ウェザーボール", let ballType = weatherBallTypes[moveWeather] {
             moveType = ballType
@@ -577,12 +601,20 @@ enum Calc {
         }
 
         var eff = typeEffectiveness(moveType, def.types, groundedFlying: defGrounded)
+        if atk.ability == "しんがん", ["ノーマル", "かくとう"].contains(moveType), def.types.contains("ゴースト") {
+            eff = typeEffectiveness(moveType, def.types.filter { $0 != "ゴースト" }, groundedFlying: defGrounded)
+        }
         if atk.move == "フライングプレス" { eff *= typeEffectiveness("ひこう", def.types) }
         if atk.move == "フリーズドライ", def.types.contains("みず") { eff *= 4 }
         if moveType == "じめん", !defGrounded { eff = 0 }
         if immuneAbilities[defAbility] == moveType { eff = 0 }
         if defAbility == "ぼうおん", has("音") { eff = 0 }
         if defAbility == "ぼうだん", has("弾") { eff = 0 }
+        if defAbility == "よびみず", moveType == "みず" { eff = 0 }
+        if defAbility == "こんがりボディ", moveType == "ほのお" { eff = 0 }
+        if defAbility == "かぜのり", has("風") { eff = 0 }
+        if defAbility == "ふしぎなまもり", eff <= 1 { eff = 0 }
+        if defAbility == "テラスシェル", def.abilityOn, eff > 0 { eff = 0.5 }
         if eff == 0 { return .fail(.immune, "効果なし") }
 
         let priorityText = remarks.first(where: { $0.hasPrefix("優先度") })?.replacingOccurrences(of: "優先度", with: "") ?? "0"
@@ -691,7 +723,11 @@ enum Calc {
         if atk.ability == "すなのちから", weather == "すなあらし", ["いわ", "じめん", "はがね"].contains(moveType) { bp(5325, atk.ability) }
         if atk.ability == "ちからずく", secondaryMoves.contains(atk.move) { bp(5325, atk.ability) }
         if atk.ability == "パンクロック", has("音") { bp(5325, atk.ability) }
-        if moveType == "フェアリー", [atk.ability, def.ability].contains("フェアリーオーラ") { bp(5448, "フェアリーオーラ", atk.ability != "フェアリーオーラ") }
+        let auraMod = [atk.ability, def.ability].contains("オーラブレイク") ? 3072 : 5448
+        if moveType == "フェアリー", [atk.ability, def.ability].contains("フェアリーオーラ") { bp(auraMod, "フェアリーオーラ", atk.ability != "フェアリーオーラ") }
+        if moveType == "あく", [atk.ability, def.ability].contains("ダークオーラ") { bp(auraMod, "ダークオーラ", atk.ability != "ダークオーラ") }
+        if atk.ability == "どくぼうそう", atk.abilityOn, isPhysical { bp(6144, atk.ability) }
+        if atk.ability == "ねつぼうそう", atk.abilityOn, !isPhysical { bp(6144, atk.ability) }
         let technicianIndex = bpMods.count
         let technicianOwnIndex = bpOwn.count
         let powers = fixedMultiHit[atk.move] ?? [basePower]
@@ -706,6 +742,9 @@ enum Calc {
         if atkItem == "ものしりメガネ", !isPhysical { bp(4505, atkItem) }
         if typeBoostItems[atkItem] == moveType { bp(4915, atkItem) }
         if atkItem == "ノーマルジュエル", moveType == "ノーマル" { bp(5325, atkItem) }
+        if plateItems[atkItem] == moveType { bp(4915, atkItem) }
+        if atkItem == "パンチグローブ", has("パンチ") { bp(4505, atkItem) }
+        if let orb = orbItems[atkItem], atk.name.contains(orb.owner), orb.types.contains(moveType) { bp(4915, atkItem) }
         if solarWeak { bp(2048, weatherNames[moveWeather] ?? "") }
         if knockOff { bp(6144, "はたきおとす", true) }
         if expanding { bp(6144, terrainName) }
@@ -722,6 +761,7 @@ enum Calc {
         let offenseKey: StatKey = atk.move == "ボディプレス" ? .b : atk.move == "イカサマ" ? .vsa : isPhysical ? .a : .c
         guard let offense = atk.evs[offenseKey] else { return .fail(.unsupported, "能力値が見つかりません") }
         var atkRank = offense.rank
+        if atk.ability == "たんじゅん" { atkRank = clampRank(atkRank * 2) }
         if ["エレクトロビーム", "メテオビーム"].contains(atk.move) { atkRank = min(6, atkRank + 1) }
         let ownRank = isCrit && atkRank < 0 ? 0 : atkRank
         if defAbility == "てんねん" { atkRank = 0 }
@@ -745,6 +785,20 @@ enum Calc {
         if atk.ability == "もらいび", atk.abilityOn, moveType == "ほのお" { am(6144, atk.ability) }
         if atk.ability == "すいほう", moveType == "みず" { am(8192, atk.ability) }
         if atk.ability == "はりこみ", atk.abilityOn { am(8192, atk.ability) }
+        if atk.ability == "はがねつかい", moveType == "はがね" { am(6144, atk.ability) }
+        if atk.ability == "トランジスタ", moveType == "でんき" { am(5325, atk.ability) }
+        if atk.ability == "りゅうのあぎと", moveType == "ドラゴン" { am(6144, atk.ability) }
+        if atk.ability == "いわはこび", moveType == "いわ" { am(6144, atk.ability) }
+        if isPhysical, atk.ability == "ごりむちゅう" { am(6144, atk.ability) }
+        if isPhysical, atk.ability == "スロースタート", atk.abilityOn { am(2048, atk.ability) }
+        if atk.ability == "よわき", atk.abilityOn { am(2048, atk.ability) }
+        if isPhysical, atk.ability == "ひひいろのこどう", moveWeather == "はれ" { am(5461, atk.ability) }
+        if !isPhysical, atk.ability == "ハドロンエンジン", terrain == "エレキ" { am(5461, atk.ability) }
+        if ["こだいかっせい", "クォークチャージ"].contains(atk.ability), atk.abilityOn, highestStat(atk) == offenseKey { am(5325, atk.ability) }
+        if isPhysical, def.ability == "わざわいのおふだ", atk.ability != "わざわいのおふだ" { am(3072, def.ability, true) }
+        if !isPhysical, def.ability == "わざわいのうつわ", atk.ability != "わざわいのうつわ" { am(3072, def.ability, true) }
+        if isPhysical, atkItem == "こだわりハチマキ" { am(6144, atkItem) }
+        if !isPhysical, atkItem == "こだわりメガネ" { am(6144, atkItem) }
         if atkItem == "でんきだま", atk.name == "ピカチュウ" { am(8192, atkItem) }
         if defAbility == "あついしぼう", ["ほのお", "こおり"].contains(moveType) { am(2048, defAbility, true) }
         if ["たいねつ", "すいほう"].contains(defAbility), moveType == "ほのお" { am(2048, defAbility, true) }
@@ -755,6 +809,7 @@ enum Calc {
         let defenseKey: StatKey = useDefense ? .b : .d
         guard let defense0 = def.evs[defenseKey] else { return .fail(.unsupported, "能力値が見つかりません") }
         var defRank = defense0.rank
+        if defAbility == "たんじゅん" { defRank = clampRank(defRank * 2) }
         if atk.ability == "てんねん" || ["DDラリアット", "せいなるつるぎ"].contains(atk.move) { defRank = 0 }
         if isCrit, defRank > 0 { defRank = 0 }
         note("\(defenseKey.statName)ランク", rankRatio(defRank), defRank < 0)
@@ -766,6 +821,11 @@ enum Calc {
         if useDefense, defAbility == "ファーコート" { dm(8192, defAbility) }
         if useDefense, defAbility == "ふしぎなうろこ", def.abilityOn { dm(6144, defAbility) }
         if useDefense, defAbility == "くさのけがわ", terrain == "グラス" { dm(6144, defAbility) }
+        if !useDefense, defItem == "とつげきチョッキ" { dm(6144, defItem) }
+        if defItem == "しんかのきせき" { dm(6144, defItem) }
+        if useDefense, atk.ability == "わざわいのつるぎ", def.ability != "わざわいのつるぎ" { dm(3072, atk.ability) }
+        if !useDefense, atk.ability == "わざわいのたま", def.ability != "わざわいのたま" { dm(3072, atk.ability) }
+        if ["こだいかっせい", "クォークチャージ"].contains(defAbility), def.abilityOn, highestStat(def) == defenseKey { dm(5325, defAbility) }
         if !useDefense, weather == "すなあらし", def.types.contains("いわ") { dm(6144, "すなあらし") }
         if useDefense, weather == "ゆき", def.types.contains("こおり") { dm(6144, "ゆき") }
         let defense = max(1, applyMod(applyRank(defense0.real, defRank), chainMods(defMods)))
@@ -800,6 +860,11 @@ enum Calc {
         if ["もふもふ", "はどうのぼうご"].contains(defAbility), isContact { fm(2048, defAbility, true) }
         if defAbility == "パンクロック", has("音") { fm(2048, defAbility, true) }
         if ["ハードロック", "フィルター"].contains(defAbility), superEffective { fm(3072, defAbility, true) }
+        if def.ability == "プリズムアーマー", superEffective { fm(3072, def.ability, true) }
+        if defAbility == "ファントムガード", def.abilityOn { fm(2048, defAbility, true) }
+        if defAbility == "こおりのりんぷん", !isPhysical { fm(2048, defAbility, true) }
+        if atk.ability == "いろめがね", eff < 1 { fm(8192, atk.ability) }
+        if atk.ability == "ブレインフォース", superEffective { fm(5120, atk.ability) }
         if atkItem == "たつじんのおび", superEffective { fm(4915, atkItem, true) }
         if atkItem == "いのちのたま" { fm(5324, atkItem) }
         if atkItem == "メトロノーム", let metronome = atk.metronome, metronome > 1 {

@@ -768,11 +768,11 @@ struct BoxMoveSheet: View {
         var lists: [(String, [String])] = [("使用率", usage)]
         if let learnable = model.learnset(entry.name) {
             let set = Set(learnable)
-            lists.append(("覚えるわざ", catalog.moveOrder.filter { set.contains($0) }))
-            lists.append(("その他", catalog.moveOrder.filter { !set.contains($0) }))
+            lists.append(("覚えるわざ", StatsCatalog.sortedMoves(catalog.moveOrder.filter { set.contains($0) })))
+            lists.append(("その他", StatsCatalog.sortedMoves(catalog.moveOrder.filter { !set.contains($0) })))
         } else {
             let set = Set(usage)
-            lists.append(("その他", catalog.moveOrder.filter { !set.contains($0) }))
+            lists.append(("その他", StatsCatalog.sortedMoves(catalog.moveOrder.filter { !set.contains($0) })))
         }
         return lists.compactMap { title, names in
             let infos = names.compactMap { catalog.moveInfo($0) }
@@ -1483,12 +1483,22 @@ struct ZoomableImage: UIViewRepresentable {
 struct TeamWeaknessSections: View {
     @Environment(AppModel.self) private var model
     let members: [BoxPokemon]
+    @State private var openTypes: Set<String> = []
+    @State private var threatShown: String?
 
     private struct TypeRow: Identifiable {
         var id: String { type }
         let type: String
-        let weak: Int
-        let resist: Int
+        let weak: [BoxPokemon]
+        let resist: [BoxPokemon]
+    }
+
+    private struct Threat: Identifiable {
+        var id: String { name }
+        let name: String
+        let score: Int
+        let threatened: [BoxPokemon]
+        let answers: [BoxPokemon]
     }
 
     private func multiplier(_ attack: String, _ entry: BoxPokemon) -> Double {
@@ -1497,13 +1507,12 @@ struct TeamWeaknessSections: View {
 
     private var typeRows: [TypeRow] {
         Palette.typeOrder.compactMap { attack in
-            let values = members.map { multiplier(attack, $0) }
-            let weak = values.filter { $0 > 1 }.count
-            let resist = values.filter { $0 < 1 }.count
-            guard weak >= 2, weak > resist else { return nil }
+            let weak = members.filter { multiplier(attack, $0) > 1 }
+            let resist = members.filter { multiplier(attack, $0) < 1 }
+            guard weak.count >= 2, weak.count > resist.count else { return nil }
             return TypeRow(type: attack, weak: weak, resist: resist)
         }
-        .sorted { ($0.weak - $0.resist, $0.weak) > ($1.weak - $1.resist, $1.weak) }
+        .sorted { ($0.weak.count - $0.resist.count, $0.weak.count) > ($1.weak.count - $1.resist.count, $1.weak.count) }
     }
 
     private func attackTypes(_ entry: BoxPokemon) -> [String] {
@@ -1512,7 +1521,7 @@ struct TeamWeaknessSections: View {
         return types.isEmpty ? entry.pokemon?.types ?? [] : Array(Set(types))
     }
 
-    private var threats: [(String, Int)] {
+    private var threats: [Threat] {
         guard let usage = model.usage else { return [] }
         let catalog = StatsCatalog.shared
         let ranked = model.data.pokemonOrder
@@ -1521,22 +1530,35 @@ struct TeamWeaknessSections: View {
             .sorted { $0.1.rank < $1.1.rank }
             .prefix(40)
         let memberNames = Set(members.map { model.data.usageName(of: $0.name) })
-        let scored: [(String, Int)] = ranked.compactMap { name, entry in
+        let scored: [Threat] = ranked.compactMap { name, entry in
             guard !memberNames.contains(name), let pokemon = model.data.pokemons[name] else { return nil }
             var moveTypes = entry.moves.compactMap(\.name).compactMap { catalog.moveInfo($0) }.filter { $0.category != "変化" }.prefix(4).map(\.type)
             if moveTypes.isEmpty { moveTypes = pokemon.types }
-            let threatened = members.filter { member in moveTypes.contains { multiplier($0, member) > 1 } }.count
+            let threatened = members.filter { member in moveTypes.contains { multiplier($0, member) > 1 } }
             let answers = members.filter { member in
                 let hits = attackTypes(member).contains { attack in
                     TypeChart.multiplier(attack, types: pokemon.types, abilities: []) > 1
                 }
                 let walls = moveTypes.allSatisfy { multiplier($0, member) < 1 }
                 return hits || walls
-            }.count
-            let score = threatened - answers
-            return score >= 1 && threatened >= 2 ? (name, score) : nil
+            }
+            let score = threatened.count - answers.count
+            return score >= 1 && threatened.count >= 2 ? Threat(name: name, score: score, threatened: threatened, answers: answers) : nil
         }
-        return Array(scored.sorted { $0.1 > $1.1 }.prefix(8))
+        return Array(scored.sorted { $0.score > $1.score }.prefix(8))
+    }
+
+    private func sprites(_ list: [BoxPokemon]) -> some View {
+        HStack(spacing: 2) {
+            if list.isEmpty {
+                Text("なし")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Palette.secondary)
+            }
+            ForEach(list) { entry in
+                SpriteView(name: entry.name, size: 36, shiny: entry.isShiny)
+            }
+        }
     }
 
     var body: some View {
@@ -1545,15 +1567,47 @@ struct TeamWeaknessSections: View {
         if !rows.isEmpty {
             Section("苦手なタイプ") {
                 ForEach(rows) { row in
-                    HStack(spacing: 10) {
-                        TypeChip(type: row.type, height: 26)
-                        Spacer()
-                        Text("弱点 \(row.weak)体")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(Palette.rankUp)
-                        Text("半減 \(row.resist)体")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Palette.secondary)
+                    let open = openTypes.contains(row.type)
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            TypeChip(type: row.type, height: 26)
+                            Spacer()
+                            Text("弱点 \(row.weak.count)体")
+                                .font(.subheadline.weight(.bold))
+                                .foregroundStyle(Palette.rankUp)
+                            Text("半減 \(row.resist.count)体")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Palette.secondary)
+                            Icon(name: "chevron_down", size: 14)
+                                .foregroundStyle(Palette.secondary)
+                                .rotationEffect(.degrees(open ? 180 : 0))
+                        }
+                        if open {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 8) {
+                                    Text("弱点")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Palette.rankUp)
+                                        .frame(width: 34, alignment: .leading)
+                                    sprites(row.weak)
+                                }
+                                HStack(spacing: 8) {
+                                    Text("半減")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Palette.rankDown)
+                                        .frame(width: 34, alignment: .leading)
+                                    sprites(row.resist)
+                                }
+                            }
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        Haptics.play(.light)
+                        withAnimation(.snappy(duration: 0.3)) {
+                            if open { openTypes.remove(row.type) } else { openTypes.insert(row.type) }
+                        }
                     }
                     .selectionDisabled()
                 }
@@ -1562,14 +1616,41 @@ struct TeamWeaknessSections: View {
         if !list.isEmpty {
             Section {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 64), spacing: 8)], spacing: 8) {
-                    ForEach(list, id: \.0) { name, score in
-                        VStack(spacing: 2) {
-                            SpriteView(name: name, size: 52)
-                            Text("+\(score)")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundStyle(Palette.rankUp)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
+                    ForEach(list) { threat in
+                        Button {
+                            Haptics.play(.light)
+                            threatShown = threat.name
+                        } label: {
+                            VStack(spacing: 2) {
+                                SpriteView(name: threat.name, size: 52)
+                                Text("+\(threat.score)")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundStyle(Palette.rankUp)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                            }
+                        }
+                        .buttonStyle(PressableStyle())
+                        .popover(isPresented: Binding(get: { threatShown == threat.name }, set: { if !$0 { threatShown = nil } }), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(threat.name)
+                                    .font(.headline)
+                                    .foregroundStyle(Palette.ink)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("抜群を取られる")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Palette.rankUp)
+                                    sprites(threat.threatened)
+                                }
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("対抗できる")
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(Palette.rankDown)
+                                    sprites(threat.answers)
+                                }
+                            }
+                            .padding(16)
+                            .presentationCompactAdaptation(.popover)
                         }
                     }
                 }
@@ -1578,8 +1659,36 @@ struct TeamWeaknessSections: View {
             } header: {
                 Text("苦手なポケモン")
             } footer: {
-                Text("使用率上位40体について、よく使われる攻撃わざで抜群を取れるメンバーの数から、抜群を返せるか全わざを半減以下で受けられるメンバーの数を引いた値です。値が大きいほど苦手です。")
+                Text("使用率上位40体について、よく使われる攻撃わざで抜群を取れるメンバーの数から、抜群を返せるか全わざを半減以下で受けられるメンバーの数を引いた値です。値が大きいほど苦手です。タップで内訳を表示します。")
             }
         }
+    }
+}
+
+enum PokesolExport {
+    static func text(_ entries: [BoxPokemon]) -> String {
+        entries.map(block).joined(separator: "\n\n")
+    }
+
+    static func block(_ entry: BoxPokemon) -> String {
+        let data = GameData.shared
+        let catalog = StatsCatalog.shared
+        var name = entry.name
+        var item = entry.item
+        if item == "メガストーン", let parent = data.megaParent(entry.name) {
+            name = parent
+            item = catalog.megaStone(for: entry.name) ?? item
+        }
+        var lines: [String] = [item.isEmpty ? name : "\(name) @ \(item)"]
+        if let tera = entry.teraType, !tera.isEmpty { lines.append("テラスタイプ: \(tera)") }
+        if !entry.ability.isEmpty { lines.append("特性: \(entry.ability)") }
+        lines.append("能力補正: \(NatureTable.name(up: entry.up, down: entry.down) ?? entry.neutralName ?? "すなお")")
+        lines.append(StatKey.baseKeys.map { key in
+            let points = entry.point(key)
+            return points > 0 ? "\(entry.real(key))(\(points))" : "\(entry.real(key))"
+        }.joined(separator: "-"))
+        let moves = entry.filledMoves
+        if !moves.isEmpty { lines.append(moves.joined(separator: " / ")) }
+        return lines.joined(separator: "\n")
     }
 }

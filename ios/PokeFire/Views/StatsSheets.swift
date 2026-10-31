@@ -232,7 +232,7 @@ struct LearnsetSheet: View {
         guard let learnable = model.learnset(stats.side(role).name) else { return nil }
         let catalog = StatsCatalog.shared
         let set = Set(learnable)
-        let infos = catalog.moveOrder.filter { set.contains($0) }.compactMap { catalog.moveInfo($0) }.filter { filter.matches($0) }
+        let infos = StatsCatalog.sortedMoves(catalog.moveOrder.filter { set.contains($0) }).compactMap { catalog.moveInfo($0) }.filter { filter.matches($0) }
         let tiers = Search.rank(infos.map(searchText), query: query)
         return Search.ordered(infos.count, tiers: tiers) { infos[$0].name }.map { infos[$0] }
     }
@@ -256,8 +256,18 @@ struct LearnsetSheet: View {
                 }
             )
             ScrollView {
-                LazyVStack(spacing: 4) {
-                    ForEach(list ?? [], id: \.name) { info in
+                LazyVStack(alignment: .leading, spacing: 4) {
+                    ForEach(Array((list ?? []).enumerated()), id: \.element.name) { index, info in
+                        if query.isEmpty, index == 0 || (list ?? [])[index - 1].type != info.type {
+                            HStack(spacing: 6) {
+                                TypeIcon(type: info.type, size: 18)
+                                Text(info.type)
+                                    .font(.footnote.weight(.bold))
+                                    .foregroundStyle(Palette.secondary)
+                            }
+                            .padding(.top, index == 0 ? 4 : 14)
+                            .padding(.leading, 6)
+                        }
                         LearnsetRow(info: info, open: expanded.contains(info.name)) {
                             Haptics.play(.light)
                             withAnimation(.snappy(duration: 0.28)) {

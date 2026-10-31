@@ -533,9 +533,12 @@ final class AppModel {
             value.rank = 0
             side.evs[key] = value
         }
-        side.ability = pokemon.abilities.first ?? "なし"
+        let unreleased = data.isUnreleased(name)
+        side.ability = unreleased ? "なし" : pokemon.abilities.first ?? "なし"
         side.abilityOn = Rules.defaultAbilityOn(role, side.ability)
-        if data.megaParent(name) != nil {
+        if unreleased {
+            side.item = "なし"
+        } else if data.megaParent(name) != nil {
             side.item = "メガストーン"
         } else if side.item == "メガストーン" {
             side.item = "なし"

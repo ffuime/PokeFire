@@ -70,15 +70,53 @@ enum Rules {
         "じきゅうりょく": [(.current, .b, 1)],
         "くだけるよろい": [(.current, .b, -1), (.current, .s, 2)],
         "いかく": [(.opponent, .a, -1)],
+        "ふとうのけん": [(.current, .a, 1)],
+        "ふくつのたて": [(.current, .b, 1)],
         "ぬめぬめ": [(.opponent, .s, -1)],
     ]
 
     static let weatherAbilities: [String: String] = [
         "ひでり": "sun", "あめふらし": "rain", "すなおこし": "sand", "すなはき": "sand", "ゆきふらし": "snow",
+        "ひひいろのこどう": "sun", "おわりのだいち": "sun", "はじまりのうみ": "rain",
+    ]
+
+    static let extraAlways: [Role: Set<String>] = [
+        .attacker: [
+            "ノーマルスキン", "エレキスキン", "いろめがね", "ダークオーラ", "オーラブレイク", "はがねつかい", "トランジスタ", "りゅうのあぎと",
+            "いわはこび", "ごりむちゅう", "わざわいのうつわ", "わざわいのつるぎ", "わざわいのおふだ", "わざわいのたま", "しんがん", "エアロック",
+            "たんじゅん", "ブレインフォース",
+        ],
+        .defender: [
+            "ふしぎなまもり", "エアロック", "よびみず", "こんがりボディ", "かぜのり", "プリズムアーマー", "こおりのりんぷん",
+            "わざわいのうつわ", "わざわいのつるぎ", "わざわいのおふだ", "わざわいのたま", "たんじゅん", "ダークオーラ", "オーラブレイク",
+        ],
+    ]
+
+    static let extraToggle: [Role: Set<String>] = [
+        .attacker: ["スロースタート", "よわき", "どくぼうそう", "ねつぼうそう", "こだいかっせい", "クォークチャージ"],
+        .defender: ["ファントムガード", "テラスシェル", "こだいかっせい", "クォークチャージ"],
+    ]
+
+    static let extraDefaultOn: Set<String> = ["ファントムガード", "テラスシェル"]
+
+    static var implementedAbilities: Set<String> {
+        var all = Set<String>()
+        for set in extraAlways.values { all.formUnion(set) }
+        for set in extraToggle.values { all.formUnion(set) }
+        return all.union(["ひひいろのこどう", "ハドロンエンジン", "おわりのだいち", "はじまりのうみ", "ふとうのけん", "ふくつのたて", "ミストメイカー"])
+    }
+
+    static let implementedItems: Set<String> = [
+        "こだわりハチマキ", "こだわりメガネ", "とつげきチョッキ", "しんかのきせき", "パンチグローブ",
+        "ひのたまプレート", "しずくプレート", "いかずちプレート", "みどりのプレート", "つららのプレート", "こぶしのプレート", "もうどくプレート",
+        "だいちのプレート", "あおぞらプレート", "ふしぎのプレート", "たまむしプレート", "がんせきプレート", "もののけプレート", "りゅうのプレート",
+        "こわもてプレート", "こうてつプレート", "せいれいプレート",
+        "こころのしずく", "こんごうだま", "だいこんごうだま", "しらたま", "だいしらたま", "はっきんだま", "だいはっきんだま",
     ]
 
     static let fieldAbilities: [String: String] = [
         "エレキメイカー": "electric", "グラスメイカー": "grass", "サイコメイカー": "psycho", "ミストメイカー": "mist", "こぼれダネ": "grass",
+        "ハドロンエンジン": "electric",
     ]
 
     static let disguiseAbility = "ばけのかわ"
@@ -192,14 +230,14 @@ enum Rules {
         if weatherAbilities[ability] != nil || fieldAbilities[ability] != nil { return .environment }
         if constantAbilities[role]?[ability] != nil { return .disguise }
         if rules.changeType.contains(ability) { return .changeType }
-        if rules.always.contains(ability) { return .locked }
-        if rules.toggle.contains(ability) { return .toggle }
+        if rules.always.contains(ability) || extraAlways[role]?.contains(ability) == true { return .locked }
+        if rules.toggle.contains(ability) || extraToggle[role]?.contains(ability) == true { return .toggle }
         if hasRankAbility(role, ability) { return .rank }
         return .hidden
     }
 
     static func defaultAbilityOn(_ role: Role, _ ability: String) -> Bool {
-        activation[role]?.defaultOn.contains(ability) ?? false
+        (activation[role]?.defaultOn.contains(ability) ?? false) || extraDefaultOn.contains(ability)
     }
 }
 
