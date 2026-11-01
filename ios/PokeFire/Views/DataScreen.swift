@@ -138,23 +138,7 @@ struct DataIcon: View {
     var body: some View {
         switch kind {
         case .pokemon:
-            GeometryReader { geometry in
-                let size = min(geometry.size.width, geometry.size.height)
-                let line = size * 0.09
-                let inner = size * 0.34
-                ZStack {
-                    Circle().strokeBorder(lineWidth: line)
-                    HStack(spacing: inner) {
-                        Rectangle().frame(height: line)
-                        Rectangle().frame(height: line)
-                    }
-                    .padding(.horizontal, line / 2)
-                    Circle().strokeBorder(lineWidth: line).frame(width: inner, height: inner)
-                    Circle().frame(width: inner * 0.32, height: inner * 0.32)
-                }
-                .frame(width: size, height: size)
-                .frame(width: geometry.size.width, height: geometry.size.height)
-            }
+            PokeBallShape()
         case .move:
             Image("tab_attack")
                 .renderingMode(.template)
@@ -170,6 +154,28 @@ struct DataIcon: View {
                 .resizable()
                 .scaledToFit()
         }
+    }
+}
+
+struct PokeBallShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        let size = min(rect.width, rect.height)
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = size / 2
+        let line = size * 0.1
+        let gap = size * 0.07
+        let core = size * 0.11
+        func circle(_ r: CGFloat) -> Path {
+            Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2))
+        }
+        let top = Path(CGRect(x: center.x - radius, y: center.y - radius, width: size, height: radius - gap / 2))
+        let bottom = Path(CGRect(x: center.x - radius, y: center.y + gap / 2, width: size, height: radius - gap / 2))
+        let ring = circle(radius).subtracting(circle(radius - line))
+        let hole = circle(core + gap + line)
+        let upper = circle(radius).intersection(top).subtracting(hole)
+        let lower = ring.intersection(bottom).subtracting(hole)
+        let button = circle(core + gap + line).subtracting(circle(core + gap)).union(circle(core))
+        return upper.union(lower).union(button)
     }
 }
 
@@ -359,24 +365,27 @@ struct DataPokemonSheet: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 6)
-            List {
-                ForEach(list, id: \.self) { name in
-                    DataPokemonRow(name: name, sort: filter.sort, open: expanded.contains(name)) {
-                        focused = false
-                        stats.select(.attacker, name)
-                        withAnimation(.easeInOut(duration: 0.35)) { stats.openStats() }
-                        dismiss()
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        Haptics.play(.light)
-                        withAnimation(.snappy(duration: 0.28)) {
-                            if expanded.contains(name) { expanded.remove(name) } else { expanded.insert(name) }
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(list, id: \.self) { name in
+                        let open = expanded.contains(name)
+                        DataPokemonRow(name: name, sort: filter.sort, open: open) {
+                            focused = false
+                            stats.select(.attacker, name)
+                            withAnimation(.easeInOut(duration: 0.35)) { stats.openStats() }
+                            dismiss()
+                        }
+                        .onTapGesture {
+                            Haptics.play(.light)
+                            withAnimation(.snappy(duration: 0.28)) {
+                                if open { expanded.remove(name) } else { expanded.insert(name) }
+                            }
                         }
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 24)
             }
-            .listStyle(.plain)
             .scrollDismissesKeyboard(.immediately)
             .overlay {
                 if list.isEmpty { EmptyResult(text: "見つかりません") }
@@ -408,10 +417,20 @@ struct DataPokemonRow: View {
                         .foregroundStyle(Palette.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                    Text(StatKey.baseKeys.map { String(base[$0]) }.joined(separator: "-"))
-                        .font(.caption.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(Palette.secondary)
+                    HStack(spacing: 6) {
+                        Text(StatKey.baseKeys.map { String(base[$0]) }.joined(separator: "-"))
+                            .font(.caption.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(Palette.secondary)
+                        if GameData.shared.isUnreleased(name) {
+                            Text("未内定")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Palette.secondary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Palette.track, in: Capsule())
+                        }
+                    }
                 }
                 Spacer(minLength: 4)
                 HStack(spacing: 3) {
@@ -440,20 +459,32 @@ struct DataPokemonRow: View {
                             .monospacedDigit()
                             .foregroundStyle(Palette.ink)
                     }
-                    Button(action: openStats) {
-                        Label("PokéStatsで見る", systemImage: "chart.pie")
-                            .font(.subheadline.weight(.bold))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 38)
+                    HStack {
+                        Spacer()
+                        Button(action: openStats) {
+                            Label("PokéStatsで見る", systemImage: "chart.pie")
+                                .font(.footnote.weight(.bold))
+                                .foregroundStyle(Palette.accent)
+                                .padding(.horizontal, 12)
+                                .frame(height: 32)
+                                .background(Palette.accent.opacity(0.08), in: Capsule())
+                        }
+                        .buttonStyle(PressableStyle())
                     }
-                    .buttonStyle(.glassProminent)
                     .padding(.top, 2)
                 }
                 .padding(.leading, 56)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                .padding(.bottom, 4)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(open ? Palette.card : Color.clear)
+                .shadow(color: open ? .black.opacity(0.08) : .clear, radius: 10, y: 3)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
