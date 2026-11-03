@@ -726,6 +726,11 @@ struct TypeSheet: View {
 
 struct EnvironmentSheet: View {
     @Environment(AppModel.self) private var model
+    @State private var detent = PresentationDetent.height(290)
+
+    private func height(_ weather: String) -> PresentationDetent {
+        .height(weather == "none" ? 290 : 338)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -738,7 +743,11 @@ struct EnvironmentSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .frame(maxHeight: .infinity, alignment: .top)
-        .presentationDetents([.height(model.weather == "none" ? 290 : 338)])
+        .presentationDetents([.height(290), .height(338)], selection: $detent)
+        .onAppear { detent = height(model.weather) }
+        .onChange(of: model.weather) { _, value in
+            withAnimation(.snappy(duration: 0.3)) { detent = height(value) }
+        }
         .presentationDragIndicator(.visible)
     }
 }

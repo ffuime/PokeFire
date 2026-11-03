@@ -6,9 +6,12 @@ struct SegmentBar: View {
     let color: Color
     var height: CGFloat = 32
     var minimum = 0
+    var onOverflow: (() -> Void)? = nil
     let onChange: (Int) -> Void
 
     @State private var dragging = false
+    @State private var startedFull = false
+    @State private var overflowed = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -24,8 +27,22 @@ struct SegmentBar: View {
             .highPriorityGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { gesture in
+                        let width = max(1, geometry.size.width)
+                        if !dragging {
+                            startedFull = onOverflow != nil && value == count && gesture.startLocation.x / width > 0.75
+                            overflowed = false
+                        }
                         dragging = true
-                        let ratio = max(0, min(1, gesture.location.x / max(1, geometry.size.width)))
+                        if startedFull {
+                            if gesture.translation.width > 18, !overflowed {
+                                overflowed = true
+                                Haptics.play(.success)
+                                onOverflow?()
+                            }
+                            if gesture.translation.width > -12 { return }
+                            startedFull = false
+                        }
+                        let ratio = max(0, min(1, gesture.location.x / width))
                         let next = max(minimum, Int(Calc.jsRound(ratio * Double(count))))
                         if next != value {
                             Haptics.play(.selection)

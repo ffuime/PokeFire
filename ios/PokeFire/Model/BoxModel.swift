@@ -139,6 +139,22 @@ final class BoxModel {
     }
 
     @discardableResult
+    @ObservationIgnored private var pristine: [UUID: BoxPokemon] = [:]
+
+    func markPristine(_ id: UUID) {
+        pristine[id] = pokemon(id)
+    }
+
+    func discardPristine(_ ids: [UUID]) {
+        var removed = Set<UUID>()
+        for id in ids {
+            guard let snapshot = pristine.removeValue(forKey: id), var current = pokemon(id) else { continue }
+            current.updated = snapshot.updated
+            if current == snapshot { removed.insert(id) }
+        }
+        if !removed.isEmpty { delete(removed) }
+    }
+
     func create(_ name: String, usage: UsageData?) -> BoxPokemon {
         var entry = BoxPokemon(name: name)
         let data = GameData.shared

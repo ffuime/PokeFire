@@ -93,6 +93,7 @@ struct BoxEditor: View {
             .background(Palette.background)
             .navigationTitle(box.pokemon(id)?.title ?? "")
             .navigationBarTitleDisplayMode(.inline)
+            .onDisappear { box.discardPristine(ids) }
         }
     }
 }
@@ -387,7 +388,8 @@ struct BoxEditorBody: View {
                 }
             }
         case .moves(let slot):
-            BoxMoveSheet(id: id, focus: slot)
+            let moves = entry.moves
+            BoxMoveSheet(id: id, focus: (0..<4).first { $0 >= moves.count || moves[$0].isEmpty } ?? 0)
         case .ability:
             EntrySearchSheet(kind: .abilities, role: .attacker, pokemonName: entry.name, currentValue: entry.ability) { name in
                 box.update(id) { $0.ability = name == "なし" ? "" : name }
@@ -523,6 +525,20 @@ struct BoxCalcHandoff: View {
                     .buttonStyle(PressableStyle())
                 }
             }
+            Button {
+                Haptics.play(.medium)
+                stats.applyBox(.attacker, entry)
+                withAnimation(.easeInOut(duration: 0.35)) { stats.openStats() }
+            } label: {
+                Label("PokéStatsで見る", systemImage: "chart.pie")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(Palette.accent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Palette.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(PressableStyle())
         }
     }
 }
@@ -544,34 +560,51 @@ struct BoxStatsSheet: View {
 
     var body: some View {
         if let entry = box.pokemon(id) {
-            let spreads = Array((model.usage?.pokemons[entry.name]?.spreads ?? []).prefix(3))
+            let spreads = Array((model.usage?.pokemons[entry.name]?.spreads ?? []).prefix(10))
             let natures = model.usage?.pokemons[entry.name]?.natures ?? []
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 30) {
-                        if !spreads.isEmpty {
-                            HStack(spacing: 6) {
-                                ForEach(Array(spreads.enumerated()), id: \.offset) { _, spread in
-                                    Button {
-                                        Haptics.play(.light)
-                                        withAnimation(.snappy(duration: 0.25)) { box.applySpread(id, spread.points) }
-                                    } label: {
-                                        VStack(spacing: 2) {
-                                            Text(label(spread.points))
-                                                .font(.caption.weight(.heavy))
-                                                .lineLimit(1)
-                                                .minimumScaleFactor(0.6)
-                                            Text("\(Format.fixed1(spread.pct))%")
-                                                .font(.caption2.weight(.bold))
-                                                .foregroundStyle(Palette.secondary)
+                        if !spreads.isEmpty || !natures.isEmpty {
+                            VStack(spacing: 8) {
+                                if !spreads.isEmpty {
+                                    carousel {
+                                        ForEach(Array(spreads.enumerated()), id: \.offset) { _, spread in
+                                            let selected = StatKey.baseKeys.enumerated().allSatisfy { index, key in entry.point(key) == (index < spread.points.count ? spread.points[index] : 0) }
+                                            usageCard(selected: selected) {
+                                                withAnimation(.snappy(duration: 0.25)) { box.applySpread(id, spread.points) }
+                                            } content: {
+                                                Text(label(spread.points))
+                                                    .font(.caption.weight(.heavy))
+                                                    .lineLimit(1)
+                                                    .minimumScaleFactor(0.6)
+                                                Text("\(Format.fixed1(spread.pct))%")
+                                                    .font(.caption2.weight(.bold))
+                                                    .foregroundStyle(Palette.secondary)
+                                            }
                                         }
-                                        .foregroundStyle(Palette.ink)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 8)
-                                        .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                                        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Palette.separator, lineWidth: 1))
                                     }
-                                    .buttonStyle(PressableStyle())
+                                }
+                                if !natures.isEmpty {
+                                    carousel {
+                                        ForEach(Array(natures.prefix(10).enumerated()), id: \.offset) { _, nature in
+                                            usageCard(selected: nature.name != nil && entry.natureName == nature.name) {
+                                                if let name = nature.name {
+                                                    withAnimation(.snappy(duration: 0.25)) { box.setNatureNamed(id, name) }
+                                                }
+                                            } content: {
+                                                Text(nature.name ?? "-")
+                                                    .font(.caption.weight(.heavy))
+                                                    .lineLimit(1)
+                                                    .minimumScaleFactor(0.6)
+                                                NatureCaption(nature: nature)
+                                                    .font(.caption2.weight(.bold))
+                                                Text("\(Format.fixed1(nature.pct))%")
+                                                    .font(.caption2.weight(.bold))
+                                                    .foregroundStyle(Palette.secondary)
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -612,6 +645,35 @@ struct BoxStatsSheet: View {
         }
     }
 
+    private func carousel<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 6) {
+                content()
+            }
+        }
+        .scrollIndicators(.hidden)
+        .contentMargins(.horizontal, 20, for: .scrollContent)
+        .padding(.horizontal, -20)
+    }
+
+    private func usageCard<Content: View>(selected: Bool, action: @escaping () -> Void, @ViewBuilder content: () -> Content) -> some View {
+        Button {
+            Haptics.play(.light)
+            action()
+        } label: {
+            VStack(spacing: 2) {
+                content()
+            }
+            .foregroundStyle(Palette.ink)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(Palette.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(selected ? Palette.accent : Palette.separator, lineWidth: selected ? 1.5 : 1))
+        }
+        .buttonStyle(PressableStyle())
+        .containerRelativeFrame(.horizontal) { length, _ in (length - 6 * 3) / 3.2 }
+    }
+
     private func statEditor(_ entry: BoxPokemon, _ key: StatKey, natures: [NatureUsage]) -> some View {
         let color = Palette.stat(key)
         let cap = min(32, BoxPokemon.pointLimit - (entry.totalPoints - entry.point(key)))
@@ -624,7 +686,9 @@ struct BoxStatsSheet: View {
                     .foregroundStyle(color)
             }
             HStack(spacing: 12) {
-                SegmentBar(count: 32, value: entry.point(key), color: color) { value in
+                SegmentBar(count: 32, value: entry.point(key), color: color, onOverflow: key.hasNature ? {
+                    withAnimation(.snappy(duration: 0.25)) { box.setNature(id, key, 11, usage: natures) }
+                } : nil) { value in
                     withAnimation(.snappy(duration: 0.25)) { box.setPoint(id, key, min(value, cap)) }
                 }
                 .frame(height: 26)
@@ -833,8 +897,8 @@ struct BoxMoveSheet: View {
                 .padding(.top, 18)
                 .padding(.bottom, 6)
                 List {
-                    ForEach(Array(entry.moves.prefix(4).enumerated()), id: \.offset) { slot, _ in
-                        slotRow(slot, entry)
+                    ForEach(slotIDs(entry), id: \.self) { key in
+                        slotRow(slotIDs(entry).firstIndex(of: key) ?? 0, entry)
                             .listRowInsets(EdgeInsets(top: 3, leading: 16, bottom: 3, trailing: 16))
                             .listRowSeparator(.hidden)
                             .listRowBackground(Color.clear)
@@ -935,6 +999,11 @@ struct BoxMoveSheet: View {
             }
             .presentationDragIndicator(.visible)
         }
+    }
+
+    private func slotIDs(_ entry: BoxPokemon) -> [String] {
+        let moves = Array(entry.moves.prefix(4))
+        return moves.enumerated().map { index, move in move.isEmpty ? "empty-\(moves[..<index].filter(\.isEmpty).count)" : move }
     }
 
     private func slotRow(_ slot: Int, _ entry: BoxPokemon) -> some View {

@@ -346,7 +346,9 @@ struct StatsStatFields: View {
                     .foregroundStyle(shown != side.real(key) ? Palette.boosted : color)
             }
             HStack(spacing: 12) {
-                SegmentBar(count: 32, value: side.point(key), color: color) { value in
+                SegmentBar(count: 32, value: side.point(key), color: color, onOverflow: key.hasNature ? {
+                    withAnimation(.snappy(duration: 0.25)) { stats.setNature(role, key, 11) }
+                } : nil) { value in
                     withAnimation(.snappy(duration: 0.25)) { stats.setPoints(role, key, value) }
                 }
                 NumberText(side.point(key))
@@ -1300,7 +1302,12 @@ struct ModeSwitchPull: ViewModifier {
                             .trim(from: 0, to: progress)
                             .stroke(tint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                        Icon(name: icon, size: 17)
+                        if UIImage(named: icon) != nil {
+                            Icon(name: icon, size: 17)
+                        } else {
+                            Image(systemName: icon)
+                                .font(.system(size: 15, weight: .semibold))
+                        }
                             .foregroundStyle(tint)
                     }
                     .frame(width: 40, height: 40)

@@ -759,6 +759,15 @@ struct MemberPicker: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(!selected && picked.count >= room)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            Button(role: .destructive) {
+                                Haptics.play(.medium)
+                                picked.removeAll { $0 == entry.id }
+                                withAnimation { box.delete([entry.id]) }
+                            } label: {
+                                Label("削除", systemImage: "trash")
+                            }
+                        }
                     }
                 } header: {
                     Text("ボックス（あと\(max(0, room - picked.count))体）")
@@ -784,6 +793,7 @@ struct MemberPicker: View {
             PokemonPicker(role: .attacker, currentName: "") { name in
                 let entry = box.create(name, usage: model.usage)
                 box.updateTeam(teamID) { $0.members.append(contentsOf: picked + [entry.id]) }
+                box.markPristine(entry.id)
                 dismiss()
                 onCreated(entry.id)
             }

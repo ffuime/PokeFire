@@ -73,7 +73,7 @@ struct SidePanel: View {
         }
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .modeSwitchPull(label: "PokéStats", icon: "search", tint: Palette.accent, distance: 52) {
+        .modeSwitchPull(label: "PokéStats", icon: "chart.pie", tint: Palette.accent, distance: 52) {
             withAnimation(.easeInOut(duration: 0.35)) { stats.enter(from: model) }
         }
     }
@@ -386,12 +386,8 @@ struct MoveSection: View {
                             model.togglePowerUp()
                         }
                     }
-                    if model.showsFainted {
-                        if model.showsLastRespects {
-                            CountPill(title: "ひんし数", range: 0...5, value: side.fainted, openEnded: true, unit: "匹", pickerRange: 0...100) { model.setFainted($0) }
-                        } else {
-                            CountPill(title: "ひんし数", range: 0...5, value: min(5, side.fainted), openEnded: true, unit: "匹") { model.setFainted($0) }
-                        }
+                    if model.showsLastRespects {
+                        CountPill(title: "ひんし数", range: 0...5, value: side.fainted, openEnded: true, unit: "匹", pickerRange: 0...100) { model.setFainted($0) }
                     }
                     if model.showsFling {
                         Menu {
@@ -509,7 +505,7 @@ struct StatEditor: View {
             }
 
             HStack(spacing: 12) {
-                SegmentBar(count: 32, value: value.points, color: color) { model.setPoints(role, key, $0) }
+                SegmentBar(count: 32, value: value.points, color: color, onOverflow: key.hasNature ? { model.setNature(role, key, 11) } : nil) { model.setPoints(role, key, $0) }
                 NumberText(value.points)
                     .font(.headline)
                     .foregroundStyle(Palette.ink)
@@ -543,35 +539,21 @@ struct AbilitySection: View {
         let candidates = side.pokemon?.abilities ?? []
         let control = model.abilityControl(role)
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 12) {
-                Text("とくせい").sectionTitle()
-                Spacer(minLength: 8)
-                ScrollView(.horizontal) {
-                    HStack(spacing: 12) {
-                        ForEach(candidates, id: \.self) { name in
-                            let selected = side.ability == name
-                            Button {
-                                model.tapAbilityCandidate(role, name)
-                            } label: {
-                                ZStack {
-                                    Text(name)
-                                        .font(.subheadline.weight(.regular))
-                                        .opacity(selected ? 0 : 1)
-                                    Text(name)
-                                        .font(.subheadline.weight(.heavy))
-                                        .opacity(selected ? 1 : 0)
-                                }
-                                .fixedSize()
-                                .foregroundStyle(selected ? Palette.accent : Color(hex: 0xB0B0B0))
-                                .scaleEffect(selected ? 1.06 : 0.84, anchor: .bottom)
-                                .animation(.spring(response: 0.42, dampingFraction: 0.52), value: selected)
-                            }
-                            .buttonStyle(PressableStyle())
-                        }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    Text("とくせい").sectionTitle()
+                    Spacer(minLength: 8)
+                    HStack(spacing: 10) {
+                        ForEach(candidates, id: \.self) { candidate($0, selected: side.ability == $0) }
+                    }
+                    .fixedSize()
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("とくせい").sectionTitle()
+                    FlowLayout(spacing: 10) {
+                        ForEach(candidates, id: \.self) { candidate($0, selected: side.ability == $0) }
                     }
                 }
-                .scrollIndicators(.hidden)
-                .fixedSize(horizontal: candidates.count <= 2, vertical: false)
             }
 
             VStack(alignment: .leading, spacing: 8) {
@@ -583,21 +565,47 @@ struct AbilitySection: View {
                     UnimplementedChip(kind: "とくせい")
                         .transition(.scale(scale: 0.8).combined(with: .opacity))
                 } else if control != .hidden {
-                    ToggleChip(
-                        title: control.label,
-                        isOn: model.abilityActive(role),
-                        locked: control == .locked
-                    ) {
-                        model.abilityButtonTapped(role)
+                    HStack(spacing: 6) {
+                        ToggleChip(
+                            title: control.label,
+                            isOn: model.abilityActive(role),
+                            locked: control == .locked
+                        ) {
+                            model.abilityButtonTapped(role)
+                        }
+                        .disabled(model.abilityDisabled(role) && control != .locked)
+                        .opacity(model.abilityDisabled(role) && control == .toggle ? 0.45 : 1)
+                        .fixedSize()
+                        if role == .attacker, model.showsOverlord {
+                            CountPill(title: "ひんし数", range: 0...5, value: min(5, side.fainted), openEnded: true, unit: "匹") { model.setFainted($0) }
+                                .fixedSize()
+                        }
                     }
-                    .disabled(model.abilityDisabled(role) && control != .locked)
-                    .opacity(model.abilityDisabled(role) && control == .toggle ? 0.45 : 1)
-                    .fixedSize()
                     .transition(.scale(scale: 0.8).combined(with: .opacity))
                 }
             }
             .animation(.snappy(duration: 0.25), value: control)
         }
+    }
+
+    private func candidate(_ name: String, selected: Bool) -> some View {
+        Button {
+            model.tapAbilityCandidate(role, name)
+        } label: {
+            ZStack {
+                Text(name)
+                    .font(.subheadline.weight(.regular))
+                    .opacity(selected ? 0 : 1)
+                Text(name)
+                    .font(.subheadline.weight(.heavy))
+                    .opacity(selected ? 1 : 0)
+            }
+            .fixedSize()
+            .foregroundStyle(selected ? Palette.accent : Color(hex: 0xB0B0B0))
+            .scaleEffect(selected ? 1.06 : 0.84, anchor: .bottom)
+            .animation(.spring(response: 0.42, dampingFraction: 0.52), value: selected)
+        }
+        .buttonStyle(PressableStyle())
     }
 }
 
