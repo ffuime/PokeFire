@@ -1302,13 +1302,15 @@ struct ModeSwitchPull: ViewModifier {
                             .trim(from: 0, to: progress)
                             .stroke(tint, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                             .rotationEffect(.degrees(-90))
-                        if UIImage(named: icon) != nil {
-                            Icon(name: icon, size: 17)
-                        } else {
-                            Image(systemName: icon)
-                                .font(.system(size: 15, weight: .semibold))
+                        Group {
+                            if UIImage(named: icon) != nil {
+                                Icon(name: icon, size: 17)
+                            } else {
+                                Image(systemName: icon)
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
                         }
-                            .foregroundStyle(tint)
+                        .foregroundStyle(tint)
                     }
                     .frame(width: 40, height: 40)
                     Text(label)

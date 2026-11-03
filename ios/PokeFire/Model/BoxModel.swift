@@ -138,7 +138,6 @@ final class BoxModel {
         teams.first { $0.id == id }
     }
 
-    @discardableResult
     @ObservationIgnored private var pristine: [UUID: BoxPokemon] = [:]
 
     func markPristine(_ id: UUID) {
@@ -155,6 +154,7 @@ final class BoxModel {
         if !removed.isEmpty { delete(removed) }
     }
 
+    @discardableResult
     func create(_ name: String, usage: UsageData?) -> BoxPokemon {
         var entry = BoxPokemon(name: name)
         let data = GameData.shared
