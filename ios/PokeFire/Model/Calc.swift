@@ -50,6 +50,7 @@ struct StatValue: Equatable {
 struct Field: Equatable {
     var weather = ""
     var terrain = ""
+    var extreme = ""
 }
 
 struct Fighter {
@@ -566,7 +567,9 @@ enum Calc {
 
         let moldBreaker = atk.ability == "かたやぶり"
         let defAbility = moldBreaker ? "" : def.ability
-        let weather = [atk.ability, def.ability].contains(where: { $0 == "ノーてんき" || $0 == "エアロック" }) ? "" : field.weather
+        let weatherSuppressed = [atk.ability, def.ability].contains(where: { $0 == "ノーてんき" || $0 == "エアロック" })
+        let weather = weatherSuppressed ? "" : field.weather
+        let extreme = weatherSuppressed ? "" : field.extreme
         let moveWeather = atk.ability == "メガソーラー" ? "はれ" : weather
         let terrain = field.terrain
         let terrainName = "\(terrain)フィールド"
@@ -608,6 +611,7 @@ enum Calc {
         }
         if atk.move == "フライングプレス" { eff *= typeEffectiveness("ひこう", def.types) }
         if atk.move == "フリーズドライ", def.types.contains("みず") { eff *= 4 }
+        if extreme == "らんきりゅう", def.types.contains("ひこう"), (typeChart[moveType]?["ひこう"] ?? 1) > 1 { eff /= 2 }
         if moveType == "じめん", !defGrounded { eff = 0 }
         if immuneAbilities[defAbility] == moveType { eff = 0 }
         if defAbility == "ぼうおん", has("音") { eff = 0 }
@@ -618,6 +622,8 @@ enum Calc {
         if defAbility == "ふしぎなまもり", eff <= 1 { eff = 0 }
         if defAbility == "テラスシェル", def.abilityOn, eff > 0 { eff = 0.5 }
         if eff == 0 { return .fail(.immune, "効果なし") }
+        if extreme == "おおひでり", moveType == "みず" { return .fail(.immune, "おおひでりで技が失敗") }
+        if extreme == "おおあめ", moveType == "ほのお" { return .fail(.immune, "おおあめで技が失敗") }
 
         let priorityText = remarks.first(where: { $0.hasPrefix("優先度") })?.replacingOccurrences(of: "優先度", with: "") ?? "0"
         let priority = Int(priorityText) ?? 0
@@ -703,7 +709,8 @@ enum Calc {
         info.displayPower = max(1, applyMod(basePower, chainMods(displayMods)))
 
         let isPhysical = move.category == "物理"
-        let isCrit = atk.crit || alwaysCritMoves.contains(atk.move)
+        let critBlocked = ["シェルアーマー", "カブトアーマー"].contains(defAbility)
+        let isCrit = !critBlocked && (atk.crit || alwaysCritMoves.contains(atk.move) || (atk.ability == "ひとでなし" && atk.abilityOn))
         var notes: [Note] = []
         func note(_ label: String, _ mul: Double, _ good: Bool? = nil) {
             if mul != 1 { notes.append(Note(label: label, mul: mul, good: good ?? (mul > 1))) }
@@ -836,7 +843,7 @@ enum Calc {
         var weatherMod = 4096
         if moveWeather == "はれ" { weatherMod = moveType == "ほのお" ? 6144 : moveType == "みず" ? 2048 : 4096 }
         if moveWeather == "あめ" { weatherMod = moveType == "みず" ? 6144 : moveType == "ほのお" ? 2048 : 4096 }
-        note(weatherNames[moveWeather] ?? "", Double(weatherMod) / 4096)
+        note(extreme.isEmpty || moveWeather != weather ? weatherNames[moveWeather] ?? "" : extreme, Double(weatherMod) / 4096)
         if isCrit { note("急所", 1.5) }
 
         let stabActive = atk.types.contains(moveType)

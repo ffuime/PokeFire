@@ -295,6 +295,7 @@ final class AppModel {
             if role == .defender, side.ability == "マルチスケイル", output.multiscaleLocked { return false }
             return side.abilityOn
         case .environment:
+            if side.ability == "デルタストリーム" { return weather.hasPrefix("winds-") }
             if let key = Rules.weatherAbilities[side.ability] { return weather == key }
             if let key = Rules.fieldAbilities[side.ability] { return field == key }
             return false
@@ -560,6 +561,7 @@ final class AppModel {
         guard data.pokemons[name] != nil else { return }
         selectPokemonCore(role, name)
         applyUsageDefaults(role, name)
+        applyPrimalWeather(role)
         if remember { Storage.rememberPokemon(name) }
         historyArmed = true
         Haptics.play(.light)
@@ -835,8 +837,17 @@ final class AppModel {
         if role == .attacker { syncAttacker(resetCounts: false) }
     }
 
+    private func applyPrimalWeather(_ role: Role) {
+        let ability = side(role).ability
+        guard Rules.primalWeatherAbilities.contains(ability), !abilityActive(role), let key = Rules.weatherAbilities[ability] else { return }
+        let base = EnvironmentInfo.base(weather)
+        let next = ability == "デルタストリーム" ? "winds-\(base == "none" ? "sun" : base)" : key
+        setEnvironmentDirect(weather: next, field: field)
+    }
+
     func selectAbility(_ role: Role, _ name: String) {
         selectAbilityCore(role, name)
+        applyPrimalWeather(role)
         historyArmed = true
         Haptics.play(.light)
         scheduleCalc()
@@ -860,7 +871,10 @@ final class AppModel {
             applyRankAbility(role)
         case .environment:
             let ability = side(role).ability
-            if let key = Rules.weatherAbilities[ability] {
+            if ability == "デルタストリーム" {
+                let base = EnvironmentInfo.base(weather)
+                setWeather(weather.hasPrefix("winds-") ? weather : "winds-\(base == "none" ? "sun" : base)")
+            } else if let key = Rules.weatherAbilities[ability] {
                 setWeather(key)
             } else if let key = Rules.fieldAbilities[ability] {
                 setField(key)
@@ -976,8 +990,16 @@ final class AppModel {
     }
 
     func setWeather(_ key: String) {
-        let next = key == weather ? "none" : key
+        let next = key == weather || (key == EnvironmentInfo.base(key) && EnvironmentInfo.base(weather) == key) ? "none" : key
         setEnvironmentDirect(weather: next, field: field)
+        historyArmed = true
+        Haptics.play(.selection)
+        scheduleCalc()
+    }
+
+    func setWeatherVariant(_ key: String) {
+        guard key != weather else { return }
+        setEnvironmentDirect(weather: key, field: field)
         historyArmed = true
         Haptics.play(.selection)
         scheduleCalc()

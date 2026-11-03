@@ -223,7 +223,8 @@ enum Palette {
     }
 
     static func environment(_ key: String) -> Color {
-        switch key {
+        if key.hasPrefix("winds-") { return Color(hex: 0x6FA6B5) }
+        switch EnvironmentInfo.base(key) {
         case "sun": return Color(hex: 0xF08C33)
         case "rain": return Color(hex: 0x4080E6)
         case "sand": return Color(hex: 0xB8945C)

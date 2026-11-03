@@ -182,7 +182,7 @@ struct EnvironmentPanel: View {
                     .font(.caption.weight(.bold))
                     .foregroundStyle(Palette.environment(model.weather))
             }
-            EnvironmentSegments(kind: "weather", keys: EnvironmentInfo.weathers.map { $0.key }, selected: model.weather) { model.setWeather($0) }
+            WeatherControl()
             HStack {
                 Text("フィールド").sectionTitle()
                 Spacer()
@@ -325,7 +325,7 @@ struct EnvironmentPill: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Icon(name: "weather_\(model.weather)", size: 22)
+                Icon(name: "weather_\(EnvironmentInfo.base(model.weather))", size: 22)
                     .foregroundStyle(Palette.environment(model.weather))
                 Text(EnvironmentInfo.label(weather: model.weather))
                 Text("・")

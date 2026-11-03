@@ -77,7 +77,7 @@ enum Rules {
 
     static let weatherAbilities: [String: String] = [
         "ひでり": "sun", "あめふらし": "rain", "すなおこし": "sand", "すなはき": "sand", "ゆきふらし": "snow",
-        "ひひいろのこどう": "sun", "おわりのだいち": "sun", "はじまりのうみ": "rain",
+        "ひひいろのこどう": "sun", "おわりのだいち": "harshsun", "はじまりのうみ": "heavyrain", "デルタストリーム": "winds-sun",
     ]
 
     static let extraAlways: [Role: Set<String>] = [
@@ -87,15 +87,17 @@ enum Rules {
             "たんじゅん", "ブレインフォース",
         ],
         .defender: [
-            "ふしぎなまもり", "エアロック", "よびみず", "こんがりボディ", "かぜのり", "プリズムアーマー", "こおりのりんぷん",
+            "ふしぎなまもり", "エアロック", "シェルアーマー", "カブトアーマー", "よびみず", "こんがりボディ", "かぜのり", "プリズムアーマー", "こおりのりんぷん",
             "わざわいのうつわ", "わざわいのつるぎ", "わざわいのおふだ", "わざわいのたま", "たんじゅん", "ダークオーラ", "オーラブレイク",
         ],
     ]
 
     static let extraToggle: [Role: Set<String>] = [
-        .attacker: ["スロースタート", "よわき", "どくぼうそう", "ねつぼうそう", "こだいかっせい", "クォークチャージ"],
+        .attacker: ["ひとでなし", "スロースタート", "よわき", "どくぼうそう", "ねつぼうそう", "こだいかっせい", "クォークチャージ"],
         .defender: ["ファントムガード", "テラスシェル", "こだいかっせい", "クォークチャージ"],
     ]
+
+    static let primalWeatherAbilities: Set<String> = ["おわりのだいち", "はじまりのうみ", "デルタストリーム"]
 
     static let extraDefaultOn: Set<String> = ["ファントムガード", "テラスシェル"]
 
@@ -103,7 +105,7 @@ enum Rules {
         var all = Set<String>()
         for set in extraAlways.values { all.formUnion(set) }
         for set in extraToggle.values { all.formUnion(set) }
-        return all.union(["ひひいろのこどう", "ハドロンエンジン", "おわりのだいち", "はじまりのうみ", "ふとうのけん", "ふくつのたて", "ミストメイカー"])
+        return all.union(["ひひいろのこどう", "ハドロンエンジン", "おわりのだいち", "はじまりのうみ", "デルタストリーム", "ふとうのけん", "ふくつのたて", "ミストメイカー"])
     }
 
     static let implementedItems: Set<String> = [

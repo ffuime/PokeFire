@@ -144,12 +144,36 @@ enum EnvironmentInfo {
     static let weathers: [(key: String, label: String, name: String)] = [
         ("none", "なし", ""), ("sun", "にほんばれ", "はれ"), ("rain", "あめ", "あめ"), ("sand", "すなあらし", "すなあらし"), ("snow", "ゆき", "ゆき"),
     ]
+    static let variants: [(key: String, label: String, name: String, extreme: String)] = [
+        ("harshsun", "おおひでり", "はれ", "おおひでり"), ("heavyrain", "おおあめ", "あめ", "おおあめ"),
+        ("winds-sun", "らんきりゅう", "", "らんきりゅう"), ("winds-rain", "らんきりゅう", "", "らんきりゅう"),
+        ("winds-sand", "らんきりゅう", "", "らんきりゅう"), ("winds-snow", "らんきりゅう", "", "らんきりゅう"),
+    ]
+
+    static func base(_ key: String) -> String {
+        switch key {
+        case "harshsun": return "sun"
+        case "heavyrain": return "rain"
+        default: return key.hasPrefix("winds-") ? String(key.dropFirst(6)) : key
+        }
+    }
+
+    static func options(_ base: String) -> [(key: String, label: String)] {
+        let own: [(key: String, label: String)] = weathers.first { $0.key == base }.map { [($0.key, $0.label)] } ?? []
+        let extra: [(key: String, label: String)] = base == "sun" ? [("harshsun", "おおひでり")] : base == "rain" ? [("heavyrain", "おおあめ")] : []
+        return own + extra + [("winds-\(base)", "らんきりゅう")]
+    }
+
+    static func isValid(weather key: String) -> Bool {
+        weathers.contains { $0.key == key } || variants.contains { $0.key == key }
+    }
+
     static let fields: [(key: String, label: String, name: String)] = [
         ("none", "なし", ""), ("electric", "エレキ", "エレキ"), ("grass", "グラス", "グラス"), ("psycho", "サイコ", "サイコ"), ("mist", "ミスト", "ミスト"),
     ]
 
     static func weatherName(_ key: String) -> String {
-        weathers.first { $0.key == key }?.name ?? ""
+        variants.first { $0.key == key }?.name ?? weathers.first { $0.key == key }?.name ?? ""
     }
 
     static func terrainName(_ key: String) -> String {
@@ -157,11 +181,11 @@ enum EnvironmentInfo {
     }
 
     static func field(weather: String, field: String) -> Field {
-        Field(weather: weatherName(weather), terrain: terrainName(field))
+        Field(weather: weatherName(weather), terrain: terrainName(field), extreme: variants.first { $0.key == weather }?.extreme ?? "")
     }
 
     static func label(weather key: String) -> String {
-        key == "none" ? "天候なし" : weathers.first { $0.key == key }?.label ?? key
+        key == "none" ? "天候なし" : variants.first { $0.key == key }?.label ?? weathers.first { $0.key == key }?.label ?? key
     }
 
     static func label(field key: String) -> String {
@@ -314,7 +338,7 @@ enum ShareCodec {
         let parts = code.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
         let weather = parts.first ?? ""
         let field = parts.count > 1 ? parts[1] : ""
-        let validWeather = EnvironmentInfo.weathers.contains { $0.key == weather } ? weather : "none"
+        let validWeather = EnvironmentInfo.isValid(weather: weather) ? weather : "none"
         let validField = EnvironmentInfo.fields.contains { $0.key == field } ? field : "none"
         return (weather.isEmpty ? "none" : validWeather, field.isEmpty ? "none" : validField)
     }

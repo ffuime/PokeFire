@@ -187,7 +187,7 @@ private struct MatchOverview: View {
         let item = same { orNone($0.atk.map { StatsCatalog.shared.itemSprite($0.item, pokemon: $0.name) }) }
         let envText = same { entry in
             let field = entry.field ?? Field()
-            let weather = Calc.weatherNames[field.weather] ?? "天候なし"
+            let weather = field.extreme.isEmpty ? Calc.weatherNames[field.weather] ?? "天候なし" : field.extreme
             return "\(weather)・\(field.terrain.isEmpty ? "フィールドなし" : "\(field.terrain)フィールド")"
         }
         let summary = Calc.summarize(sum ? output.entries : list, hp, multi: sum)

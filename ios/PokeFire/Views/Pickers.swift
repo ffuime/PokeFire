@@ -730,7 +730,7 @@ struct EnvironmentSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("天候").sectionTitle()
-            EnvironmentSegments(kind: "weather", keys: EnvironmentInfo.weathers.map { $0.key }, selected: model.weather) { model.setWeather($0) }
+            WeatherControl()
                 .padding(.bottom, 10)
             Text("フィールド").sectionTitle()
             EnvironmentSegments(kind: "field", keys: EnvironmentInfo.fields.map { $0.key }, selected: model.field) { model.setField($0) }
@@ -738,8 +738,27 @@ struct EnvironmentSheet: View {
         .padding(.horizontal, 20)
         .padding(.top, 28)
         .frame(maxHeight: .infinity, alignment: .top)
-        .presentationDetents([.height(290)])
+        .presentationDetents([.height(model.weather == "none" ? 290 : 338)])
         .presentationDragIndicator(.visible)
+    }
+}
+
+struct WeatherControl: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let base = EnvironmentInfo.base(model.weather)
+        VStack(spacing: 10) {
+            EnvironmentSegments(kind: "weather", keys: EnvironmentInfo.weathers.map { $0.key }, selected: base) { model.setWeather($0) }
+            if base != "none" {
+                Picker("天候の種類", selection: Binding(get: { model.weather }, set: { model.setWeatherVariant($0) })) {
+                    ForEach(EnvironmentInfo.options(base), id: \.key) { Text($0.label).tag($0.key) }
+                }
+                .pickerStyle(.segmented)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.snappy(duration: 0.25), value: base)
     }
 }
 
