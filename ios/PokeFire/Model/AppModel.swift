@@ -782,7 +782,11 @@ final class AppModel {
     }
 
     var showsRankBoost: Bool { Calc.rankBoostMoves.contains(attacker.move) }
-    var showsFainted: Bool { attacker.move == "おはかまいり" }
+    var showsFainted: Bool { showsLastRespects || showsOverlord }
+    var showsLastRespects: Bool { attacker.move == "おはかまいり" }
+    var showsOverlord: Bool {
+        attacker.ability == "そうだいしょう" && ["物理", "特殊"].contains(data.moves[attacker.move]?.category ?? "")
+    }
     var showsFling: Bool { attacker.move == "なげつける" }
 
     func setRankBoostTotal(_ total: Int) {

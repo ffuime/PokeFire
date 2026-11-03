@@ -387,7 +387,11 @@ struct MoveSection: View {
                         }
                     }
                     if model.showsFainted {
-                        CountPill(title: "ひんし数", range: 0...5, value: side.fainted, openEnded: true, unit: "匹", pickerRange: 0...100) { model.setFainted($0) }
+                        if model.showsLastRespects {
+                            CountPill(title: "ひんし数", range: 0...5, value: side.fainted, openEnded: true, unit: "匹", pickerRange: 0...100) { model.setFainted($0) }
+                        } else {
+                            CountPill(title: "ひんし数", range: 0...5, value: min(5, side.fainted), openEnded: true, unit: "匹") { model.setFainted($0) }
+                        }
                     }
                     if model.showsFling {
                         Menu {

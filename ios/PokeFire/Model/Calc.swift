@@ -407,6 +407,8 @@ enum Calc {
         return ability == "スキルリンク" ? (5, 5, 5) : (2, 5, 2)
     }
 
+    static let supremeOverlordMods = [4096, 4506, 4915, 5325, 5734, 6144]
+
     static let flingPowers = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 130]
     static let rankBoostMoves: Set<String> = ["アシストパワー", "つけあがる"]
     static let rankBoostLimit = 42
@@ -726,6 +728,7 @@ enum Calc {
         let auraMod = [atk.ability, def.ability].contains("オーラブレイク") ? 3072 : 5448
         if moveType == "フェアリー", [atk.ability, def.ability].contains("フェアリーオーラ") { bp(auraMod, "フェアリーオーラ", atk.ability != "フェアリーオーラ") }
         if moveType == "あく", [atk.ability, def.ability].contains("ダークオーラ") { bp(auraMod, "ダークオーラ", atk.ability != "ダークオーラ") }
+        if atk.ability == "そうだいしょう", atk.fainted > 0 { bp(supremeOverlordMods[min(5, atk.fainted)], atk.ability) }
         if atk.ability == "どくぼうそう", atk.abilityOn, isPhysical { bp(6144, atk.ability) }
         if atk.ability == "ねつぼうそう", atk.abilityOn, !isPhysical { bp(6144, atk.ability) }
         let technicianIndex = bpMods.count

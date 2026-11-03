@@ -201,6 +201,10 @@ struct DataListHeader: View {
             filterActive: filterActive,
             onFilter: onFilter
         )
+        .task {
+            try? await Task.sleep(for: .milliseconds(120))
+            focused.wrappedValue = true
+        }
     }
 }
 
@@ -224,9 +228,20 @@ struct PokemonFilter: Equatable {
         case weight = "重さ"
     }
 
+    enum Compare: String, CaseIterable {
+        case atLeast = "以上"
+        case exact = "ぴったり"
+        case atMost = "以下"
+    }
+
+    static let matchups: [(Double, String)] = [(4, "4倍"), (2, "2倍"), (1, "等倍"), (0.5, "半減"), (0.25, "4分の1"), (0, "無効")]
+
     var types: Set<String> = []
     var bothTypes = false
-    var group = Group.all
+    var group = Group.released
+    var matchType = ""
+    var matchValue = 2.0
+    var compare = Compare.atLeast
     var mega = 0
     var ability = ""
     var moves = ""
@@ -284,6 +299,16 @@ struct DataPokemonSheet: View {
             names = names.filter { name in
                 let types = Set(data.pokemons[name]?.types ?? [])
                 return filter.bothTypes ? filter.types.isSubset(of: types) : !filter.types.isDisjoint(with: types)
+            }
+        }
+        if !filter.matchType.isEmpty {
+            names = names.filter { name in
+                let value = TypeChart.multiplier(filter.matchType, types: data.pokemons[name]?.types ?? [], abilities: [])
+                switch filter.compare {
+                case .atLeast: return value >= filter.matchValue - 0.0001
+                case .exact: return abs(value - filter.matchValue) < 0.0001
+                case .atMost: return value <= filter.matchValue + 0.0001
+                }
             }
         }
         let ability = filter.ability.trimmingCharacters(in: .whitespaces)
@@ -522,6 +547,26 @@ struct PokemonFilterSheet: View {
                         Text("すべてを含む").tag(true)
                     }
                     .pickerStyle(.segmented)
+                }
+                Section {
+                    Picker("わざのタイプ", selection: $filter.matchType) {
+                        Text("指定なし").tag("")
+                        ForEach(Palette.typeOrder, id: \.self) { Text($0).tag($0) }
+                    }
+                    if !filter.matchType.isEmpty {
+                        Picker("相性", selection: $filter.matchValue) {
+                            ForEach(PokemonFilter.matchups, id: \.0) { Text($0.1).tag($0.0) }
+                        }
+                        .pickerStyle(.segmented)
+                        Picker("条件", selection: $filter.compare) {
+                            ForEach(PokemonFilter.Compare.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                } header: {
+                    Text("タイプ相性")
+                } footer: {
+                    Text("選んだタイプのわざを受けたときの倍率で絞り込みます。とくせいは考慮しません。")
                 }
                 Section("区分") {
                     Picker("内定", selection: $filter.group) {
