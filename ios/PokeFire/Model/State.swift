@@ -28,6 +28,7 @@ struct SideState: Equatable {
     var fainted = 2
     var flingPower = 130
     var shiny = false
+    var boxMoves: [String]?
 
     var pokemon: Pokemon? { GameData.shared.pokemons[name] }
     var base: BaseStats { pokemon?.base ?? BaseStats() }

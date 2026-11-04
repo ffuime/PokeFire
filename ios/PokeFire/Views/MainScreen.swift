@@ -353,6 +353,7 @@ struct EnvironmentPill: View {
 
 struct TabStrip: View {
     @Environment(AppModel.self) private var model
+    @Environment(StatsModel.self) private var stats
     @State private var confirmReset = false
 
     private var items: [TabItem] {
@@ -383,6 +384,7 @@ struct TabStrip: View {
                 ForEach([TabKind.attack, .damage, .heel], id: \.self) { kind in
                     Button {
                         model.addTab(kind)
+                        stats.pendingPage = .attacker
                     } label: {
                         Label {
                             Text(kind.menuLabel)

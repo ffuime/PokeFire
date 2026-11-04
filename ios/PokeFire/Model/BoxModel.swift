@@ -93,6 +93,7 @@ struct BoxTeam: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
     var members: [UUID] = []
+    var memo: String?
     var favorite = false
     var created = Date().timeIntervalSince1970
     var updated = Date().timeIntervalSince1970

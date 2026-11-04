@@ -198,9 +198,11 @@ final class AppModel {
         }
         if !entry.ability.isEmpty { selectAbility(role, entry.ability) }
         if !entry.item.isEmpty { selectItem(role, entry.item) }
-        if role == .attacker, let move = entry.moves.first(where: { !$0.isEmpty }), data.moves[move] != nil {
-            selectMove(move)
-        }
+        guard role == .attacker else { return }
+        let known = entry.moves.filter { data.moves[$0] != nil }
+        let ordered = known.filter { data.moves[$0]?.category != "変化" } + known.filter { data.moves[$0]?.category == "変化" }
+        if let move = ordered.first { selectMove(move) }
+        update(.attacker) { $0.boxMoves = ordered.isEmpty ? nil : ordered }
     }
 
     func applyStats(_ source: StatsSide, to role: Role) {
@@ -534,6 +536,7 @@ final class AppModel {
             value.rank = 0
             side.evs[key] = value
         }
+        side.boxMoves = nil
         let unreleased = data.isUnreleased(name)
         side.ability = unreleased ? "なし" : pokemon.abilities.first ?? "なし"
         side.abilityOn = Rules.defaultAbilityOn(role, side.ability)

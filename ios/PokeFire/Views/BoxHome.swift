@@ -561,6 +561,13 @@ struct TeamDetail: View {
             }
             if !members.isEmpty, !editing {
                 TeamWeaknessSections(members: members)
+                Section("メモ") {
+                    TextField("構築のメモ", text: Binding(
+                        get: { team?.memo ?? "" },
+                        set: { value in box.updateTeam(teamID) { $0.memo = value.isEmpty ? nil : value } }
+                    ), axis: .vertical)
+                    .lineLimit(3...)
+                }
                 Section {
                     Button {
                         UIPasteboard.general.string = PokesolExport.text(members)

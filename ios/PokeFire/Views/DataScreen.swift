@@ -201,14 +201,10 @@ struct DataListHeader: View {
             filterActive: filterActive,
             onFilter: onFilter
         )
-        .task {
-            try? await Task.sleep(for: .milliseconds(120))
-            focused.wrappedValue = true
-        }
     }
 }
 
-struct PokemonFilter: Equatable {
+struct PokemonFilter: Hashable {
     enum Group: String, CaseIterable {
         case all = "すべて"
         case released = "内定"
@@ -226,6 +222,15 @@ struct PokemonFilter: Equatable {
         case d = "D"
         case s = "S"
         case weight = "重さ"
+
+        var label: String {
+            switch self {
+            case .total: return "合計種族値"
+            case .weight: return rawValue
+            case .dex, .usage: return rawValue
+            default: return PokemonFilter.statLabels[rawValue] ?? rawValue
+            }
+        }
     }
 
     enum Compare: String, CaseIterable {
@@ -251,6 +256,7 @@ struct PokemonFilter: Equatable {
     var descending = false
 
     static let statKeys = ["H", "A", "B", "C", "D", "S", "合計", "重さ"]
+    static let statLabels = ["H": "HP", "A": "こうげき", "B": "ぼうぎょ", "C": "とくこう", "D": "とくぼう", "S": "すばやさ", "合計": "合計種族値", "重さ": "重さ"]
 
     var isActive: Bool {
         var copy = self
@@ -380,13 +386,17 @@ struct DataPokemonSheet: View {
                 Spacer()
                 Menu {
                     Picker("並び順", selection: $filter.sort) {
-                        ForEach(PokemonFilter.Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        ForEach(PokemonFilter.Sort.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
                     Toggle("逆順", isOn: $filter.descending)
                 } label: {
-                    Label(filter.sort.rawValue, systemImage: "arrow.up.arrow.down")
-                        .font(.caption.weight(.bold))
+                    Label(filter.sort.label, systemImage: "arrow.up.arrow.down")
+                        .font(.footnote.weight(.bold))
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
+                .padding(.trailing, -14)
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 6)
@@ -412,6 +422,7 @@ struct DataPokemonSheet: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.immediately)
+            .scrollsToTop(on: [AnyHashable(query), AnyHashable(filter)])
             .overlay {
                 if list.isEmpty { EmptyResult(text: "見つかりません") }
             }
@@ -591,9 +602,9 @@ struct PokemonFilterSheet: View {
                 Section("種族値・重さ") {
                     ForEach(PokemonFilter.statKeys, id: \.self) { key in
                         HStack {
-                            Text(key)
+                            Text(PokemonFilter.statLabels[key] ?? key)
                                 .font(.subheadline.weight(.bold))
-                                .frame(width: 44, alignment: .leading)
+                                .frame(width: 84, alignment: .leading)
                             TextField("下限", text: Binding(get: { filter.mins[key] ?? "" }, set: { filter.mins[key] = $0 }))
                                 .keyboardType(.decimalPad)
                                 .multilineTextAlignment(.center)
@@ -607,7 +618,7 @@ struct PokemonFilterSheet: View {
                 }
                 Section("並び順") {
                     Picker("並び順", selection: $filter.sort) {
-                        ForEach(PokemonFilter.Sort.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        ForEach(PokemonFilter.Sort.allCases, id: \.self) { Text($0.label).tag($0) }
                     }
                     Toggle("逆順", isOn: $filter.descending)
                 }
@@ -702,6 +713,7 @@ struct DataMoveSheet: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.immediately)
+            .scrollsToTop(on: [AnyHashable(query), AnyHashable(filter)])
             .overlay {
                 if list.isEmpty { EmptyResult(text: "見つかりません") }
             }
@@ -841,6 +853,7 @@ struct DataAbilitySheet: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.immediately)
+            .scrollsToTop(on: [AnyHashable(query), AnyHashable(state)])
             .overlay {
                 if list.isEmpty { EmptyResult(text: "見つかりません") }
             }
@@ -925,6 +938,7 @@ struct DataItemSheet: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.immediately)
+            .scrollsToTop(on: [AnyHashable(query), AnyHashable(state), AnyHashable(category)])
             .overlay {
                 if list.isEmpty { EmptyResult(text: "見つかりません") }
             }

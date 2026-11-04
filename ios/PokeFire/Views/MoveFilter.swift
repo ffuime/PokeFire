@@ -14,7 +14,7 @@ enum CompareMode: String, CaseIterable {
     }
 }
 
-struct MoveFilter: Equatable {
+struct MoveFilter: Hashable {
     var types: Set<String> = []
     var category = ""
     var power: Int?

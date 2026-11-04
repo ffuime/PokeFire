@@ -284,6 +284,7 @@ struct LearnsetSheet: View {
                 .padding(.bottom, 24)
             }
             .scrollDismissesKeyboard(.immediately)
+            .scrollsToTop(on: [AnyHashable(query), AnyHashable(filter)])
             .overlay {
                 if list == nil {
                     if model.learnsets == nil {

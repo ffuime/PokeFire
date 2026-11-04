@@ -40,6 +40,41 @@ struct CloseToolbarButton: View {
     }
 }
 
+@MainActor
+func focusWhenReady(_ focused: FocusState<Bool>.Binding) async {
+    for _ in 0..<6 {
+        try? await Task.sleep(for: .milliseconds(250))
+        if Task.isCancelled { return }
+        focused.wrappedValue = true
+        try? await Task.sleep(for: .milliseconds(100))
+        if focused.wrappedValue { return }
+    }
+}
+
+struct ScrollTopOnChange<Value: Equatable>: ViewModifier {
+    let value: Value
+    @State private var position = ScrollPosition(edge: .top)
+
+    func body(content: Content) -> some View {
+        content
+            .scrollPosition($position)
+            .onChange(of: value) { _, _ in position.scrollTo(edge: .top) }
+    }
+}
+
+extension View {
+    func scrollsToTop<Value: Equatable>(on value: Value) -> some View {
+        modifier(ScrollTopOnChange(value: value))
+    }
+
+    func listScrollsToTop<Value: Equatable>(_ proxy: ScrollViewProxy, on value: Value, to id: AnyHashable?) -> some View {
+        onChange(of: value) { _, _ in
+            guard let id else { return }
+            DispatchQueue.main.async { proxy.scrollTo(id, anchor: .top) }
+        }
+    }
+}
+
 struct SearchHeader: View {
     let title: String
     var modes: [String] = []
@@ -108,6 +143,7 @@ struct SearchHeader: View {
         .padding(.horizontal, 16)
         .padding(.top, 18)
         .padding(.bottom, 10)
+        .task { await focusWhenReady(focused) }
     }
 }
 
@@ -199,6 +235,7 @@ struct PokemonPicker: View {
             )
             if mode == 2 {
                 let entries = boxRows
+                ScrollViewReader { proxy in
                 List {
                     ForEach(entries) { entry in
                         Button {
@@ -209,14 +246,17 @@ struct PokemonPicker: View {
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .id(entry.id)
                     }
                 }
                 .listStyle(.plain)
                 .scrollDismissesKeyboard(.immediately)
+                .listScrollsToTop(proxy, on: query, to: entries.first.map { AnyHashable($0.id) })
                 .overlay {
                     if entries.isEmpty {
                         EmptyResult(text: box.pokemons.isEmpty ? "PokéBox にポケモンがいません" : "見つかりません")
                     }
+                }
                 }
             } else {
             ScrollViewReader { proxy in
@@ -272,6 +312,7 @@ struct PokemonPicker: View {
                 guard list.contains(where: { $0.name == current }) else { return }
                 proxy.scrollTo(current, anchor: .center)
             }
+            .listScrollsToTop(proxy, on: query, to: list.first.map { AnyHashable($0.name) })
             }
             }
         }
@@ -288,10 +329,6 @@ struct PokemonPicker: View {
             }
         }
         .onChange(of: mode) { _, _ in Haptics.play(.selection) }
-        .task {
-            try? await Task.sleep(for: .milliseconds(300))
-            focused = true
-        }
         .presentationDragIndicator(.visible)
     }
 
@@ -473,6 +510,9 @@ struct EntrySearchSheet: View {
             case .abilities: names = data.abilityOrder
             case .items: names = data.itemOrder
             }
+            if kind == .moves, model.attacker.name == name, let known = model.attacker.boxMoves {
+                lists.append(("覚えたわざ", known.filter(exists)))
+            }
             lists.append(("使用率", used))
             if kind == .moves, let learnable = model.learnset(name) {
                 let set = Set(learnable)
@@ -561,13 +601,10 @@ struct EntrySearchSheet: View {
                 guard let group = sections.first(where: { $0.rows.contains { $0.name == selected } }) else { return }
                 proxy.scrollTo(group.id + "|" + selected, anchor: .center)
             }
+            .listScrollsToTop(proxy, on: query, to: sections.first.flatMap { group in group.rows.first.map { AnyHashable(group.id + "|" + $0.name) } })
             }
         }
         .onChange(of: mode) { _, _ in Haptics.play(.selection) }
-        .task {
-            try? await Task.sleep(for: .milliseconds(300))
-            focused = true
-        }
         .presentationDragIndicator(.visible)
     }
 

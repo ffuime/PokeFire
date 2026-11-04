@@ -942,6 +942,7 @@ struct BoxMoveSheet: View {
                 .background(Palette.field, in: Capsule())
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
+                ScrollViewReader { proxy in
                 List {
                     ForEach(sections) { group in
                         Section {
@@ -986,6 +987,7 @@ struct BoxMoveSheet: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.plain)
+                                .id(group.id + "|" + info.name)
                             }
                         } header: {
                             Text(group.id)
@@ -996,8 +998,11 @@ struct BoxMoveSheet: View {
                 }
                 .listStyle(.plain)
                 .scrollDismissesKeyboard(.immediately)
+                .listScrollsToTop(proxy, on: query, to: sections.first.flatMap { group in group.rows.first.map { AnyHashable(group.id + "|" + $0.name) } })
+                }
             }
             .presentationDragIndicator(.visible)
+            .task { await focusWhenReady($focused) }
         }
     }
 
@@ -1637,7 +1642,7 @@ struct TeamWeaknessSections: View {
             Section("苦手なタイプ") {
                 ForEach(rows) { row in
                     let open = openTypes.contains(row.type)
-                    VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 0) {
                         HStack(spacing: 10) {
                             TypeChip(type: row.type, height: 26)
                             Spacer()
@@ -1648,33 +1653,35 @@ struct TeamWeaknessSections: View {
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(Palette.secondary)
                             Icon(name: "chevron_down", size: 14)
-                                .foregroundStyle(Palette.secondary)
+                                .foregroundStyle(Palette.secondary.opacity(0.6))
                                 .rotationEffect(.degrees(open ? 180 : 0))
                         }
-                        if open {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(spacing: 8) {
-                                    Text("弱点")
-                                        .font(.caption.weight(.bold))
-                                        .foregroundStyle(Palette.rankUp)
-                                        .frame(width: 34, alignment: .leading)
-                                    sprites(row.weak)
-                                }
-                                HStack(spacing: 8) {
-                                    Text("半減")
-                                        .font(.caption.weight(.bold))
-                                        .foregroundStyle(Palette.rankDown)
-                                        .frame(width: 34, alignment: .leading)
-                                    sprites(row.resist)
-                                }
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Text("弱点")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(Palette.rankUp)
+                                    .frame(width: 34, alignment: .leading)
+                                sprites(row.weak)
                             }
-                            .transition(.opacity.combined(with: .move(edge: .top)))
+                            HStack(spacing: 8) {
+                                Text("半減")
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(Palette.rankDown)
+                                    .frame(width: 34, alignment: .leading)
+                                sprites(row.resist)
+                            }
                         }
+                        .padding(.top, 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(height: open ? nil : 0, alignment: .top)
+                        .clipped()
+                        .opacity(open ? 1 : 0)
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
                         Haptics.play(.light)
-                        withAnimation(.snappy(duration: 0.3)) {
+                        withAnimation(.snappy(duration: 0.28)) {
                             if open { openTypes.remove(row.type) } else { openTypes.insert(row.type) }
                         }
                     }
@@ -1701,7 +1708,7 @@ struct TeamWeaknessSections: View {
                         }
                         .buttonStyle(PressableStyle())
                         .popover(isPresented: Binding(get: { threatShown == threat.name }, set: { if !$0 { threatShown = nil } }), attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
-                            VStack(alignment: .leading, spacing: 10) {
+                            VStack(alignment: .leading, spacing: 14) {
                                 Text(threat.name)
                                     .font(.headline)
                                     .foregroundStyle(Palette.ink)
@@ -1718,7 +1725,8 @@ struct TeamWeaknessSections: View {
                                     sprites(threat.answers)
                                 }
                             }
-                            .padding(16)
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 22)
                             .presentationCompactAdaptation(.popover)
                         }
                     }
