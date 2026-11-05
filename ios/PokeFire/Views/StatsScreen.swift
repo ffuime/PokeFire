@@ -731,9 +731,10 @@ struct MoveUsageRow: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 if let info, let id = Palette.types[info.type]?.id {
-                    Outlined(color: .white, outline: color) {
-                        Icon(name: "glyph_\(id)", size: 20)
-                    }
+                    Icon(name: "glyph_\(id)", size: 18)
+                        .foregroundStyle(Color.white)
+                        .frame(width: 24, height: 24)
+                        .background(color, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 }
                 Outlined(color: color) {
                     Text(pair.name ?? "不明なわざ")

@@ -124,6 +124,7 @@ struct SettingsSheet: View {
     @AppStorage(AppSettings.autoSleepKey) private var autoSleep = true
     @AppStorage(AppSettings.portraitTeamKey) private var portraitTeam = false
     @AppStorage(AppSettings.appearanceKey) private var appearance = "system"
+    @State private var showThe1900 = false
 
     var body: some View {
         NavigationStack {
@@ -153,6 +154,33 @@ struct SettingsSheet: View {
                 }
                 .font(.footnote)
                 .foregroundStyle(Palette.secondary)
+                Section("My Own Tools") {
+                    Button {
+                        Haptics.play(.light)
+                        showThe1900 = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "character.book.closed")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(T1900Color.accent)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("THE 1900")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Palette.ink)
+                                Text("英単語ターゲット1900のテストと単語カード")
+                                    .font(.caption)
+                                    .foregroundStyle(Palette.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Palette.secondary.opacity(0.6))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
             .navigationTitle("設定")
             .navigationBarTitleDisplayMode(.inline)
@@ -170,6 +198,9 @@ struct SettingsSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        .fullScreenCover(isPresented: $showThe1900) {
+            The1900View()
+        }
     }
 }
 

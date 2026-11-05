@@ -36,6 +36,9 @@ targets:
       - path: Data/unreleased.json
         group: Data
         buildPhase: resources
+      - path: Data/the1900.json
+        group: Data
+        buildPhase: resources
     scheme: {}
     info:
       path: PokeFire/Info.plist
