@@ -26,8 +26,8 @@ jobs:
 
       - name: Generate project
         run: |
-          brew install xcodegen
-          cd ios && xcodegen generate
+          set -o pipefail
+          { brew install xcodegen && cd ios && xcodegen generate; } 2>&1 | tee ios/build.log
 
       - name: Build app
         run: |
