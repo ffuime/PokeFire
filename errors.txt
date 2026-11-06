@@ -1,0 +1,2 @@
+** BUILD SUCCEEDED **
+/Users/runner/work/PokeFire/PokeFire/ios/PokeFire/Views/BoxEditor.swift:390:25: warning: immutable value 'slot' was never used; consider replacing with '_' or removing it
