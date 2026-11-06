@@ -2,6 +2,8 @@ import SwiftUI
 
 @main
 struct PokeFireApp: App {
+    @UIApplicationDelegateAdaptor(PokelootAppDelegate.self) private var appDelegate
+    @State private var launch = The1900Launch.shared
     @State private var model = AppModel()
     @State private var stats = StatsModel()
     @State private var box = BoxModel()
@@ -19,7 +21,14 @@ struct PokeFireApp: App {
                 }
                 .tint(Palette.accent)
                 .onOpenURL { url in
-                    model.open(url)
+                    if url.host == "the1900" {
+                        launch.open = true
+                    } else {
+                        model.open(url)
+                    }
+                }
+                .fullScreenCover(isPresented: $launch.open) {
+                    The1900View()
                 }
         }
     }

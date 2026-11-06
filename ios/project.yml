@@ -44,6 +44,10 @@ targets:
       path: PokeFire/Info.plist
       properties:
         NSPhotoLibraryAddUsageDescription: ポケモンのカード画像を写真に保存するために使用します。
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: me.ffui.pokefire.the1900
+            UIApplicationShortcutItemTitle: THE 1900
+            UIApplicationShortcutItemIconSymbolName: character.book.closed
         CFBundleURLTypes:
           - CFBundleURLName: me.ffui.pokefire
             CFBundleURLSchemes:
