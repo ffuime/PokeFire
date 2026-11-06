@@ -78,6 +78,7 @@ struct OrderTab: Identifiable, Equatable {
     var field = "none"
     var defRanks: [StatKey: Int]?
     var constant = ConstantState()
+    var disabled = false
 }
 
 struct AbilitySnapshot: Equatable {
@@ -139,6 +140,7 @@ struct ShareData {
     var field: String
     var defender: SideSnapshot
     var tabs: [ShareTab]
+    var disabled: [Int] = []
 }
 
 enum EnvironmentInfo {
@@ -435,7 +437,8 @@ enum ShareCodec {
             weather: environment.weather,
             field: environment.field,
             defender: defender,
-            tabs: tabs
+            tabs: tabs,
+            disabled: list.count > 5 ? (list[5].array ?? []).compactMap(\.int) : []
         )
     }
 

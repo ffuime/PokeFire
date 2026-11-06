@@ -360,7 +360,7 @@ struct TabStrip: View {
         model.tabs.enumerated().map { index, tab in
             let name = index == model.active ? model.attacker.name : tab.snapshot?.name ?? model.attacker.name
             let title = tab.kind == .attack && !name.isEmpty ? name : tab.kind.shortLabel
-            return TabItem(id: tab.id, kind: tab.kind, title: title)
+            return TabItem(id: tab.id, kind: tab.kind, title: title, disabled: tab.disabled)
         }
     }
 
@@ -565,10 +565,10 @@ struct ResultCard: View {
                 .accessibilityLabel("すばやさ比較")
 
                 if output.multi {
-                    Text("\(model.tabs.count)件の加算")
+                    Text("\(output.included.count)件の加算")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(Palette.secondary)
-                        .contentTransition(.numericText(value: Double(model.tabs.count)))
+                        .contentTransition(.numericText(value: Double(output.included.count)))
                 }
 
                 Spacer(minLength: 8)

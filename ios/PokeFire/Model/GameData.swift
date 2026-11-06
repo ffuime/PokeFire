@@ -318,6 +318,12 @@ final class GameData {
         return name
     }
 
+    func sharesUsage(_ lhs: String, _ rhs: String) -> Bool {
+        if lhs == rhs { return true }
+        guard let left = usageNames.pokemons[lhs], let right = usageNames.pokemons[rhs] else { return false }
+        return left == right
+    }
+
     private func cachedSearch(_ key: String, _ make: () -> String) -> String {
         if let hit = searchCache[key] { return hit }
         let value = make()

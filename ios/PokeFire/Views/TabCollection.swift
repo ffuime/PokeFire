@@ -5,6 +5,7 @@ struct TabItem: Equatable {
     let id: Int
     let kind: TabKind
     let title: String
+    var disabled = false
 }
 
 struct TabChipLabel: View {
@@ -13,23 +14,26 @@ struct TabChipLabel: View {
     let active: Bool
 
     var body: some View {
+        let tint = item.disabled ? Palette.secondary : Palette.tab(item.kind)
         HStack(spacing: 5) {
             Text("\(index + 1)")
                 .font(.caption.weight(.heavy))
                 .monospacedDigit()
             Icon(name: item.kind.icon, size: 14)
-                .foregroundStyle(active ? Color.white : Palette.tab(item.kind))
+                .foregroundStyle(active ? Color.white : tint)
             Text(item.title)
                 .font(.footnote.weight(.semibold))
+                .strikethrough(item.disabled)
                 .lineLimit(1)
                 .frame(maxWidth: 110)
         }
-        .foregroundStyle(active ? Color.white : Palette.ink)
+        .foregroundStyle(active ? Color.white : item.disabled ? Palette.secondary : Palette.ink)
+        .opacity(item.disabled && !active ? 0.6 : 1)
         .padding(.horizontal, 12)
         .frame(height: 34)
-        .glassEffect(active ? .regular.tint(Palette.tab(item.kind)) : .regular, in: Capsule())
+        .glassEffect(active ? .regular.tint(tint) : .regular, in: Capsule())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(index + 1)番目 \(item.kind.menuLabel) \(item.title)")
+        .accessibilityLabel("\(index + 1)番目 \(item.kind.menuLabel) \(item.title)\(item.disabled ? " 無効" : "")")
         .accessibilityAddTraits(active ? [.isSelected, .isButton] : .isButton)
     }
 }
@@ -111,6 +115,7 @@ struct TabCollection: UIViewRepresentable {
         var model: AppModel
         var onReset: () -> Void
         private var previewKey: String?
+        private var lastTap: (id: Int, time: TimeInterval)?
 
         init(model: AppModel, onReset: @escaping () -> Void) {
             self.model = model
@@ -212,6 +217,15 @@ struct TabCollection: UIViewRepresentable {
                 onReset()
                 return
             }
+            guard items.indices.contains(indexPath.item) else { return }
+            let id = items[indexPath.item].id
+            let now = CACurrentMediaTime()
+            if let lastTap, lastTap.id == id, now - lastTap.time < 0.32 {
+                self.lastTap = nil
+                model.toggleTabDisabled(indexPath.item)
+                return
+            }
+            lastTap = (id, now)
             model.activate(indexPath.item)
         }
 
@@ -227,6 +241,8 @@ struct TabCollection: UIViewRepresentable {
             let kind = items[index].kind
             let tint = UIColor(Palette.tab(kind))
             let count = items.count
+            let disabled = items[index].disabled
+            let canToggle = model.canDisableTab(index)
             return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
                 let left = UIAction(title: "左へ移動", image: UIImage(named: "move_left")?.withTintColor(tint, renderingMode: .alwaysOriginal), attributes: index == 0 ? .disabled : []) { _ in
                     self?.model.moveTab(index, by: -1)
@@ -237,7 +253,10 @@ struct TabCollection: UIViewRepresentable {
                 let remove = UIAction(title: "削除", image: UIImage(named: "close_circle")?.withTintColor(.systemRed, renderingMode: .alwaysOriginal), attributes: count <= 1 ? [.destructive, .disabled] : .destructive) { _ in
                     self?.model.removeTab(index)
                 }
-                return UIMenu(children: [UIMenu(options: .displayInline, children: [left, right]), remove])
+                let toggle = UIAction(title: disabled ? "有効にする" : "無効にする", image: UIImage(systemName: disabled ? "eye" : "eye.slash")?.withTintColor(tint, renderingMode: .alwaysOriginal), attributes: canToggle ? [] : .disabled) { _ in
+                    self?.model.toggleTabDisabled(index)
+                }
+                return UIMenu(children: [UIMenu(options: .displayInline, children: [left, right]), toggle, remove])
             }
         }
 

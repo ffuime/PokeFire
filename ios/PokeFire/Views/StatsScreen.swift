@@ -319,7 +319,10 @@ struct StatsBaseRow: View {
                         StatsBubble(role: role, key: key, close: close, present: present)
                             .frame(width: width)
                             .offset(y: height + 14)
-                            .transition(.scale(scale: 0.6, anchor: UnitPoint(x: StatsBubble.ratio(key), y: 0)).combined(with: .opacity))
+                            .transition(.asymmetric(
+                                insertion: .opacity,
+                                removal: .scale(scale: 0.6, anchor: UnitPoint(x: StatsBubble.ratio(key), y: 0)).combined(with: .opacity)
+                            ))
                     }
                     .frame(width: width, alignment: .top)
                 }
@@ -465,6 +468,7 @@ struct StatsBubble: View {
     let key: StatKey
     let close: () -> Void
     let present: (ActiveSheet) -> Void
+    @State private var pulse = 0
 
     static func ratio(_ key: StatKey) -> CGFloat {
         let index = StatKey.baseKeys.firstIndex(of: key) ?? 0
@@ -473,6 +477,7 @@ struct StatsBubble: View {
 
     var body: some View {
         let tailRatio = Self.ratio(key)
+        let start: CGFloat = pulse == 1 ? 0.7 : 1
         VStack(alignment: .leading, spacing: 14) {
             StatsStatFields(role: role, key: key)
             if key == .s {
@@ -514,16 +519,19 @@ struct StatsBubble: View {
                 .shadow(color: .black.opacity(0.18), radius: 24, y: 8)
                 .animation(.spring(response: 0.42, dampingFraction: 0.78), value: key)
         )
-        .keyframeAnimator(initialValue: CGFloat(1), trigger: key) { content, scale in
+        .keyframeAnimator(initialValue: CGFloat(1), trigger: pulse) { content, scale in
             content.scaleEffect(scale, anchor: UnitPoint(x: tailRatio, y: 0))
         } keyframes: { _ in
             KeyframeTrack {
+                MoveKeyframe(start)
                 SpringKeyframe(CGFloat(0.93), duration: 0.12)
                 SpringKeyframe(CGFloat(1), duration: 0.35, spring: .bouncy)
             }
         }
         .contentShape(Rectangle())
         .onTapGesture {}
+        .onAppear { pulse = 1 }
+        .onChange(of: key) { pulse += 1 }
     }
 }
 
@@ -677,29 +685,6 @@ struct TypeChartCard: View {
     }
 }
 
-struct Outlined<Content: View>: View {
-    let color: Color
-    var outline = Palette.bar
-    var width: CGFloat = 1.2
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        ZStack {
-            ForEach(0..<4, id: \.self) { index in
-                let angle = Double(index) * .pi / 2 + .pi / 4
-                content()
-                    .foregroundStyle(outline)
-                    .offset(x: cos(angle) * width, y: sin(angle) * width)
-            }
-            content()
-                .foregroundStyle(color)
-        }
-        .padding(width)
-        .drawingGroup()
-        .padding(-width)
-    }
-}
-
 struct MoveUsageSection: View {
     let pairs: [UsagePair]
     let present: (ActiveSheet) -> Void
@@ -724,44 +709,58 @@ struct MoveUsageRow: View {
     let pair: UsagePair
     let action: () -> Void
 
-    var body: some View {
-        let info = pair.name.flatMap { StatsCatalog.shared.moveInfo($0) }
-        let color = info.map { Palette.typeColor($0.type) } ?? Palette.secondary
-        let ratio = min(1, max(0, pair.pct / 100))
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if let info, let id = Palette.types[info.type]?.id {
-                    Icon(name: "glyph_\(id)", size: 18)
-                        .foregroundStyle(Color.white)
-                        .frame(width: 24, height: 24)
-                        .background(color, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                Outlined(color: color) {
-                    Text(pair.name ?? "不明なわざ")
-                        .font(.subheadline.weight(.heavy))
-                        .lineLimit(1)
-                }
+    private var info: MoveInfo? {
+        pair.name.flatMap { StatsCatalog.shared.moveInfo($0) }
+    }
+
+    private func label(_ tint: Color) -> some View {
+        HStack(spacing: 8) {
+            if info != nil {
+                Color.clear.frame(width: 24, height: 24)
+            }
+            Text(pair.name ?? "不明なわざ")
+                .font(.subheadline.weight(.heavy))
+                .lineLimit(1)
                 .id(pair.name ?? "")
                 .transition(.blurReplace)
-                Spacer(minLength: 6)
-                Outlined(color: color) {
-                    Text("\(Format.fixed1(pair.pct))%")
-                        .font(.subheadline.weight(.heavy))
-                        .monospacedDigit()
-                        .contentTransition(.numericText(value: pair.pct))
+            Spacer(minLength: 6)
+            Text("\(Format.fixed1(pair.pct))%")
+                .font(.subheadline.weight(.heavy))
+                .monospacedDigit()
+                .contentTransition(.numericText(value: pair.pct))
+        }
+        .foregroundStyle(tint)
+        .padding(.horizontal, 12)
+    }
+
+    var body: some View {
+        let info = self.info
+        let color = info.map { Palette.typeColor($0.type) } ?? Palette.secondary
+        let fillInk = info.map { Palette.typeInk($0.type) } ?? Color.white
+        let ratio = min(1, max(0, pair.pct / 100))
+        Button(action: action) {
+            ZStack(alignment: .leading) {
+                Palette.bar
+                label(Palette.ink)
+                ZStack(alignment: .leading) {
+                    color
+                    label(fillInk)
                 }
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 40)
-            .background {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        Palette.bar
-                        color.frame(width: geometry.size.width * ratio)
+                .mask(alignment: .leading) {
+                    GeometryReader { geometry in
+                        Rectangle().frame(width: geometry.size.width * ratio)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                if let info, let id = Palette.types[info.type]?.id {
+                    Icon(name: "glyph_\(id)", size: 18)
+                        .foregroundStyle(fillInk)
+                        .frame(width: 24, height: 24)
+                        .background(color, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .padding(.leading, 12)
+                }
             }
+            .frame(height: 40)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }
         .buttonStyle(PressableStyle())

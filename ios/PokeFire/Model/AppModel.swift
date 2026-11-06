@@ -32,7 +32,8 @@ struct CalcOutput {
     var field = Field()
     var revision = 0
 
-    var attacks: [CalcEntry] { entries.filter { $0.kind == .attack } }
+    var included: [CalcEntry] { entries.filter { !$0.disabled } }
+    var attacks: [CalcEntry] { included.filter { $0.kind == .attack } }
 
     var percentText: String {
         guard hp.max > 0 else { return "0.0%" }
@@ -134,6 +135,17 @@ final class AppModel {
         }
     }
 
+    func itemUsage(_ name: String) -> [UsagePair] {
+        guard let entry = usage?.pokemons[name] else { return [] }
+        var pairs = entry.items.filter { $0.name != UsageLoader.megaStone }
+        if let stone = StatsCatalog.shared.megaStone(for: name),
+           let own = entry.rawItems.first(where: { $0.name == stone }) {
+            let position = pairs.firstIndex { $0.pct < own.pct } ?? pairs.count
+            pairs.insert(UsagePair(name: UsageLoader.megaStone, pct: own.pct), at: position)
+        }
+        return pairs
+    }
+
     func applyTopSet(_ role: Role) {
         let name = side(role).name
         guard let entry = usage?.pokemons[name] else {
@@ -156,7 +168,7 @@ final class AppModel {
         if let ability = usageAbilities(name).compactMap(\.name).first(where: { data.abilities[$0] != nil }) {
             selectAbility(role, ability)
         }
-        if let item = entry.items.compactMap(\.name).first(where: { data.items[$0] != nil }) {
+        if let item = itemUsage(name).compactMap(\.name).first(where: { data.items[$0] != nil }) {
             selectItem(role, item)
         }
         if role == .attacker, let move = entry.moves.compactMap(\.name).first(where: { data.moves[$0] != nil }) {
@@ -460,8 +472,8 @@ final class AppModel {
         for (index, tab) in tabs.enumerated() {
             if tab.kind != .attack {
                 let constant = Constants.breakdown(tab.constant, kind: tab.kind, max: hp.max)
-                if tab.kind == .damage, constant.total > 0 { damaged = true }
-                entries.append(CalcEntry(tabID: tab.id, kind: tab.kind, constant: constant))
+                if tab.kind == .damage, constant.total > 0, !tab.disabled { damaged = true }
+                entries.append(CalcEntry(tabID: tab.id, kind: tab.kind, constant: constant, disabled: tab.disabled))
                 continue
             }
             let bonus = stamina ? taken : 0
@@ -486,7 +498,8 @@ final class AppModel {
                 let tabField = EnvironmentInfo.field(weather: tab.weather, field: tab.field)
                 entry = CalcEntry(tabID: tab.id, kind: .attack, atk: merged, def: def, field: tabField, result: Calc.calcDamage(merged, def, tabField))
             }
-            if let result = entry.result, result.isOK {
+            entry.disabled = tab.disabled
+            if !tab.disabled, let result = entry.result, result.isOK {
                 taken += result.hits.count
                 damaged = true
             }
@@ -499,8 +512,9 @@ final class AppModel {
         next.entries = entries
         next.def = def0
         next.hp = hp
-        next.multi = entries.count > 1
-        next.summary = Calc.summarize(entries, hp, multi: entries.count > 1)
+        let included = next.included
+        next.multi = included.count > 1
+        next.summary = Calc.summarize(included, hp, multi: included.count > 1)
         next.liveAttacker = atk
         next.liveResult = liveResult
         next.defRankBonus = isConstantActive ? 0 : bonusActive
@@ -562,8 +576,13 @@ final class AppModel {
 
     func selectPokemon(_ role: Role, _ name: String, remember: Bool = true) {
         guard data.pokemons[name] != nil else { return }
+        let previous = side(role)
         selectPokemonCore(role, name)
-        applyUsageDefaults(role, name)
+        if data.sharesUsage(previous.name, name) {
+            keepSharedAbility(role, previous.ability)
+        } else {
+            applyUsageDefaults(role, name)
+        }
         applyPrimalWeather(role)
         if remember { Storage.rememberPokemon(name) }
         historyArmed = true
@@ -578,12 +597,26 @@ final class AppModel {
         }?.name
     }
 
+    private func keepSharedAbility(_ role: Role, _ ability: String) {
+        let name = side(role).name
+        if side(role).pokemon?.abilities.contains(ability) == true {
+            selectAbilityIfCandidate(role, ability)
+        } else if data.usageName(of: name) == name, let top = usage?.pokemons[name]?.abilities.first?.name {
+            selectAbilityCore(role, top)
+        }
+    }
+
+    private func topHeldItem(_ entry: UsageEntry) -> String {
+        let top = (entry.rawItems.isEmpty ? entry.items : entry.rawItems).first?.name
+        guard let top, top != UsageLoader.megaStone, StatsCatalog.shared.items[top]?.mega != true else { return "なし" }
+        return top
+    }
+
     private func applyUsageDefaults(_ role: Role, _ name: String) {
         if role == .attacker, let move = topAttackMove(name) { selectMoveCore(move) }
         guard let entry = usage?.pokemons[name], data.usageName(of: name) == name else { return }
         if let ability = entry.abilities.first?.name { selectAbilityCore(role, ability) }
-        let item = entry.items.first?.name
-        selectItemCore(role, item.map { $0 != UsageLoader.megaStone ? $0 : "なし" } ?? "なし")
+        selectItemCore(role, topHeldItem(entry))
     }
 
     func setTypes(_ role: Role, _ types: [String]) {
@@ -900,7 +933,7 @@ final class AppModel {
         let index = active - 1
         guard tabs.indices.contains(active), tabs[active].kind == .attack, tabs.indices.contains(index) else { return nil }
         let constant = tabs[index].constant
-        guard tabs[index].kind == .damage,
+        guard tabs[index].kind == .damage, !tabs[index].disabled,
               constant.ratios.filter({ $0.value > 0 }) == [ratio: 1],
               constant.toxic.values.allSatisfy({ $0 == 0 }),
               constant.fixed == 0,
@@ -913,6 +946,7 @@ final class AppModel {
         if let index = constantTabIndex(ratio) {
             tabs.remove(at: index)
             active -= 1
+            ensureEnabledTab()
             showToast("\(label)：\(ratio)ダメージを外しました")
         } else {
             var tab = newTab(.damage)
@@ -1241,6 +1275,31 @@ final class AppModel {
             tabs.remove(at: index)
             if index < active { active -= 1 }
         }
+        ensureEnabledTab()
+        historyArmed = true
+        Haptics.play(.medium)
+        scheduleCalc()
+    }
+
+    private func ensureEnabledTab() {
+        if tabs.allSatisfy(\.disabled), tabs.indices.contains(active) {
+            tabs[active].disabled = false
+        }
+    }
+
+    func canDisableTab(_ index: Int) -> Bool {
+        guard tabs.indices.contains(index) else { return false }
+        return tabs[index].disabled || tabs.filter { !$0.disabled }.count > 1
+    }
+
+    func toggleTabDisabled(_ index: Int) {
+        guard tabs.indices.contains(index) else { return }
+        guard canDisableTab(index) else {
+            showToast("すべてのタブは無効にできません")
+            Haptics.play(.warning)
+            return
+        }
+        tabs[index].disabled.toggle()
         historyArmed = true
         Haptics.play(.medium)
         scheduleCalc()
@@ -1383,13 +1442,16 @@ final class AppModel {
             }
             return .array([JSON(tab.kind == .heel ? "h" : "d"), ShareCodec.packConstant(tab.constant)])
         }
-        return .array(ShareCodec.trimTail([
+        var root: [JSON] = [
             JSON(2),
             ShareCodec.packSide(defender),
             .array(tabList),
             JSON(active),
             JSON(ShareCodec.packEnvironment(weather: weather, field: field)),
-        ]))
+        ]
+        let disabled: [JSON] = tabs.indices.filter { tabs[$0].disabled }.map { JSON($0) }
+        if !disabled.isEmpty { root.append(.array(disabled)) }
+        return .array(ShareCodec.trimTail(root))
     }
 
     func shareURL() -> URL? {
@@ -1400,8 +1462,9 @@ final class AppModel {
     func applyShareData(_ raw: JSON) -> Bool {
         guard let share = ShareCodec.expand(raw), !share.tabs.isEmpty else { return false }
         restoreSide(.defender, share.defender)
-        tabs = share.tabs.map { item in
+        tabs = share.tabs.enumerated().map { index, item in
             var tab = newTab(item.kind)
+            tab.disabled = share.disabled.contains(index)
             tab.weather = item.weather
             tab.field = item.field
             tab.defRanks = item.kind == .attack ? item.defRanks : nil
@@ -1417,6 +1480,7 @@ final class AppModel {
             saveActiveTab()
         }
         active = min(max(0, share.active), tabs.count - 1)
+        ensureEnabledTab()
         if tabs[active].kind == .attack {
             loadTab(tabs[active])
         } else {

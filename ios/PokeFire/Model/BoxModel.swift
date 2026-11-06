@@ -201,13 +201,16 @@ final class BoxModel {
     func changeSpecies(_ id: UUID, to name: String, usage: UsageData?) {
         let data = GameData.shared
         update(id) { entry in
+            let keepsAbility = data.sharesUsage(entry.name, name) && data.pokemons[name]?.abilities.contains(entry.ability) == true
             entry.name = name
-            if data.usageName(of: name) != name, let first = data.pokemons[name]?.abilities.first {
-                entry.ability = first
-            } else if let top = usage?.pokemons[name]?.abilities.compactMap(\.name).first {
-                entry.ability = top
-            } else {
-                entry.ability = data.pokemons[name]?.abilities.first ?? ""
+            if !keepsAbility {
+                if data.usageName(of: name) != name, let first = data.pokemons[name]?.abilities.first {
+                    entry.ability = first
+                } else if let top = usage?.pokemons[name]?.abilities.compactMap(\.name).first {
+                    entry.ability = top
+                } else {
+                    entry.ability = data.pokemons[name]?.abilities.first ?? ""
+                }
             }
             if data.megaParent(name) != nil {
                 entry.item = "メガストーン"

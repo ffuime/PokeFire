@@ -190,7 +190,7 @@ private struct MatchOverview: View {
             let weather = field.extreme.isEmpty ? Calc.weatherNames[field.weather] ?? "天候なし" : field.extreme
             return "\(weather)・\(field.terrain.isEmpty ? "フィールドなし" : "\(field.terrain)フィールド")"
         }
-        let summary = Calc.summarize(sum ? output.entries : list, hp, multi: sum)
+        let summary = Calc.summarize(sum ? output.included : list, hp, multi: sum)
 
         return VStack(spacing: 12) {
             VStack(spacing: 12) {
@@ -431,7 +431,7 @@ private struct FlowList: View {
     var body: some View {
         let output = model.output
         VStack(spacing: 8) {
-            ForEach(Array(output.entries.enumerated()), id: \.element.tabID) { index, entry in
+            ForEach(Array(output.entries.enumerated()).filter { !$0.element.disabled }, id: \.element.tabID) { index, entry in
                 let id = DetailSelection.tab(entry.tabID)
                 let selected = view.effective == id
                 FlowItem(entry: entry, index: index, selected: selected)
@@ -687,7 +687,7 @@ private struct HPPMSection: View {
             let color = plus ? Palette.plus : Palette.minus
             let base = Double(maxHP)
             let bars: (Double, Double) = plus
-                ? (Double(small) / base, Double(large) / base)
+                ? (min(1, Double(small) / base), min(1, Double(large) / base))
                 : (Double(max(0, maxHP - large)) / base, Double(max(0, maxHP - small)) / base)
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline) {

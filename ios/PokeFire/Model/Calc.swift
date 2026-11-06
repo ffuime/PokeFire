@@ -164,6 +164,7 @@ struct CalcEntry {
     var field: Field?
     var result: CalcResult?
     var constant: ConstantBreakdown?
+    var disabled = false
 }
 
 struct HPInfo: Equatable {
@@ -1056,7 +1057,7 @@ enum Calc {
                     rows[name] = [0, 0]
                     order.append(name)
                 }
-                rows[name]?[pick] = hp - before
+                rows[name]?[pick] = amount > 0 ? (before > 0 ? amount : 0) : hp - before
             }
             for (index, damages) in result.hits.enumerated() {
                 if defHP <= 0 { continue }

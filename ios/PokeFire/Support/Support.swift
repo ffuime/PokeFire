@@ -250,6 +250,15 @@ enum Palette {
     static func typeColor(_ type: String) -> Color {
         Color(hex: types[type]?.color ?? 0x999999)
     }
+
+    static func typeInk(_ type: String) -> Color {
+        let hex = types[type]?.color ?? 0x999999
+        let red = Double((hex >> 16) & 0xFF)
+        let green = Double((hex >> 8) & 0xFF)
+        let blue = Double(hex & 0xFF)
+        let luminance = (0.299 * red + 0.587 * green + 0.114 * blue) / 255
+        return luminance > 0.62 ? Color(hex: 0x1C1C1E) : .white
+    }
 }
 
 extension Color {

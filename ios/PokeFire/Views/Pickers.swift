@@ -492,7 +492,7 @@ struct EntrySearchSheet: View {
         case .moves:
             usage = (model.usage?.pokemons[name]?.moves ?? []).compactMap { pair in pair.name.map { ($0, pair.pct) } }
         case .items:
-            usage = (model.usage?.pokemons[name]?.items ?? []).compactMap { pair in pair.name.map { ($0, pair.pct) } }
+            usage = model.itemUsage(name).compactMap { pair in pair.name.map { ($0, pair.pct) } }
         }
         var percent: [String: String] = [:]
         var used: [String] = []
