@@ -98,23 +98,44 @@ struct The1900View: View {
         case result(T1900Scope, T1900Outcome)
     }
 
+    private static let tabKey = "the1900-tab"
+
     @Environment(\.dismiss) private var dismiss
     @State private var route = Route.home
-    @State private var forward = true
+    @State private var tab = UserDefaults.standard.integer(forKey: The1900View.tabKey)
+    @State private var revision = 0
 
-    private func go(_ next: Route, forward: Bool = true) {
-        self.forward = forward
-        withAnimation(.snappy(duration: 0.34)) { route = next }
+    private var isHome: Bool { route == .home }
+
+    private func go(_ next: Route) {
+        withAnimation(.snappy(duration: 0.34)) {
+            route = next
+            if next == .home { revision += 1 }
+        }
     }
 
     var body: some View {
         ZStack {
-            T1900Color.paper.ignoresSafeArea()
-            screen
-                .transition(.asymmetric(
-                    insertion: .move(edge: forward ? .trailing : .leading),
-                    removal: .move(edge: forward ? .leading : .trailing)
-                ))
+            T1900Home(
+                tab: $tab,
+                revision: revision,
+                onBack: { dismiss() },
+                onTest: { go(.test($0, $1, UUID())) },
+                onCards: { go(.cards($0)) }
+            )
+            .allowsHitTesting(isHome)
+            if !isHome {
+                ZStack {
+                    T1900Color.paper.ignoresSafeArea()
+                    screen
+                        .transition(.opacity)
+                }
+                .transition(.move(edge: .trailing))
+                .zIndex(1)
+            }
+        }
+        .onChange(of: tab) { _, value in
+            UserDefaults.standard.set(value, forKey: The1900View.tabKey)
         }
     }
 
@@ -122,27 +143,23 @@ struct The1900View: View {
     private var screen: some View {
         switch route {
         case .home:
-            T1900Home(
-                onBack: { dismiss() },
-                onTest: { go(.test($0, $1, UUID())) },
-                onCards: { go(.cards($0)) }
-            )
+            EmptyView()
         case .test(let scope, let count, let run):
             T1900TestView(
                 scope: scope,
                 total: count,
-                onClose: { go(.home, forward: false) },
+                onClose: { go(.home) },
                 onFinish: { go(.result(scope, $0)) }
             )
             .id(run)
         case .cards(let scope):
-            T1900CardsView(scope: scope) { go(.home, forward: false) }
+            T1900CardsView(scope: scope) { go(.home) }
         case .result(let scope, let outcome):
             T1900ResultView(
                 scope: scope,
                 outcome: outcome,
                 onRetry: { go(.test(scope, outcome.total, UUID())) },
-                onList: { go(.home, forward: false) }
+                onList: { go(.home) }
             )
         }
     }
@@ -194,60 +211,15 @@ private struct T1900Bar<Trailing: View>: View {
     }
 }
 
-private struct T1900TabBar: View {
-    @Binding var tab: Int
-    @Namespace private var namespace
-
-    private let items: [(title: String, symbol: String)] = [("テスト", "checklist"), ("カード", "rectangle.stack")]
-
-    var body: some View {
-        HStack(spacing: 4) {
-            ForEach(items.indices, id: \.self) { index in
-                let selected = tab == index
-                Button {
-                    guard !selected else { return }
-                    Haptics.play(.selection)
-                    withAnimation(.snappy(duration: 0.32)) { tab = index }
-                } label: {
-                    VStack(spacing: 2) {
-                        Image(systemName: selected && index == 1 ? "rectangle.stack.fill" : items[index].symbol)
-                            .font(.system(size: 20, weight: .semibold))
-                            .frame(height: 24)
-                        Text(items[index].title)
-                            .font(.system(size: 10, weight: .semibold))
-                    }
-                    .foregroundStyle(selected ? T1900Color.accentDeep : T1900Color.gray)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background {
-                        if selected {
-                            Capsule()
-                                .fill(T1900Color.accentSoft)
-                                .matchedGeometryEffect(id: "pill", in: namespace)
-                        }
-                    }
-                    .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(5)
-        .glassEffect(.regular, in: Capsule())
-        .padding(.horizontal, 40)
-    }
-}
-
 private struct T1900Home: View {
+    @Binding var tab: Int
+    let revision: Int
     let onBack: () -> Void
     let onTest: (T1900Scope, Int) -> Void
     let onCards: (T1900Scope) -> Void
 
-    @AppStorage("the1900-tab") private var tab = 0
-    @AppStorage("the1900-scroll-test") private var testScroll = ""
-    @AppStorage("the1900-scroll-cards") private var cardScroll = ""
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 10) {
             VStack(alignment: .leading, spacing: 14) {
                 T1900BarButton(symbol: "chevron.left", label: "戻る", action: onBack)
                 HStack(spacing: 0) {
@@ -260,59 +232,81 @@ private struct T1900Home: View {
             }
             .padding(.horizontal, 20)
             TabView(selection: $tab) {
-                list(test: true, saved: $testScroll)
-                    .tag(0)
-                list(test: false, saved: $cardScroll)
-                    .tag(1)
+                Tab("テスト", systemImage: "checklist", value: 0) {
+                    T1900List(test: true, revision: revision, onTest: onTest, onCards: onCards)
+                }
+                Tab("カード", systemImage: "rectangle.stack", value: 1) {
+                    T1900List(test: false, revision: revision, onTest: onTest, onCards: onCards)
+                }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .onChange(of: tab) { _, _ in Haptics.play(.selection) }
+            .tint(T1900Color.accent)
         }
         .padding(.top, 6)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            T1900TabBar(tab: $tab)
-                .padding(.bottom, 4)
-        }
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
     }
+}
 
-    private func list(test: Bool, saved: Binding<String>) -> some View {
-        let scopes = test ? [T1900Store.all] + T1900Store.sections : T1900Store.sections
+private final class T1900ScrollTracker {
+    var offset: CGFloat = 0
+    var restored = false
+}
+
+private struct T1900List: View {
+    private static let rowHeight: CGFloat = 65
+
+    let test: Bool
+    let revision: Int
+    let onTest: (T1900Scope, Int) -> Void
+    let onCards: (T1900Scope) -> Void
+
+    @State private var tracker = T1900ScrollTracker()
+
+    private var scrollKey: String { test ? "the1900-scroll-test" : "the1900-scroll-cards" }
+    private var scopes: [T1900Scope] { test ? [T1900Store.all] + T1900Store.sections : T1900Store.sections }
+
+    var body: some View {
         let best = T1900Store.best
-        let position = Binding<String?>(
-            get: { saved.wrappedValue.isEmpty ? nil : saved.wrappedValue },
-            set: { saved.wrappedValue = $0 ?? "" }
-        )
-        return ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(scopes, id: \.key) { scope in
-                    Button {
-                        Haptics.play(.light)
-                        if test { onTest(scope, T1900TestView.standardCount) } else { onCards(scope) }
-                    } label: {
-                        row(scope, test: test, score: best[scope.key])
-                    }
-                    .buttonStyle(.plain)
-                    .id(scope.key)
-                    .contextMenu {
-                        if test {
-                            Button {
-                                onTest(scope, T1900TestView.longCount)
-                            } label: {
-                                Label("100問モードで開始", systemImage: "text.badge.checkmark")
-                            }
+        ScrollViewReader { proxy in
+            List(scopes, id: \.key) { scope in
+                Button {
+                    Haptics.play(.light)
+                    if test { onTest(scope, T1900TestView.standardCount) } else { onCards(scope) }
+                } label: {
+                    row(scope, score: best[scope.key])
+                }
+                .id(scope.key)
+                .contextMenu {
+                    if test {
+                        Button {
+                            onTest(scope, T1900TestView.longCount)
+                        } label: {
+                            Label("100問モードで開始", systemImage: "text.badge.checkmark")
                         }
                     }
                 }
             }
-            .scrollTargetLayout()
-            .padding(.horizontal, 20)
-            .padding(.bottom, 32)
+            .listStyle(.insetGrouped)
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.y + geometry.contentInsets.top
+            } action: { _, value in
+                tracker.offset = value
+            }
+            .onAppear {
+                guard !tracker.restored else { return }
+                tracker.restored = true
+                let saved = UserDefaults.standard.double(forKey: scrollKey)
+                let index = min(scopes.count - 1, Int(saved / Self.rowHeight))
+                guard index > 0 else { return }
+                let key = scopes[index].key
+                DispatchQueue.main.async { proxy.scrollTo(key, anchor: .top) }
+            }
+            .onDisappear {
+                UserDefaults.standard.set(Double(tracker.offset), forKey: scrollKey)
+            }
         }
-        .scrollPosition(id: position, anchor: .top)
-        .scrollIndicators(.hidden)
     }
 
-    private func row(_ scope: T1900Scope, test: Bool, score: Int?) -> some View {
+    private func row(_ scope: T1900Scope, score: Int?) -> some View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(scope.label)
@@ -329,13 +323,11 @@ private struct T1900Home: View {
                         .font(.headline.weight(.heavy))
                         .monospacedDigit()
                         .foregroundStyle(T1900Color.ink)
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(T1900Color.line)
-                            Capsule()
-                                .fill(T1900Color.accent)
-                                .frame(width: geometry.size.width * CGFloat(score ?? 0) / 100)
-                        }
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(T1900Color.line)
+                        Capsule()
+                            .fill(T1900Color.accent)
+                            .frame(width: 92 * CGFloat(score ?? 0) / 100)
                     }
                     .frame(width: 92, height: 5)
                 }
@@ -345,12 +337,7 @@ private struct T1900Home: View {
                     .foregroundStyle(T1900Color.gray)
             }
         }
-        .frame(minHeight: 64)
-        .contentShape(Rectangle())
-        .background(T1900Color.paper)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(T1900Color.line).frame(height: 1)
-        }
+        .frame(minHeight: 52)
     }
 }
 
@@ -549,11 +536,11 @@ struct T1900TestView: View {
                     .lineLimit(3)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
-                if answered, isAnswer || isPicked {
-                    Image(systemName: isAnswer ? "circle" : "xmark")
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundStyle(tint)
-                }
+                Image(systemName: isAnswer ? "circle" : "xmark")
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 18)
+                    .opacity(answered && (isAnswer || isPicked) ? 1 : 0)
             }
             .padding(.horizontal, 16)
             .frame(maxWidth: .infinity, minHeight: 62)
@@ -849,8 +836,6 @@ private struct T1900CardsView: View {
     @State private var backProgress: CGFloat = 0
     @State private var busy = false
     @State private var held = false
-    @State private var pressAt: Date?
-    @State private var pressedOpen = false
     @State private var shuffled = false
     @State private var riffle = false
 
@@ -993,24 +978,9 @@ private struct T1900CardsView: View {
                 }
                 .buttonStyle(.plain)
                 Spacer()
-                Color.clear
+                T1900TouchArea { setHeld($0) }
                     .frame(width: 76, height: 76)
-                    .contentShape(Circle())
-                    .highPriorityGesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { _ in
-                                guard pressAt == nil else { return }
-                                pressAt = Date()
-                                pressedOpen = held
-                                if !held { setHeld(true) }
-                            }
-                            .onEnded { _ in
-                                let quick = Date().timeIntervalSince(pressAt ?? Date()) < 0.25
-                                pressAt = nil
-                                if pressedOpen || !quick { setHeld(false) }
-                            }
-                    )
-                    .accessibilityLabel("タップで訳を表示")
+                    .accessibilityLabel("長押しで訳を表示")
                     .accessibilityAddTraits(.isButton)
             }
             .padding(.leading, 14)
@@ -1101,6 +1071,36 @@ private struct T1900CardsView: View {
                 busy = false
             }
         }
+    }
+}
+
+private struct T1900TouchArea: UIViewRepresentable {
+    let onChange: (Bool) -> Void
+
+    final class TouchView: UIView {
+        var onChange: ((Bool) -> Void)?
+
+        override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+            onChange?(true)
+        }
+
+        override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+            onChange?(false)
+        }
+
+        override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+            onChange?(false)
+        }
+    }
+
+    func makeUIView(context: Context) -> TouchView {
+        let view = TouchView()
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateUIView(_ view: TouchView, context: Context) {
+        view.onChange = onChange
     }
 }
 
