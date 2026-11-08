@@ -294,7 +294,7 @@ final class WeatherStore {
         do {
             report = try await weather
         } catch {
-            if !Task.isCancelled { self.error = "天気を取得できませんでした。" }
+            if !Task.isCancelled { self.error = "天気を取得できませんでした。\n\(error.localizedDescription)" }
         }
         await rain
     }

@@ -332,6 +332,7 @@ struct WeatherView: View {
         VStack(spacing: 6) {
             Link("天気データ: Open-Meteo.com（CC BY 4.0）", destination: URL(string: "https://open-meteo.com/")!)
             Link("雨雲レーダー: 気象庁 降水ナウキャスト", destination: URL(string: "https://www.jma.go.jp/bosai/nowc/")!)
+            Link("地図: 地理院タイル（国土地理院）", destination: URL(string: "https://maps.gsi.go.jp/development/ichiran.html")!)
             if !clientID.isEmpty {
                 Link("Webサービス by Yahoo! JAPAN", destination: YahooWeather.creditURL)
             }
@@ -499,7 +500,7 @@ struct RadarScreen: View {
                     RadarTimeLabel(frame: radar.current)
                 }
                 RadarLegend()
-                Text("出典：気象庁 降水ナウキャスト")
+                Text("出典：気象庁 降水ナウキャスト・地理院タイル")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -519,6 +520,8 @@ struct RadarScreen: View {
 final class RadarOverlay: MKTileOverlay {
     var index = 0
 }
+
+final class BaseMapOverlay: MKTileOverlay {}
 
 struct RadarMapView: UIViewRepresentable {
     let frames: [RadarFrame]
@@ -540,6 +543,11 @@ struct RadarMapView: UIViewRepresentable {
         map.isRotateEnabled = false
         map.isPitchEnabled = false
         map.cameraZoomRange = MKMapView.CameraZoomRange(minCenterCoordinateDistance: 40_000, maxCenterCoordinateDistance: 4_000_000)
+        let base = BaseMapOverlay(urlTemplate: "https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png")
+        base.minimumZ = 2
+        base.maximumZ = 18
+        base.canReplaceMapContent = true
+        map.addOverlay(base, level: .aboveRoads)
         return map
     }
 
@@ -551,7 +559,7 @@ struct RadarMapView: UIViewRepresentable {
         }
         let ids = frames.map(\.id)
         if coordinator.frameIDs != ids {
-            map.removeOverlays(map.overlays)
+            map.removeOverlays(map.overlays.filter { $0 is RadarOverlay })
             coordinator.renderers = [:]
             coordinator.frameIDs = ids
             coordinator.index = index
@@ -578,6 +586,9 @@ struct RadarMapView: UIViewRepresentable {
         var centered: CLLocationCoordinate2D?
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            if let base = overlay as? BaseMapOverlay {
+                return MKTileOverlayRenderer(tileOverlay: base)
+            }
             guard let tile = overlay as? RadarOverlay else { return MKOverlayRenderer(overlay: overlay) }
             let renderer = MKTileOverlayRenderer(tileOverlay: tile)
             renderer.alpha = tile.index == index ? RadarMapView.alpha : 0
@@ -661,6 +672,7 @@ struct WeatherSettingsSheet: View {
                 Section("データ") {
                     Link("Open-Meteo.com（CC BY 4.0）", destination: URL(string: "https://open-meteo.com/")!)
                     Link("気象庁 降水ナウキャスト", destination: URL(string: "https://www.jma.go.jp/bosai/nowc/")!)
+                    Link("地理院タイル（国土地理院）", destination: URL(string: "https://maps.gsi.go.jp/development/ichiran.html")!)
                     Link("Webサービス by Yahoo! JAPAN", destination: YahooWeather.creditURL)
                 }
                 .font(.footnote)

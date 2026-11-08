@@ -142,6 +142,18 @@ enum OpenMeteo {
             let windDirection10m: Double?
             let surfacePressure: Double?
             let precipitation: Double?
+
+            enum CodingKeys: String, CodingKey {
+                case temperature2m = "temperature_2m"
+                case apparentTemperature = "apparent_temperature"
+                case relativeHumidity2m = "relative_humidity_2m"
+                case weatherCode = "weather_code"
+                case isDay = "is_day"
+                case windSpeed10m = "wind_speed_10m"
+                case windDirection10m = "wind_direction_10m"
+                case surfacePressure = "surface_pressure"
+                case precipitation
+            }
         }
 
         struct Hourly: Decodable {
@@ -150,6 +162,14 @@ enum OpenMeteo {
             let weatherCode: [Int?]
             let isDay: [Int?]
             let precipitationProbability: [Double?]
+
+            enum CodingKeys: String, CodingKey {
+                case time
+                case temperature2m = "temperature_2m"
+                case weatherCode = "weather_code"
+                case isDay = "is_day"
+                case precipitationProbability = "precipitation_probability"
+            }
         }
 
         struct Daily: Decodable {
@@ -163,6 +183,19 @@ enum OpenMeteo {
             let precipitationProbabilityMax: [Double?]
             let precipitationSum: [Double?]
             let relativeHumidity2mMean: [Double?]
+
+            enum CodingKeys: String, CodingKey {
+                case time
+                case weatherCode = "weather_code"
+                case temperature2mMax = "temperature_2m_max"
+                case temperature2mMin = "temperature_2m_min"
+                case sunrise
+                case sunset
+                case uvIndexMax = "uv_index_max"
+                case precipitationProbabilityMax = "precipitation_probability_max"
+                case precipitationSum = "precipitation_sum"
+                case relativeHumidity2mMean = "relative_humidity_2m_mean"
+            }
         }
 
         let timezone: String
@@ -185,9 +218,7 @@ enum OpenMeteo {
         ]
         let (data, response) = try await URLSession.shared.data(from: components.url!)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw URLError(.badServerResponse) }
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        let raw = try decoder.decode(Response.self, from: data)
+        let raw = try JSONDecoder().decode(Response.self, from: data)
         let zone = TimeZone(identifier: raw.timezone) ?? .current
         let minute = formatter("yyyy-MM-dd'T'HH:mm", zone)
         let day = formatter("yyyy-MM-dd", zone)
