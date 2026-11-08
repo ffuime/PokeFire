@@ -192,7 +192,7 @@ struct TemperatureText: View {
     let value: Double
     var size: CGFloat
     var weight: Font.Weight = .regular
-    var unit: CGFloat = 0.45
+    var unit: CGFloat = 0.6
 
     var body: some View {
         Text("\(Int(value.rounded()))\(Text("℃").font(.system(size: size * unit, weight: weight)))")
@@ -285,6 +285,7 @@ struct WeatherView: View {
     @AppStorage(YahooWeather.idKey) private var clientID = ""
     @AppStorage(WeatherScene.debugKey) private var debugScene = ""
     @AppStorage(WeatherScene.debugNightKey) private var debugNight = ""
+    @AppStorage("weather-header-mode") private var headerMode = 0
 
     private var condition: (code: Int, isDay: Bool, scene: WeatherScene) {
         let report = store.report
@@ -411,28 +412,32 @@ struct WeatherView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
             if let report = store.report {
-                TemperatureText(value: report.current.temperature, size: 96, weight: .thin, unit: 0.36)
-                    .contentTransition(.numericText(value: report.current.temperature))
-                HStack(spacing: 6) {
-                    Image(systemName: WeatherCondition.symbol(condition.code, isDay: condition.isDay))
-                        .symbolRenderingMode(.multicolor)
-                    Text(WeatherCondition.label(condition.code))
-                }
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(.white.opacity(0.9))
-                if let today = report.today {
-                    HStack(spacing: 14) {
-                        HStack(spacing: 3) {
-                            Text("最高").font(.system(size: 15, weight: .medium)).opacity(0.7)
-                            TemperatureText(value: today.high, size: 18, weight: .semibold)
-                        }
-                        HStack(spacing: 3) {
-                            Text("最低").font(.system(size: 15, weight: .medium)).opacity(0.7)
-                            TemperatureText(value: today.low, size: 18, weight: .semibold)
-                        }
+                Group {
+                    if headerMode == 1, report.days.count >= 3 {
+                        ThreeDayHeader(report: report)
+                            .transition(.blurReplace)
+                    } else {
+                        currentHeader(report, condition)
+                            .transition(.blurReplace)
                     }
-                    .padding(.top, 2)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    Haptics.play(.light)
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.86)) {
+                        headerMode = headerMode == 1 ? 0 : 1
+                    }
+                }
+                HStack(spacing: 6) {
+                    ForEach(0..<2, id: \.self) { mode in
+                        Capsule()
+                            .fill(.white.opacity(mode == headerMode ? 0.9 : 0.35))
+                            .frame(width: mode == headerMode ? 14 : 6, height: 6)
+                    }
+                }
+                .padding(.top, 10)
+                .animation(.snappy, value: headerMode)
+                .accessibilityHidden(true)
             } else if store.loading {
                 ProgressView()
                     .tint(.white)
@@ -446,6 +451,36 @@ struct WeatherView: View {
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
         .padding(.bottom, 18)
+    }
+
+    private func currentHeader(_ report: WeatherReport, _ condition: (code: Int, isDay: Bool, scene: WeatherScene)) -> some View {
+        VStack(spacing: 2) {
+            TemperatureText(value: report.current.temperature, size: 96, weight: .thin, unit: 0.42)
+                .contentTransition(.numericText(value: report.current.temperature))
+            HStack(spacing: 6) {
+                Image(systemName: WeatherCondition.symbol(condition.code, isDay: condition.isDay))
+                    .symbolRenderingMode(.multicolor)
+                Text(WeatherCondition.label(condition.code))
+            }
+            .font(.system(size: 20, weight: .medium))
+            .foregroundStyle(.white.opacity(0.9))
+            if let today = report.today {
+                HStack(spacing: 14) {
+                    HStack(spacing: 3) {
+                        Text("最高").font(.system(size: 15, weight: .medium)).opacity(0.7)
+                        TemperatureText(value: today.high, size: 18, weight: .semibold)
+                    }
+                    HStack(spacing: 3) {
+                        Text("最低").font(.system(size: 15, weight: .medium)).opacity(0.7)
+                        TemperatureText(value: today.low, size: 18, weight: .semibold)
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint("タップで3日間の天気に切り替えます")
     }
 
     private var rainCard: some View {
@@ -549,9 +584,16 @@ struct WeatherView: View {
                         Divider().overlay(Color.white.opacity(0.15))
                     }
                     HStack(spacing: 10) {
-                        Text(index == 0 ? "今日" : WeatherFormat.time(day.date, report.zone, "E"))
-                            .font(.system(size: 18, weight: index == 0 ? .bold : .semibold))
-                            .frame(width: 42, alignment: .leading)
+                        HStack(alignment: .firstTextBaseline, spacing: 3) {
+                            Text(index == 0 ? "今日" : WeatherFormat.time(day.date, report.zone, "M/d"))
+                                .font(.system(size: 17, weight: index == 0 ? .bold : .semibold))
+                                .monospacedDigit()
+                            Text(WeatherFormat.time(day.date, report.zone, "E"))
+                                .font(.system(size: 11, weight: .light))
+                                .foregroundStyle(DayStyle.weekday(day.date, report.zone).opacity(0.7))
+                        }
+                        .lineLimit(1)
+                        .frame(width: 62, alignment: .leading)
                         VStack(spacing: 1) {
                             Image(systemName: WeatherCondition.symbol(day.code))
                                 .symbolRenderingMode(.multicolor)
@@ -565,10 +607,10 @@ struct WeatherView: View {
                         .frame(width: 40)
                         TemperatureText(value: day.low, size: 18, weight: .medium)
                             .opacity(0.55)
-                            .frame(width: 46, alignment: .trailing)
+                            .frame(width: 44, alignment: .trailing)
                         TemperatureRange(low: low, high: high, dayLow: day.low, dayHigh: day.high, current: index == 0 ? report.current.temperature : nil)
                         TemperatureText(value: day.high, size: 18, weight: .semibold)
-                            .frame(width: 46, alignment: .trailing)
+                            .frame(width: 44, alignment: .trailing)
                     }
                     .frame(height: 50)
                 }
@@ -626,6 +668,95 @@ struct WeatherView: View {
         .font(.caption2.weight(.medium))
         .foregroundStyle(.white.opacity(0.6))
         .padding(.top, 6)
+    }
+}
+
+private enum DayStyle {
+    static func weekday(_ date: Date, _ zone: TimeZone) -> Color {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        switch calendar.component(.weekday, from: date) {
+        case 1: return Color(hex: 0xFF9A8F)
+        case 7: return Color(hex: 0x8FCBFF)
+        default: return .white
+        }
+    }
+
+    static func diff(_ value: Double, _ previous: Double?) -> String? {
+        guard let previous else { return nil }
+        let delta = Int(value.rounded()) - Int(previous.rounded())
+        return delta == 0 ? "±0" : delta > 0 ? "+\(delta)" : "\(delta)"
+    }
+}
+
+private struct ThreeDayHeader: View {
+    let report: WeatherReport
+
+    private static let high = Color(hex: 0xFFA28F)
+    private static let low = Color(hex: 0x8FCBFF)
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            ForEach(0..<3, id: \.self) { index in
+                column(index)
+            }
+        }
+    }
+
+    private func column(_ index: Int) -> some View {
+        let day = report.days[index]
+        let previous: WeatherDay? = index == 0 ? report.yesterday : report.days[index - 1]
+        return VStack(spacing: 8) {
+            VStack(spacing: 1) {
+                Text(["今日", "明日", "明後日"][index])
+                    .font(.system(size: 15, weight: .bold))
+                HStack(spacing: 2) {
+                    Text(WeatherFormat.time(day.date, report.zone, "M/d"))
+                        .font(.system(size: 12, weight: .medium))
+                        .monospacedDigit()
+                        .opacity(0.75)
+                    Text(WeatherFormat.time(day.date, report.zone, "(E)"))
+                        .font(.system(size: 11, weight: .light))
+                        .foregroundStyle(DayStyle.weekday(day.date, report.zone).opacity(0.75))
+                }
+            }
+            Image(systemName: WeatherCondition.symbol(day.code))
+                .symbolRenderingMode(.multicolor)
+                .font(.system(size: 38))
+                .frame(height: 46)
+            Text(WeatherCondition.label(day.code))
+                .font(.system(size: 13, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            HStack(spacing: 3) {
+                Image(systemName: "drop.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(hex: 0x8FD3FF))
+                Text("\(day.precipitationProbability ?? 0)%")
+                    .font(.system(size: 14, weight: .medium))
+                    .monospacedDigit()
+            }
+            HStack(alignment: .top, spacing: 8) {
+                temperature(day.high, previous?.high, Self.high)
+                temperature(day.low, previous?.low, Self.low)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .padding(.horizontal, 4)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .accessibilityElement(children: .combine)
+    }
+
+    private func temperature(_ value: Double, _ previous: Double?, _ color: Color) -> some View {
+        VStack(spacing: 0) {
+            TemperatureText(value: value, size: 22, weight: .medium)
+                .foregroundStyle(color)
+            Text(DayStyle.diff(value, previous).map { "[\($0)]" } ?? " ")
+                .font(.system(size: 11, weight: .medium))
+                .monospacedDigit()
+                .foregroundStyle(color.opacity(0.75))
+        }
     }
 }
 
@@ -972,7 +1103,7 @@ struct RadarScreen: View {
                         Color.clear
                     }
                 }
-                .frame(width: 44)
+                .frame(width: 44, height: expanded ? RadarRain.barHeight : 6)
                 ZStack {
                     RadarRain(radar: radar, expanded: expanded, scale: scale)
                     if expanded && !hasRain {
@@ -982,7 +1113,7 @@ struct RadarScreen: View {
                             .multilineTextAlignment(.center)
                     }
                 }
-                Color.clear.frame(width: 44)
+                Color.clear.frame(width: 44, height: expanded ? RadarRain.barHeight : 6)
             }
             if expanded {
                 RadarLegend()
@@ -1125,6 +1256,7 @@ struct WeatherSettingsSheet: View {
     @AppStorage(WeatherAlerts.enabledKey) private var notify = false
     @AppStorage(WeatherScene.debugKey) private var debugScene = ""
     @AppStorage(WeatherScene.debugNightKey) private var debugNight = ""
+    @State private var editMode: EditMode = .inactive
 
     var body: some View {
         NavigationStack {
@@ -1216,11 +1348,22 @@ struct WeatherSettingsSheet: View {
                 }
                 .font(.footnote)
             }
+            .environment(\.editMode, $editMode)
             .navigationTitle("天気の設定")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
+                    Button {
+                        Haptics.play(.light)
+                        withAnimation(.snappy) {
+                            editMode = editMode.isEditing ? .inactive : .active
+                        }
+                    } label: {
+                        Image(systemName: editMode.isEditing ? "checkmark" : "pencil")
+                            .fontWeight(.semibold)
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .accessibilityLabel(editMode.isEditing ? "完了" : "編集")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     CloseToolbarButton { dismiss() }

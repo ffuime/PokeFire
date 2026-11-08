@@ -119,11 +119,11 @@ struct WeatherRectangularView: View {
                 Gauge(value: values.current, in: values.low...max(values.low + 0.1, values.high)) {
                     Text("気温")
                 } currentValueLabel: {
-                    temperature(values.current, unit: 9)
+                    temperature(values.current, unit: 11)
                 } minimumValueLabel: {
-                    temperature(values.low, unit: 8)
+                    temperature(values.low, unit: 10)
                 } maximumValueLabel: {
-                    temperature(values.high, unit: 8)
+                    temperature(values.high, unit: 10)
                 }
                 .gaugeStyle(.accessoryLinear)
             }
@@ -142,11 +142,11 @@ struct WeatherCircularView: View {
             Gauge(value: values.current, in: values.low...max(values.low + 0.1, values.high)) {
                 Image(systemName: values.symbol)
             } currentValueLabel: {
-                temperature(values.current, unit: 9)
+                temperature(values.current, unit: 11)
             } minimumValueLabel: {
-                temperature(values.low, unit: 8)
+                temperature(values.low, unit: 10)
             } maximumValueLabel: {
-                temperature(values.high, unit: 8)
+                temperature(values.high, unit: 10)
             }
             .gaugeStyle(.accessoryCircular)
         } else {

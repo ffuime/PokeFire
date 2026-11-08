@@ -44,6 +44,7 @@ struct WeatherReport: Codable, Equatable {
     var current: WeatherCurrent
     var hours: [WeatherHour]
     var days: [WeatherDay]
+    var yesterday: WeatherDay?
 
     var zone: TimeZone { TimeZone(identifier: timeZone) ?? .current }
     var today: WeatherDay? { days.first }
@@ -214,6 +215,7 @@ enum OpenMeteo {
             URLQueryItem(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_probability_max,precipitation_sum,relative_humidity_2m_mean"),
             URLQueryItem(name: "timezone", value: "auto"),
             URLQueryItem(name: "forecast_days", value: "10"),
+            URLQueryItem(name: "past_days", value: "1"),
             URLQueryItem(name: "wind_speed_unit", value: "ms"),
         ]
         let (data, response) = try await URLSession.shared.data(from: components.url!)
@@ -246,7 +248,7 @@ enum OpenMeteo {
             )
         }
 
-        let days: [WeatherDay] = raw.daily.time.enumerated().compactMap { index, text in
+        let allDays: [WeatherDay] = raw.daily.time.enumerated().compactMap { index, text in
             guard let date = day.date(from: text) else { return nil }
             return WeatherDay(
                 date: date,
@@ -262,7 +264,12 @@ enum OpenMeteo {
             )
         }
 
-        return WeatherReport(fetchedAt: Date(), timeZone: raw.timezone, current: current, hours: hours, days: days)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let start = calendar.startOfDay(for: Date())
+        let days = allDays.filter { $0.date >= start }
+        let yesterday = allDays.last { $0.date < start }
+        return WeatherReport(fetchedAt: Date(), timeZone: raw.timezone, current: current, hours: hours, days: days, yesterday: yesterday)
     }
 
     private static func value<T>(_ list: [T?], _ index: Int) -> T? {

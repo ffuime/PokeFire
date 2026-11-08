@@ -1,6 +1,7 @@
 name: PokeFire
 options:
   bundleIdPrefix: me.ffui
+  developmentLanguage: ja
   deploymentTarget:
     iOS: "26.0"
 targets:
@@ -47,6 +48,9 @@ targets:
       path: PokeFire/Info.plist
       properties:
         NSPhotoLibraryAddUsageDescription: ポケモンのカード画像を写真に保存するために使用します。
+        CFBundleDevelopmentRegion: ja
+        CFBundleLocalizations:
+          - ja
         NSLocationWhenInUseUsageDescription: 現在地の天気と雨雲を表示するために使用します。
         UIBackgroundModes:
           - fetch
@@ -87,6 +91,9 @@ targets:
       path: Widgets/Info.plist
       properties:
         CFBundleDisplayName: Pokéloot
+        CFBundleDevelopmentRegion: ja
+        CFBundleLocalizations:
+          - ja
         NSWidgetWantsLocation: true
         NSLocationWhenInUseUsageDescription: 現在地の天気をウィジェットに表示するために使用します。
         NSExtension:

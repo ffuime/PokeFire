@@ -138,6 +138,8 @@ struct BoxRoot: View {
                         }
                     } label: {
                         Image(systemName: editing ? "checkmark.circle.fill" : "checkmark.circle")
+                        .contentTransition(.symbolEffect(.replace))
+                            .contentTransition(.symbolEffect(.replace))
                     }
                     .accessibilityLabel(editing ? "選択を終了" : "選択")
                 }
