@@ -702,6 +702,7 @@ private struct RainChart: View {
     }
 }
 
+@MainActor
 private enum RadarText {
     static func relative(_ radar: RadarModel) -> String {
         guard let frame = radar.current, radar.frames.indices.contains(radar.nowIndex) else { return "" }
