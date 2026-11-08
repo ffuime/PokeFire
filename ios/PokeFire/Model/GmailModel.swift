@@ -348,19 +348,148 @@ enum MailText {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    static func decode(_ data: Data, charset: String?) -> String {
-        var encodings: [String.Encoding] = []
-        if let charset {
-            let cf = CFStringConvertIANACharSetNameToEncoding(charset as CFString)
-            if cf != kCFStringEncodingInvalidId {
-                encodings.append(String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(cf)))
+    private static func core(_ value: UInt32) -> String.Encoding {
+        String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(value))
+    }
+
+    private static var jis: [String.Encoding] { [.iso2022JP, core(0x0821), core(0x0822), core(0x0823)] }
+    private static var sjis: [String.Encoding] { [core(0x0421), .shiftJIS] }
+    private static let weak: Set<String> = ["us-ascii", "ascii", "iso-8859-1", "latin1", "windows-1252", "cp1252"]
+
+    static func encodings(_ charset: String?) -> [String.Encoding] {
+        guard let name = charset?.trimmingCharacters(in: CharacterSet(charactersIn: "\"' ")).lowercased(), !name.isEmpty else { return [] }
+        switch name {
+        case "utf-8", "utf8", "unicode-1-1-utf-8", "x-unicode20utf8":
+            return [.utf8]
+        case "shift_jis", "shift-jis", "sjis", "x-sjis", "s-jis", "cp932", "ms932", "windows-31j", "x-ms-cp932", "ms_kanji", "csshiftjis", "cswindows31j":
+            return sjis
+        case "euc-jp", "x-euc-jp", "eucjp", "x-euc", "cseucpkdfmtjapanese":
+            return [.japaneseEUC]
+        case "jis", "csiso2022jp", "x-iso-2022-jp":
+            return jis
+        default:
+            if name.hasPrefix("iso-2022-jp") { return jis }
+            let value = CFStringConvertIANACharSetNameToEncoding(name as CFString)
+            return value == kCFStringEncodingInvalidId ? [] : [String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(value))]
+        }
+    }
+
+    private static func score(_ text: String) -> Int {
+        var total = 0
+        for scalar in text.unicodeScalars.prefix(20000) {
+            switch scalar.value {
+            case 0x3041...0x309F: total += 3
+            case 0x30A0...0x30FF: total += 2
+            case 0x4E00...0x9FFF, 0x3000...0x303F, 0xFF01...0xFF5E: total += 1
+            case 0xFF61...0xFF9F: total -= 3
+            case 0xE000...0xF8FF, 0xFFFD, 0x80...0x9F: total -= 6
+            case 0x00...0x08, 0x0B, 0x0C, 0x0E...0x1F: total -= 6
+            default: break
             }
         }
-        encodings += [.utf8, .shiftJIS, .japaneseEUC, .iso2022JP, .isoLatin1]
-        for encoding in encodings {
-            if let text = String(data: data, encoding: encoding) { return text }
+        return total
+    }
+
+    static func decode(_ data: Data, charset: String?) -> String {
+        guard !data.isEmpty else { return "" }
+        let declared = encodings(charset)
+        let high = data.contains { $0 >= 0x80 }
+        if !high {
+            if data.contains(0x1B) {
+                for encoding in jis {
+                    if let text = String(data: data, encoding: encoding), !text.contains("\u{1B}") { return text }
+                }
+            }
+            for encoding in declared where encoding != .utf8 {
+                if let text = String(data: data, encoding: encoding) { return text }
+            }
+            return String(decoding: data, as: UTF8.self)
         }
-        return ""
+        if let text = String(data: data, encoding: .utf8) { return text }
+        let name = charset?.lowercased() ?? ""
+        if !declared.isEmpty, !weak.contains(name), !declared.contains(.japaneseEUC), !declared.contains(.shiftJIS) {
+            for encoding in declared {
+                if let text = String(data: data, encoding: encoding) { return text }
+            }
+        }
+        var best: (text: String, score: Int)?
+        for encoding in declared + sjis + [.japaneseEUC] {
+            guard let text = String(data: data, encoding: encoding) else { continue }
+            var value = score(text)
+            if declared.contains(encoding) { value += 4 }
+            if best == nil || value > best!.score { best = (text, value) }
+        }
+        if let best { return best.text }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func quoted(_ text: String) -> Data {
+        let chars = Array(text.utf8)
+        var bytes: [UInt8] = []
+        var index = 0
+        while index < chars.count {
+            let char = chars[index]
+            if char == UInt8(ascii: "_") {
+                bytes.append(0x20)
+                index += 1
+            } else if char == UInt8(ascii: "="), index + 2 < chars.count,
+                      let hex = String(bytes: chars[(index + 1)...(index + 2)], encoding: .ascii),
+                      let value = UInt8(hex, radix: 16) {
+                bytes.append(value)
+                index += 3
+            } else {
+                bytes.append(char)
+                index += 1
+            }
+        }
+        return Data(bytes)
+    }
+
+    static func header(_ value: String) -> String {
+        guard value.contains("=?"),
+              let regex = try? NSRegularExpression(pattern: "=\\?([^?\\s]+)\\?([BbQq])\\?([^?\\s]*)\\?=") else { return value }
+        let source = value as NSString
+        var result = ""
+        var cursor = 0
+        var pending: (charset: String, data: Data)?
+        func flush() {
+            if let current = pending { result += decode(current.data, charset: current.charset) }
+            pending = nil
+        }
+        for match in regex.matches(in: value, range: NSRange(location: 0, length: source.length)) {
+            let between = source.substring(with: NSRange(location: cursor, length: match.range.location - cursor))
+            let adjacent = pending != nil && between.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            let charset = source.substring(with: match.range(at: 1)).components(separatedBy: "*").first ?? ""
+            let mode = source.substring(with: match.range(at: 2)).uppercased()
+            let text = source.substring(with: match.range(at: 3))
+            var bytes: Data?
+            if mode == "B" {
+                var padded = text
+                while padded.count % 4 != 0 { padded += "=" }
+                bytes = Data(base64Encoded: padded, options: .ignoreUnknownCharacters)
+            } else {
+                bytes = quoted(text)
+            }
+            if !adjacent {
+                flush()
+                result += between
+            }
+            if let bytes {
+                if let current = pending, current.charset.lowercased() == charset.lowercased() {
+                    pending = (current.charset, current.data + bytes)
+                } else {
+                    flush()
+                    pending = (charset, bytes)
+                }
+            } else {
+                flush()
+                result += source.substring(with: match.range)
+            }
+            cursor = match.range.location + match.range.length
+        }
+        flush()
+        result += source.substring(from: cursor)
+        return result
     }
 
     static func charset(_ contentType: String?) -> String? {
@@ -503,7 +632,7 @@ enum GmailAPI {
         guard let id = json["id"] as? String else { return nil }
         let headers = (json["payload"] as? [String: Any])?["headers"] as? [[String: Any]] ?? []
         func header(_ name: String) -> String {
-            headers.first { ($0["name"] as? String)?.caseInsensitiveCompare(name) == .orderedSame }?["value"] as? String ?? ""
+            MailText.header(headers.first { ($0["name"] as? String)?.caseInsensitiveCompare(name) == .orderedSame }?["value"] as? String ?? "")
         }
         let from = MailText.address(header("From"))
         let millis = Double(json["internalDate"] as? String ?? "") ?? 0
@@ -528,7 +657,7 @@ enum GmailAPI {
         var attachments: [MailAttachment] = []
         let payload = json["payload"] as? [String: Any] ?? [:]
         let topHeaders = (payload["headers"] as? [[String: Any]] ?? []).map {
-            (name: $0["name"] as? String ?? "", value: $0["value"] as? String ?? "")
+            (name: $0["name"] as? String ?? "", value: MailText.header($0["value"] as? String ?? ""))
         }
         func walk(_ part: [String: Any]) {
             let mime = (part["mimeType"] as? String ?? "").lowercased()
@@ -546,7 +675,7 @@ enum GmailAPI {
                 let cid = header("Content-ID")?.trimmingCharacters(in: CharacterSet(charactersIn: "<> "))
                 attachments.append(MailAttachment(
                     attachmentID: attachmentID,
-                    filename: filename.isEmpty ? "添付ファイル" : filename,
+                    filename: filename.isEmpty ? "添付ファイル" : MailText.header(filename),
                     mimeType: mime,
                     size: body["size"] as? Int ?? 0,
                     contentID: cid
@@ -604,6 +733,8 @@ final class GmailStore {
     var mailbox: Mailbox = .inbox
     var query = ""
     var unread: [String: Int] = [:]
+    var boxUnread: [Mailbox: Int] = [:]
+    var markingRead = false
     let all = MailFeed()
     let starred = MailFeed()
     var toast: MailToast?
@@ -658,6 +789,11 @@ final class GmailStore {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         guard trimmed != query else { return }
         query = trimmed
+        for feed in [all, starred] {
+            feed.items = []
+            feed.error = nil
+            feed.loading = true
+        }
         reloadAll()
     }
 
@@ -680,14 +816,9 @@ final class GmailStore {
         var result: [Mailbox: CategorySummary] = [:]
         for box in Mailbox.categories {
             var summary = CategorySummary()
-            let unreadQuery = [
-                URLQueryItem(name: "labelIds", value: box.label), URLQueryItem(name: "labelIds", value: "INBOX"),
-                URLQueryItem(name: "labelIds", value: "UNREAD"), URLQueryItem(name: "maxResults", value: "3"),
-            ]
-            if let json = try? GmailAPI.object(try await call(email, "messages", query: unreadQuery)) {
-                let ids = (json["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
-                summary.unread = ids.isEmpty ? 0 : max(ids.count, json["resultSizeEstimate"] as? Int ?? ids.count)
-                var listed = ids
+            if let ids = await messageIDs(email, labels: [box.label, "INBOX", "UNREAD"]) {
+                summary.unread = ids.count
+                var listed = Array(ids.prefix(3))
                 if listed.isEmpty {
                     let latest = [
                         URLQueryItem(name: "labelIds", value: box.label), URLQueryItem(name: "labelIds", value: "INBOX"),
@@ -783,10 +914,94 @@ final class GmailStore {
                 unread[email] = json["messagesUnread"] as? Int ?? 0
             }
         }
+        guard let email = selected else {
+            boxUnread = [:]
+            return
+        }
+        var counts: [Mailbox: Int] = [:]
+        counts[.inbox] = await messageIDs(email, labels: ["INBOX", "CATEGORY_PERSONAL", "UNREAD"])?.count
+        if let data = try? await call(email, "labels/SPAM"), let json = try? GmailAPI.object(data) {
+            counts[.spam] = json["messagesUnread"] as? Int ?? 0
+        }
+        var groups: [Mailbox: Int] = [:]
+        for box in Mailbox.categories {
+            groups[box] = await messageIDs(email, labels: [box.label, "INBOX", "UNREAD"])?.count
+        }
+        guard selected == email else { return }
+        boxUnread = counts
+        for (box, count) in groups {
+            categories[box, default: CategorySummary()].unread = count
+        }
+    }
+
+    private func messageIDs(_ email: String, labels: [String], spamTrash: Bool = false, search: String = "", limit: Int = 10000) async -> [String]? {
+        var ids: [String] = []
+        var page: String?
+        repeat {
+            var items = labels.map { URLQueryItem(name: "labelIds", value: $0) }
+            items.append(URLQueryItem(name: "maxResults", value: "500"))
+            items.append(URLQueryItem(name: "fields", value: "messages/id,nextPageToken"))
+            if spamTrash { items.append(URLQueryItem(name: "includeSpamTrash", value: "true")) }
+            if !search.isEmpty { items.append(URLQueryItem(name: "q", value: search)) }
+            if let page { items.append(URLQueryItem(name: "pageToken", value: page)) }
+            guard let data = try? await call(email, "messages", query: items), let json = try? GmailAPI.object(data) else { return nil }
+            ids += (json["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+            page = json["nextPageToken"] as? String
+        } while page != nil && ids.count < limit
+        return ids
+    }
+
+    private func labels(for feed: MailFeed) -> [String] {
+        if let category = feed.category { return [category.label, "INBOX"] }
+        if feed === starred { return ["STARRED"] }
+        if mailbox == .inbox { return ["INBOX", "CATEGORY_PERSONAL"] }
+        return [mailbox.label]
+    }
+
+    private func spamTrash(_ feed: MailFeed) -> Bool {
+        feed.category == nil && feed !== starred && mailbox.includesSpamTrash
+    }
+
+    func markAllRead(_ feed: MailFeed) async {
+        guard !markingRead else { return }
+        markingRead = true
+        defer { markingRead = false }
+        let labels = self.labels(for: feed) + ["UNREAD"]
+        let includeSpamTrash = self.spamTrash(feed)
+        var marked = Set<String>()
+        var failed = false
+        for email in scope(feed) {
+            guard let ids = await messageIDs(email, labels: labels, spamTrash: includeSpamTrash, search: query) else {
+                failed = true
+                continue
+            }
+            var start = 0
+            while start < ids.count {
+                let chunk = Array(ids[start..<min(start + 1000, ids.count)])
+                start += 1000
+                let body: [String: Any] = ["ids": chunk, "removeLabelIds": ["UNREAD"]]
+                if (try? await call(email, "messages/batchModify", method: "POST", json: body)) != nil {
+                    for id in chunk { marked.insert(email + "/" + id) }
+                } else {
+                    failed = true
+                }
+            }
+        }
+        for target in feeds {
+            for index in target.items.indices where marked.contains(target.items[index].id) {
+                target.items[index].labels.remove("UNREAD")
+            }
+        }
+        if marked.isEmpty {
+            showToast(failed ? "既読にできませんでした" : "未読のメールはありません")
+        } else {
+            Haptics.play(.success)
+            showToast("\(marked.count)件を既読にしました")
+        }
+        await refreshUnread()
     }
 
     func load(_ feed: MailFeed, reset: Bool) async {
-        let starredFeed = feed === starred
         if reset {
             feed.generation += 1
             feed.tokens = [:]
@@ -804,17 +1019,8 @@ final class GmailStore {
         }
         feed.loading = true
         defer { if feed.generation == generation { feed.loading = false } }
-        let labels: [String]
-        if let category = feed.category {
-            labels = [category.label, "INBOX"]
-        } else if starredFeed {
-            labels = ["STARRED"]
-        } else if mailbox == .inbox {
-            labels = ["INBOX", "CATEGORY_PERSONAL"]
-        } else {
-            labels = [mailbox.label]
-        }
-        let spamTrash = feed.category == nil && !starredFeed && mailbox.includesSpamTrash
+        let labels = self.labels(for: feed)
+        let spamTrash = self.spamTrash(feed)
         var collected: [MailItem] = []
         var nextTokens = feed.tokens
         var failure: Error?
@@ -891,6 +1097,18 @@ final class GmailStore {
         guard item.unread == read else { return }
         update(item.id) { $0.labels.set("UNREAD", !read) }
         unread[item.account, default: 0] += read ? -1 : 1
+        if item.account == selected {
+            let delta = read ? -1 : 1
+            if item.labels.contains("INBOX"), item.labels.contains("CATEGORY_PERSONAL") {
+                boxUnread[.inbox] = max(0, (boxUnread[.inbox] ?? 0) + delta)
+            }
+            if item.labels.contains("SPAM") {
+                boxUnread[.spam] = max(0, (boxUnread[.spam] ?? 0) + delta)
+            }
+            for box in Mailbox.categories where item.labels.contains(box.label) && item.labels.contains("INBOX") {
+                categories[box, default: CategorySummary()].unread = max(0, (categories[box]?.unread ?? 0) + delta)
+            }
+        }
         Task {
             let ok = await modify(item, add: read ? [] : ["UNREAD"], remove: read ? ["UNREAD"] : [])
             if !ok {

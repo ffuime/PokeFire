@@ -22,13 +22,21 @@ struct PokeFireApp: App {
                 .tint(Palette.accent)
                 .onOpenURL { url in
                     if url.host == "the1900" {
-                        launch.open = true
+                        launch.handle(The1900Launch.shortcutType)
+                    } else if url.host == "gmail" {
+                        launch.handle(The1900Launch.gmailShortcutType)
                     } else {
                         model.open(url)
                     }
                 }
                 .fullScreenCover(isPresented: $launch.open) {
                     The1900View()
+                }
+                .background {
+                    Color.clear
+                        .fullScreenCover(isPresented: $launch.gmail) {
+                            GmailView()
+                        }
                 }
         }
     }

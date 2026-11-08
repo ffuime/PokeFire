@@ -101,6 +101,7 @@ struct GmailView: View {
                     }
                 }
             }
+            .background(PopGestureEnabler())
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: MailItem.self) { item in
                 MailDetailView(item: item) { request in compose = request }
@@ -117,7 +118,7 @@ struct GmailView: View {
                     .gesture(
                         DragGesture(minimumDistance: 8)
                             .onChanged { value in
-                                if value.translation.width > 36, abs(value.translation.height) < value.translation.width {
+                                if !showSidebar, value.translation.width > 36, abs(value.translation.height) < value.translation.width {
                                     setSidebar(true)
                                 }
                             }
@@ -154,7 +155,7 @@ struct GmailView: View {
     }
 
     private func setSidebar(_ open: Bool) {
-        Haptics.play(.light)
+        guard showSidebar != open else { return }
         withAnimation(.spring(response: 0.38, dampingFraction: 0.88)) { showSidebar = open }
     }
 
@@ -296,7 +297,7 @@ private struct MailListView: View {
             }
         }
         .safeAreaBar(edge: .top, spacing: 0) { searchBar }
-        .overlay(alignment: .bottom) { GmailBottomControls(onCompose: onCompose) }
+        .overlay(alignment: .bottom) { GmailBottomControls(feed: feed, onCompose: onCompose) }
     }
 
     private var searchBar: some View {
@@ -319,7 +320,11 @@ private struct MailListView: View {
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .onSubmit { store.search(text) }
-            if !text.isEmpty {
+            if feed.loading, feed.items.isEmpty, !store.query.isEmpty {
+                ProgressView()
+                    .frame(width: 32, height: 44)
+                    .accessibilityLabel("検索中")
+            } else if !text.isEmpty {
                 Button {
                     text = ""
                     store.search("")
@@ -391,14 +396,20 @@ private struct MailFeedRows: View {
                 .tint(.blue)
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                Button(role: .destructive) {
-                    store.trash(item)
-                } label: {
-                    if restores {
+                if restores {
+                    Button {
+                        store.trash(item)
+                    } label: {
                         Label("戻す", systemImage: "arrow.uturn.backward")
-                    } else {
+                    }
+                    .tint(.green)
+                } else {
+                    Button(role: .destructive) {
+                        store.trash(item)
+                    } label: {
                         Label("削除", systemImage: "trash")
                     }
+                    .tint(.red)
                 }
             }
             .onAppear {
@@ -437,22 +448,32 @@ private struct MailFeedEmpty: View {
 }
 
 private struct GmailBottomControls: View {
+    let feed: MailFeed
     let onCompose: () -> Void
     @State private var store = GmailStore.shared
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 12) {
-            Button {
-                Haptics.play(.light)
-                onCompose()
+            Menu {
+                Button {
+                    Task { await store.markAllRead(feed) }
+                } label: {
+                    Label("すべて既読にする", systemImage: "envelope.open")
+                }
+                .disabled(store.markingRead)
             } label: {
                 Image(systemName: "pencil")
                     .font(.system(size: 22, weight: .semibold))
                     .frame(width: 56, height: 56)
+            } primaryAction: {
+                Haptics.play(.light)
+                onCompose()
             }
+            .menuStyle(.button)
             .buttonStyle(.glassProminent)
             .buttonBorderShape(.circle)
             .accessibilityLabel("作成")
+            .accessibilityHint("長押しでその他の操作を表示します")
             if let toast = store.toast {
                 HStack(spacing: 12) {
                     Text(toast.text)
@@ -471,6 +492,7 @@ private struct GmailBottomControls: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, 20)
         .padding(.bottom, 20)
         .animation(.snappy(duration: 0.3), value: store.toast)
@@ -542,12 +564,18 @@ private struct CategoryListView: View {
     var body: some View {
         let feed = store.feed(for: box)
         List {
+            Text(box.title)
+                .font(.system(size: 34, weight: .bold))
+                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 6, trailing: 16))
+                .listRowSeparator(.hidden)
+                .accessibilityAddTraits(.isHeader)
             MailFeedRows(feed: feed, recipient: false, restores: false)
         }
         .listStyle(.plain)
-        .navigationTitle(box.title)
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar(.visible, for: .navigationBar)
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaBar(edge: .top, spacing: 0) {
+            GmailTopBar { EmptyView() }
+        }
         .refreshable {
             await store.load(feed, reset: true)
             await store.refreshCategories()
@@ -558,7 +586,7 @@ private struct CategoryListView: View {
                 MailFeedEmpty(feed: feed, starred: false)
             }
         }
-        .overlay(alignment: .bottom) { GmailBottomControls(onCompose: onCompose) }
+        .overlay(alignment: .bottom) { GmailBottomControls(feed: feed, onCompose: onCompose) }
         .task {
             if feed.items.isEmpty { await store.load(feed, reset: true) }
         }
@@ -646,8 +674,8 @@ private struct GmailSidebar: View {
             .padding(.bottom, 14)
             row(.allInboxes, count: store.unread.values.reduce(0, +))
             divider
-            row(.inbox, count: store.selected.flatMap { store.unread[$0] } ?? 0)
-            row(.spam)
+            row(.inbox, count: store.boxUnread[.inbox] ?? 0)
+            row(.spam, count: store.boxUnread[.spam] ?? 0)
             row(.trash)
             divider
             row(.sent)
@@ -689,7 +717,7 @@ private struct GmailSidebar: View {
                     .font(.system(size: 16, weight: active ? .semibold : .regular))
                 Spacer(minLength: 4)
                 if count > 0 {
-                    Text("\(count)")
+                    Text(count > 9999 ? "9999+" : "\(count)")
                         .font(.system(size: 13, weight: .semibold))
                         .monospacedDigit()
                 }
@@ -801,10 +829,9 @@ private struct MailDetailView: View {
             .padding(.top, 8)
             .padding(.bottom, 32)
         }
-        .toolbar(.visible, for: .navigationBar)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+        .toolbar(.hidden, for: .navigationBar)
+        .safeAreaBar(edge: .top, spacing: 0) {
+            GmailTopBar {
                 Menu {
                     Button {
                         onCompose(reply())
@@ -835,7 +862,7 @@ private struct MailDetailView: View {
                         Label("\(current.fromName)をブロック", systemImage: "hand.raised")
                     }
                 } label: {
-                    Image(systemName: "ellipsis")
+                    GlassIcon(symbol: "ellipsis")
                 }
                 .accessibilityLabel("その他の操作")
             }
@@ -994,7 +1021,8 @@ private struct MailDetailView: View {
     }
 
     private func page(_ content: MailContent) -> String {
-        let inner = content.html.isEmpty ? "<div class='plain'>\(linkify(escape(content.plain)))</div>" : content.html
+        let html = content.html.replacingOccurrences(of: "<meta[^>]*charset[^>]*>", with: "", options: [.regularExpression, .caseInsensitive])
+        let inner = html.isEmpty ? "<div class='plain'>\(linkify(escape(content.plain)))</div>" : html
         return """
         <!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1, user-scalable=no'>
         <style>html,body{margin:0;padding:0;background:#ffffff;color:#1c1c1e;font-family:-apple-system,sans-serif;font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%;overflow-wrap:anywhere}img{max-width:100%;height:auto}.plain{white-space:pre-wrap;padding:2px 0}a{color:#0b57d0}blockquote{margin-left:8px;padding-left:10px;border-left:3px solid #d0d7de}</style>
@@ -1059,6 +1087,79 @@ private struct MailDetailView: View {
             onCompose(ComposeRequest(title: "登録解除", draft: draft))
         } else {
             openURL(url)
+        }
+    }
+}
+
+private struct GlassIcon: View {
+    let symbol: String
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundStyle(.primary)
+            .frame(width: 44, height: 44)
+            .contentShape(Circle())
+            .glassEffect(.regular.interactive(), in: Circle())
+    }
+}
+
+private struct GmailTopBar<Trailing: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button {
+                dismiss()
+            } label: {
+                GlassIcon(symbol: "chevron.left")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("戻る")
+            Spacer(minLength: 0)
+            trailing
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 6)
+    }
+}
+
+@MainActor
+private final class PopGestureDelegate: NSObject, UIGestureRecognizerDelegate {
+    weak var navigation: UINavigationController?
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        (navigation?.viewControllers.count ?? 0) > 1
+    }
+}
+
+private struct PopGestureEnabler: UIViewRepresentable {
+    func makeUIView(context: Context) -> Probe { Probe() }
+
+    func updateUIView(_ view: Probe, context: Context) {}
+
+    final class Probe: UIView {
+        private let handler = PopGestureDelegate()
+
+        override func didMoveToWindow() {
+            super.didMoveToWindow()
+            isUserInteractionEnabled = false
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let navigation = self.navigation else { return }
+                self.handler.navigation = navigation
+                navigation.interactivePopGestureRecognizer?.isEnabled = true
+                navigation.interactivePopGestureRecognizer?.delegate = self.handler
+            }
+        }
+
+        private var navigation: UINavigationController? {
+            var responder: UIResponder? = next
+            while let current = responder {
+                if let navigation = current as? UINavigationController { return navigation }
+                responder = current.next
+            }
+            return nil
         }
     }
 }

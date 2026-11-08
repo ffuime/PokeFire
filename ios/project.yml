@@ -52,6 +52,9 @@ targets:
           - UIApplicationShortcutItemType: me.ffui.pokefire.the1900
             UIApplicationShortcutItemTitle: THE 1900
             UIApplicationShortcutItemIconSymbolName: character.book.closed
+          - UIApplicationShortcutItemType: me.ffui.pokefire.gmail
+            UIApplicationShortcutItemTitle: Gmail
+            UIApplicationShortcutItemIconSymbolName: envelope
         CFBundleURLTypes:
           - CFBundleURLName: me.ffui.pokefire
             CFBundleURLSchemes:

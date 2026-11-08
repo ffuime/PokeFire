@@ -7,8 +7,25 @@ import UIKit
 final class The1900Launch {
     static let shared = The1900Launch()
     static let shortcutType = "me.ffui.pokefire.the1900"
+    static let gmailShortcutType = "me.ffui.pokefire.gmail"
 
     var open = false
+    var gmail = false
+
+    @discardableResult
+    func handle(_ type: String) -> Bool {
+        switch type {
+        case Self.shortcutType:
+            gmail = false
+            open = true
+        case Self.gmailShortcutType:
+            open = false
+            gmail = true
+        default:
+            return false
+        }
+        return true
+    }
 }
 
 struct OpenThe1900Intent: AppIntent {
@@ -23,6 +40,18 @@ struct OpenThe1900Intent: AppIntent {
     }
 }
 
+struct OpenGmailIntent: AppIntent {
+    static let title: LocalizedStringResource = "Gmailを開く"
+    static let description = IntentDescription("Pokéloot の Gmail を直接開きます。")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        The1900Launch.shared.handle(The1900Launch.gmailShortcutType)
+        return .result()
+    }
+}
+
 struct PokelootShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -30,6 +59,12 @@ struct PokelootShortcuts: AppShortcutsProvider {
             phrases: ["\(.applicationName)でTHE 1900を開く"],
             shortTitle: "THE 1900",
             systemImageName: "character.book.closed"
+        )
+        AppShortcut(
+            intent: OpenGmailIntent(),
+            phrases: ["\(.applicationName)でGmailを開く"],
+            shortTitle: "Gmail",
+            systemImageName: "envelope"
         )
     }
 }
@@ -40,8 +75,8 @@ final class PokelootAppDelegate: NSObject, UIApplicationDelegate {
         configurationForConnecting connectingSceneSession: UISceneSession,
         options: UIScene.ConnectionOptions
     ) -> UISceneConfiguration {
-        if options.shortcutItem?.type == The1900Launch.shortcutType {
-            The1900Launch.shared.open = true
+        if let type = options.shortcutItem?.type {
+            The1900Launch.shared.handle(type)
         }
         let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
         configuration.delegateClass = PokelootSceneDelegate.self
@@ -55,8 +90,6 @@ final class PokelootSceneDelegate: NSObject, UIWindowSceneDelegate {
         performActionFor shortcutItem: UIApplicationShortcutItem,
         completionHandler: @escaping (Bool) -> Void
     ) {
-        let matched = shortcutItem.type == The1900Launch.shortcutType
-        if matched { The1900Launch.shared.open = true }
-        completionHandler(matched)
+        completionHandler(The1900Launch.shared.handle(shortcutItem.type))
     }
 }
