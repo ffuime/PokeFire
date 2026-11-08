@@ -82,7 +82,7 @@ struct GmailView: View {
     @State private var showSidebar = false
     @State private var showSettings = false
     @State private var compose: ComposeRequest?
-    @State private var path: [MailItem] = []
+    @State private var path = NavigationPath()
     @AppStorage(GmailAuth.clientKey) private var clientID = ""
 
     var body: some View {
@@ -104,6 +104,25 @@ struct GmailView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: MailItem.self) { item in
                 MailDetailView(item: item) { request in compose = request }
+            }
+            .navigationDestination(for: Mailbox.self) { box in
+                CategoryListView(box: box) { compose = newMail() }
+            }
+        }
+        .overlay(alignment: .leading) {
+            if !store.accounts.isEmpty, path.isEmpty, !showSidebar {
+                Color.clear
+                    .frame(width: 16)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 8)
+                            .onChanged { value in
+                                if value.translation.width > 36, abs(value.translation.height) < value.translation.width {
+                                    setSidebar(true)
+                                }
+                            }
+                    )
+                    .accessibilityHidden(true)
             }
         }
         .overlay { sidebar }
@@ -129,7 +148,8 @@ struct GmailView: View {
             onSidebar: { setSidebar(true) },
             onCompose: { compose = newMail() },
             onAddAccount: { Task { await store.signIn(with: webAuth) } },
-            onSettings: { showSettings = true }
+            onSettings: { showSettings = true },
+            onCategory: { box in path.append(box) }
         )
     }
 
@@ -238,51 +258,24 @@ private struct MailListView: View {
     let onCompose: () -> Void
     let onAddAccount: () -> Void
     let onSettings: () -> Void
+    let onCategory: (Mailbox) -> Void
     @State private var store = GmailStore.shared
     @State private var text = GmailStore.shared.query
     @FocusState private var searching: Bool
 
+    private var showsCategories: Bool {
+        !starred && store.mailbox == .inbox && store.query.isEmpty
+    }
+
     var body: some View {
         List {
+            if showsCategories {
+                CategoryCard(onOpen: onCategory)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
+            }
             Section {
-                ForEach(feed.items) { item in
-                    ZStack {
-                        NavigationLink(value: item) { EmptyView() }
-                            .opacity(0)
-                        MailRow(item: item, recipient: !starred && store.mailbox.showsRecipient)
-                    }
-                    .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
-                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                        Button {
-                            Haptics.play(.light)
-                            store.setRead(item, item.unread)
-                        } label: {
-                            Label(item.unread ? "既読にする" : "未読にする", systemImage: item.unread ? "envelope.open.fill" : "envelope.badge.fill")
-                        }
-                        .tint(.blue)
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            store.trash(item)
-                        } label: {
-                            if store.mailbox == .trash && !starred {
-                                Label("戻す", systemImage: "arrow.uturn.backward")
-                            } else {
-                                Label("削除", systemImage: "trash")
-                            }
-                        }
-                    }
-                    .onAppear {
-                        if item.id == feed.items.last?.id {
-                            Task { await store.load(feed, reset: false) }
-                        }
-                    }
-                }
-                if feed.loading, !feed.items.isEmpty {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .listRowSeparator(.hidden)
-                }
+                MailFeedRows(feed: feed, recipient: !starred && store.mailbox.showsRecipient, restores: !starred && store.mailbox == .trash)
             } header: {
                 Text(starred ? "スター付き" : store.mailbox.title)
                     .font(.system(size: 13, weight: .semibold))
@@ -291,27 +284,19 @@ private struct MailListView: View {
         }
         .listStyle(.plain)
         .refreshable {
-            await store.load(feed, reset: true)
-            await store.refreshUnread()
+            async let mails: Void = store.load(feed, reset: true)
+            async let counts: Void = store.refreshUnread()
+            async let groups: Void = store.refreshCategories()
+            _ = await (mails, counts, groups)
             Haptics.play(.success)
         }
         .overlay {
-            if feed.items.isEmpty {
-                if feed.loading {
-                    ProgressView()
-                } else if let error = feed.error {
-                    ContentUnavailableView("読み込めませんでした", systemImage: "exclamationmark.triangle", description: Text(error))
-                } else {
-                    ContentUnavailableView(
-                        starred ? "スター付きのメールはありません" : store.query.isEmpty ? "メールはありません" : "一致するメールはありません",
-                        systemImage: starred ? "star" : store.query.isEmpty ? store.mailbox.symbol : "magnifyingglass"
-                    )
-                }
+            if feed.items.isEmpty, !showsCategories || feed.error != nil || feed.loading {
+                MailFeedEmpty(feed: feed, starred: starred)
             }
         }
         .safeAreaBar(edge: .top, spacing: 0) { searchBar }
-        .overlay(alignment: .bottom) { bottomControls }
-        .animation(.snappy(duration: 0.3), value: store.toast)
+        .overlay(alignment: .bottom) { GmailBottomControls(onCompose: onCompose) }
     }
 
     private var searchBar: some View {
@@ -380,22 +365,94 @@ private struct MailListView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 6)
     }
+}
 
-    private var bottomControls: some View {
-        VStack(alignment: .trailing, spacing: 10) {
+private struct MailFeedRows: View {
+    let feed: MailFeed
+    let recipient: Bool
+    let restores: Bool
+    @State private var store = GmailStore.shared
+
+    var body: some View {
+        ForEach(feed.items) { item in
+            ZStack {
+                NavigationLink(value: item) { EmptyView() }
+                    .opacity(0)
+                MailRow(item: item, recipient: recipient)
+            }
+            .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 10, trailing: 16))
+            .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                Button {
+                    Haptics.play(.light)
+                    store.setRead(item, item.unread)
+                } label: {
+                    Label(item.unread ? "既読にする" : "未読にする", systemImage: item.unread ? "envelope.open.fill" : "envelope.badge.fill")
+                }
+                .tint(.blue)
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                Button(role: .destructive) {
+                    store.trash(item)
+                } label: {
+                    if restores {
+                        Label("戻す", systemImage: "arrow.uturn.backward")
+                    } else {
+                        Label("削除", systemImage: "trash")
+                    }
+                }
+            }
+            .onAppear {
+                if item.id == feed.items.last?.id {
+                    Task { await store.load(feed, reset: false) }
+                }
+            }
+        }
+        if feed.loading, !feed.items.isEmpty {
+            ProgressView()
+                .frame(maxWidth: .infinity)
+                .listRowSeparator(.hidden)
+        }
+    }
+}
+
+private struct MailFeedEmpty: View {
+    let feed: MailFeed
+    let starred: Bool
+    @State private var store = GmailStore.shared
+
+    var body: some View {
+        if feed.loading {
+            ProgressView()
+        } else if let error = feed.error {
+            ContentUnavailableView("読み込めませんでした", systemImage: "exclamationmark.triangle", description: Text(error))
+        } else if let category = feed.category {
+            ContentUnavailableView("\(category.title)のメールはありません", systemImage: category.symbol)
+        } else {
+            ContentUnavailableView(
+                starred ? "スター付きのメールはありません" : store.query.isEmpty ? "メールはありません" : "一致するメールはありません",
+                systemImage: starred ? "star" : store.query.isEmpty ? store.mailbox.symbol : "magnifyingglass"
+            )
+        }
+    }
+}
+
+private struct GmailBottomControls: View {
+    let onCompose: () -> Void
+    @State private var store = GmailStore.shared
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 12) {
             Button {
                 Haptics.play(.light)
                 onCompose()
             } label: {
-                Label("作成", systemImage: "pencil")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 20)
-                    .frame(height: 54)
-                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                Image(systemName: "pencil")
+                    .font(.system(size: 22, weight: .semibold))
+                    .frame(width: 56, height: 56)
             }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.tint(Color.accentColor.opacity(0.3)).interactive(), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("作成")
             if let toast = store.toast {
                 HStack(spacing: 12) {
                     Text(toast.text)
@@ -414,8 +471,97 @@ private struct MailListView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 20)
+        .padding(.bottom, 20)
+        .animation(.snappy(duration: 0.3), value: store.toast)
+    }
+}
+
+private struct CategoryCard: View {
+    let onOpen: (Mailbox) -> Void
+    @State private var store = GmailStore.shared
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(Mailbox.categories.enumerated()), id: \.element) { index, box in
+                if index > 0 {
+                    Divider()
+                        .padding(.leading, 62)
+                }
+                Button {
+                    Haptics.play(.light)
+                    onOpen(box)
+                } label: {
+                    row(box, store.categories[box] ?? CategorySummary())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color(.secondarySystemBackground)))
+    }
+
+    private func row(_ box: Mailbox, _ summary: CategorySummary) -> some View {
+        let color = Color(hex: box.tint)
+        let fresh = summary.unread > 0
+        return HStack(spacing: 14) {
+            Image(systemName: box.symbol)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(color.opacity(0.14)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(box.title)
+                    .font(.system(size: 16, weight: fresh ? .bold : .medium))
+                Text(summary.senders.isEmpty ? " " : summary.senders.joined(separator: "、"))
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 6)
+            if fresh {
+                Text("\(summary.unread)件の新着")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9)
+                    .frame(height: 22)
+                    .background(Capsule().fill(color))
+            }
+        }
+        .padding(.horizontal, 14)
+        .frame(height: 62)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct CategoryListView: View {
+    let box: Mailbox
+    let onCompose: () -> Void
+    @State private var store = GmailStore.shared
+
+    var body: some View {
+        let feed = store.feed(for: box)
+        List {
+            MailFeedRows(feed: feed, recipient: false, restores: false)
+        }
+        .listStyle(.plain)
+        .navigationTitle(box.title)
+        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.visible, for: .navigationBar)
+        .refreshable {
+            await store.load(feed, reset: true)
+            await store.refreshCategories()
+            Haptics.play(.success)
+        }
+        .overlay {
+            if feed.items.isEmpty {
+                MailFeedEmpty(feed: feed, starred: false)
+            }
+        }
+        .overlay(alignment: .bottom) { GmailBottomControls(onCompose: onCompose) }
+        .task {
+            if feed.items.isEmpty { await store.load(feed, reset: true) }
+        }
     }
 }
 

@@ -178,7 +178,9 @@ extension Data {
 }
 
 enum Mailbox: String, CaseIterable, Identifiable {
-    case allInboxes, inbox, spam, trash, sent, scheduled, drafts
+    case allInboxes, inbox, spam, trash, sent, scheduled, drafts, social, promotions, updates
+
+    static let categories: [Mailbox] = [.social, .promotions, .updates]
 
     var id: String { rawValue }
 
@@ -191,6 +193,9 @@ enum Mailbox: String, CaseIterable, Identifiable {
         case .sent: return "送信済み"
         case .scheduled: return "送信予定"
         case .drafts: return "下書き"
+        case .social: return "ソーシャル"
+        case .promotions: return "プロモーション"
+        case .updates: return "新着"
         }
     }
 
@@ -203,6 +208,18 @@ enum Mailbox: String, CaseIterable, Identifiable {
         case .sent: return "paperplane"
         case .scheduled: return "clock"
         case .drafts: return "doc"
+        case .social: return "person.2.fill"
+        case .promotions: return "tag.fill"
+        case .updates: return "info.circle.fill"
+        }
+    }
+
+    var tint: UInt32 {
+        switch self {
+        case .social: return 0x1A73E8
+        case .promotions: return 0x188038
+        case .updates: return 0xE37400
+        default: return 0x5F6368
         }
     }
 
@@ -214,6 +231,9 @@ enum Mailbox: String, CaseIterable, Identifiable {
         case .sent: return "SENT"
         case .scheduled: return "SCHEDULED"
         case .drafts: return "DRAFT"
+        case .social: return "CATEGORY_SOCIAL"
+        case .promotions: return "CATEGORY_PROMOTIONS"
+        case .updates: return "CATEGORY_UPDATES"
         }
     }
 
@@ -546,12 +566,22 @@ enum GmailAPI {
 @Observable
 @MainActor
 final class MailFeed {
+    let category: Mailbox?
     var items: [MailItem] = []
     var loading = false
     var exhausted = false
     var error: String?
     @ObservationIgnored var tokens: [String: String] = [:]
     @ObservationIgnored var generation = 0
+
+    init(category: Mailbox? = nil) {
+        self.category = category
+    }
+}
+
+struct CategorySummary: Equatable {
+    var unread = 0
+    var senders: [String] = []
 }
 
 struct MailToast: Identifiable, Equatable {
@@ -577,6 +607,8 @@ final class GmailStore {
     let all = MailFeed()
     let starred = MailFeed()
     var toast: MailToast?
+    var categories: [Mailbox: CategorySummary] = [:]
+    @ObservationIgnored private var categoryFeeds: [Mailbox: MailFeed] = [:]
     var signingIn = false
     var authError: String?
     @ObservationIgnored private var access: [String: (token: String, expiry: Date)] = [:]
@@ -594,8 +626,17 @@ final class GmailStore {
 
     func accountInfo(_ email: String) -> GmailAccount? { accounts.first { $0.email == email } }
 
+    private var feeds: [MailFeed] { [all, starred] + Mailbox.categories.compactMap { categoryFeeds[$0] } }
+
+    func feed(for box: Mailbox) -> MailFeed {
+        if let feed = categoryFeeds[box] { return feed }
+        let feed = MailFeed(category: box)
+        categoryFeeds[box] = feed
+        return feed
+    }
+
     private func scope(_ feed: MailFeed) -> [String] {
-        if mailbox == .allInboxes { return accounts.map(\.email) }
+        if feed.category == nil, mailbox == .allInboxes { return accounts.map(\.email) }
         return selected.map { [$0] } ?? []
     }
 
@@ -621,9 +662,50 @@ final class GmailStore {
     }
 
     func reloadAll() {
+        for feed in categoryFeeds.values {
+            feed.items = []
+            feed.generation += 1
+        }
         Task { await load(all, reset: true) }
         Task { await load(starred, reset: true) }
         Task { await refreshUnread() }
+        Task { await refreshCategories() }
+    }
+
+    func refreshCategories() async {
+        guard let email = selected else {
+            categories = [:]
+            return
+        }
+        var result: [Mailbox: CategorySummary] = [:]
+        for box in Mailbox.categories {
+            var summary = CategorySummary()
+            let unreadQuery = [
+                URLQueryItem(name: "labelIds", value: box.label), URLQueryItem(name: "labelIds", value: "INBOX"),
+                URLQueryItem(name: "labelIds", value: "UNREAD"), URLQueryItem(name: "maxResults", value: "3"),
+            ]
+            if let json = try? GmailAPI.object(try await call(email, "messages", query: unreadQuery)) {
+                let ids = (json["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+                summary.unread = ids.isEmpty ? 0 : max(ids.count, json["resultSizeEstimate"] as? Int ?? ids.count)
+                var listed = ids
+                if listed.isEmpty {
+                    let latest = [
+                        URLQueryItem(name: "labelIds", value: box.label), URLQueryItem(name: "labelIds", value: "INBOX"),
+                        URLQueryItem(name: "maxResults", value: "3"),
+                    ]
+                    if let recent = try? GmailAPI.object(try await call(email, "messages", query: latest)) {
+                        listed = (recent["messages"] as? [[String: Any]] ?? []).compactMap { $0["id"] as? String }
+                    }
+                }
+                let items = await metadata(email, listed).sorted { $0.date > $1.date }
+                var names: [String] = []
+                for item in items where !names.contains(item.fromName) { names.append(item.fromName) }
+                summary.senders = names
+            }
+            result[box] = summary
+        }
+        guard selected == email else { return }
+        categories = result
     }
 
     func token(_ email: String) async throws -> String {
@@ -722,14 +804,23 @@ final class GmailStore {
         }
         feed.loading = true
         defer { if feed.generation == generation { feed.loading = false } }
-        let label = starredFeed ? "STARRED" : mailbox.label
-        let spamTrash = !starredFeed && mailbox.includesSpamTrash
+        let labels: [String]
+        if let category = feed.category {
+            labels = [category.label, "INBOX"]
+        } else if starredFeed {
+            labels = ["STARRED"]
+        } else if mailbox == .inbox {
+            labels = ["INBOX", "CATEGORY_PERSONAL"]
+        } else {
+            labels = [mailbox.label]
+        }
+        let spamTrash = feed.category == nil && !starredFeed && mailbox.includesSpamTrash
         var collected: [MailItem] = []
         var nextTokens = feed.tokens
         var failure: Error?
         for email in emails {
             if !reset, nextTokens[email] == nil { continue }
-            var query = [URLQueryItem(name: "labelIds", value: label), URLQueryItem(name: "maxResults", value: "25")]
+            var query = labels.map { URLQueryItem(name: "labelIds", value: $0) } + [URLQueryItem(name: "maxResults", value: "25")]
             if spamTrash { query.append(URLQueryItem(name: "includeSpamTrash", value: "true")) }
             if !self.query.isEmpty { query.append(URLQueryItem(name: "q", value: self.query)) }
             if let token = nextTokens[email] { query.append(URLQueryItem(name: "pageToken", value: token)) }
@@ -777,11 +868,14 @@ final class GmailStore {
     }
 
     func item(_ id: String) -> MailItem? {
-        all.items.first { $0.id == id } ?? starred.items.first { $0.id == id }
+        for feed in feeds {
+            if let item = feed.items.first(where: { $0.id == id }) { return item }
+        }
+        return nil
     }
 
     private func update(_ id: String, _ body: (inout MailItem) -> Void) {
-        for feed in [all, starred] {
+        for feed in feeds {
             if let index = feed.items.firstIndex(where: { $0.id == id }) {
                 body(&feed.items[index])
             }
@@ -829,8 +923,8 @@ final class GmailStore {
 
     func trash(_ item: MailItem) {
         let restore = mailbox == .trash
-        let positions = [all, starred].map { feed in feed.items.firstIndex { $0.id == item.id } }
-        for feed in [all, starred] { feed.items.removeAll { $0.id == item.id } }
+        let positions = feeds.map { feed in (feed, feed.items.firstIndex { $0.id == item.id }) }
+        for feed in feeds { feed.items.removeAll { $0.id == item.id } }
         Haptics.play(.medium)
         Task {
             let path = "messages/\(item.messageID)/\(restore ? "untrash" : "trash")"
@@ -840,6 +934,7 @@ final class GmailStore {
                 return
             }
             await refreshUnread()
+            await refreshCategories()
         }
         showToast(restore ? "受信トレイに戻しました" : "ゴミ箱に移動しました", undo: true) { [weak self] in
             guard let self else { return }
@@ -851,8 +946,8 @@ final class GmailStore {
         }
     }
 
-    private func reinsert(_ item: MailItem, _ positions: [Int?]) {
-        for (feed, position) in zip([all, starred], positions) {
+    private func reinsert(_ item: MailItem, _ positions: [(MailFeed, Int?)]) {
+        for (feed, position) in positions {
             guard let position, !feed.items.contains(where: { $0.id == item.id }) else { continue }
             feed.items.insert(item, at: min(position, feed.items.count))
         }
@@ -865,7 +960,7 @@ final class GmailStore {
         ]
         do {
             _ = try await call(item.account, "settings/filters", method: "POST", json: json)
-            for feed in [all, starred] { feed.items.removeAll { $0.id == item.id } }
+            for feed in feeds { feed.items.removeAll { $0.id == item.id } }
             _ = try? await call(item.account, "messages/\(item.messageID)/trash", method: "POST")
             showToast("\(item.fromEmail) をブロックしました")
             Haptics.play(.success)
