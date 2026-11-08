@@ -270,7 +270,10 @@ final class WeatherStore {
 
     func reload() async {
         task?.cancel()
-        let next = Task { [weak self] in await self?.load() }
+        let next = Task { [weak self] in
+            guard let self else { return }
+            await self.load()
+        }
         task = next
         await next.value
     }
