@@ -125,6 +125,7 @@ struct SettingsSheet: View {
     @AppStorage(AppSettings.portraitTeamKey) private var portraitTeam = false
     @AppStorage(AppSettings.appearanceKey) private var appearance = "system"
     @State private var showThe1900 = false
+    @State private var showWeather = false
 
     var body: some View {
         NavigationStack {
@@ -180,6 +181,31 @@ struct SettingsSheet: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    Button {
+                        Haptics.play(.light)
+                        showWeather = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "cloud.sun.fill")
+                                .symbolRenderingMode(.multicolor)
+                                .font(.system(size: 19, weight: .semibold))
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Weather")
+                                    .font(.body.weight(.semibold))
+                                    .foregroundStyle(Palette.ink)
+                                Text("天気予報・60分間の降水・雨雲レーダー")
+                                    .font(.caption)
+                                    .foregroundStyle(Palette.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(Palette.secondary.opacity(0.6))
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             .navigationTitle("設定")
@@ -200,6 +226,12 @@ struct SettingsSheet: View {
         .presentationDragIndicator(.visible)
         .fullScreenCover(isPresented: $showThe1900) {
             The1900View()
+        }
+        .background {
+            Color.clear
+                .fullScreenCover(isPresented: $showWeather) {
+                    WeatherView()
+                }
         }
     }
 }

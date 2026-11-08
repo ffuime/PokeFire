@@ -9,6 +9,7 @@ targets:
     platform: iOS
     sources:
       - path: PokeFire
+      - path: Shared
       - path: ../pokemons.json
         group: Data
         buildPhase: resources
@@ -39,11 +40,18 @@ targets:
       - path: Data/the1900.json
         group: Data
         buildPhase: resources
+    dependencies:
+      - target: PokelootWidgets
     scheme: {}
     info:
       path: PokeFire/Info.plist
       properties:
         NSPhotoLibraryAddUsageDescription: ポケモンのカード画像を写真に保存するために使用します。
+        NSLocationWhenInUseUsageDescription: 現在地の天気と雨雲を表示するために使用します。
+        UIBackgroundModes:
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - me.ffui.pokefire.weather-refresh
         UIApplicationShortcutItems:
           - UIApplicationShortcutItemType: me.ffui.pokefire.the1900
             UIApplicationShortcutItemTitle: THE 1900
@@ -69,3 +77,29 @@ targets:
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_PREVIEWS: YES
+  PokelootWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: Shared
+    info:
+      path: Widgets/Info.plist
+      properties:
+        CFBundleDisplayName: Pokéloot
+        NSWidgetWantsLocation: true
+        NSLocationWhenInUseUsageDescription: 現在地の天気をウィジェットに表示するために使用します。
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_NAME: PokelootWidgets
+        PRODUCT_BUNDLE_IDENTIFIER: me.ffui.pokefire.widgets
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Pokéloot
+        SKIP_INSTALL: YES

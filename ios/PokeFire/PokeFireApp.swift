@@ -8,6 +8,7 @@ struct PokeFireApp: App {
     @State private var stats = StatsModel()
     @State private var box = BoxModel()
     @AppStorage(AppSettings.appearanceKey) private var appearance = "system"
+    @Environment(\.scenePhase) private var phase
 
     var body: some Scene {
         WindowGroup {
@@ -23,6 +24,8 @@ struct PokeFireApp: App {
                 .onOpenURL { url in
                     if url.host == "the1900" {
                         launch.open = true
+                    } else if url.host == "weather" {
+                        launch.weather = true
                     } else {
                         model.open(url)
                     }
@@ -30,6 +33,19 @@ struct PokeFireApp: App {
                 .fullScreenCover(isPresented: $launch.open) {
                     The1900View()
                 }
+                .background {
+                    Color.clear
+                        .fullScreenCover(isPresented: $launch.weather) {
+                            WeatherView()
+                        }
+                }
+        }
+        .onChange(of: phase) { _, value in
+            if value == .background { WeatherAlerts.schedule() }
+        }
+        .backgroundTask(.appRefresh(WeatherAlerts.taskID)) {
+            await WeatherAlerts.check()
+            WeatherAlerts.schedule()
         }
     }
 }

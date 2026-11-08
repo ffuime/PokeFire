@@ -9,6 +9,7 @@ final class The1900Launch {
     static let shortcutType = "me.ffui.pokefire.the1900"
 
     var open = false
+    var weather = false
 }
 
 struct OpenThe1900Intent: AppIntent {
