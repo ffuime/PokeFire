@@ -2,6 +2,10 @@ import CoreLocation
 import SwiftUI
 import WidgetKit
 
+private func temperature(_ value: Double, unit: CGFloat) -> Text {
+    Text("\(Int(value.rounded()))\(Text("℃").font(.system(size: unit)))")
+}
+
 struct WeatherEntry: TimelineEntry {
     var date: Date
     var report: WeatherReport?
@@ -115,11 +119,11 @@ struct WeatherRectangularView: View {
                 Gauge(value: values.current, in: values.low...max(values.low + 0.1, values.high)) {
                     Text("気温")
                 } currentValueLabel: {
-                    Text(WeatherFormat.degree(values.current))
+                    temperature(values.current, unit: 9)
                 } minimumValueLabel: {
-                    Text(WeatherFormat.degree(values.low))
+                    temperature(values.low, unit: 8)
                 } maximumValueLabel: {
-                    Text(WeatherFormat.degree(values.high))
+                    temperature(values.high, unit: 8)
                 }
                 .gaugeStyle(.accessoryLinear)
             }
@@ -138,11 +142,11 @@ struct WeatherCircularView: View {
             Gauge(value: values.current, in: values.low...max(values.low + 0.1, values.high)) {
                 Image(systemName: values.symbol)
             } currentValueLabel: {
-                Text(WeatherFormat.degree(values.current))
+                temperature(values.current, unit: 9)
             } minimumValueLabel: {
-                Text(WeatherFormat.degree(values.low))
+                temperature(values.low, unit: 8)
             } maximumValueLabel: {
-                Text(WeatherFormat.degree(values.high))
+                temperature(values.high, unit: 8)
             }
             .gaugeStyle(.accessoryCircular)
         } else {

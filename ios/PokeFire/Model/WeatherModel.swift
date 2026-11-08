@@ -3,6 +3,7 @@ import CoreLocation
 import Foundation
 import MapKit
 import Observation
+import UIKit
 import UserNotifications
 
 struct WeatherPlace: Codable, Equatable, Identifiable, Hashable {
@@ -180,9 +181,7 @@ enum JMARadar {
         let predicted = try await future.compactMap { make($0, true) }.sorted { $0.date < $1.date }
         let latest = observed.last?.date ?? Date()
         let recent = observed.filter { latest.timeIntervalSince($0.date) <= 3600 }
-        let pastFrames = stride(from: recent.count - 1, through: 0, by: -2).map { recent[$0] }.reversed()
-        let futureFrames = stride(from: 1, to: predicted.count, by: 2).map { predicted[$0] }
-        return Array(pastFrames) + futureFrames.filter { $0.date > latest }
+        return recent + predicted.filter { $0.date > latest }
     }
 
     private static func list(_ name: String) async throws -> [Time] {
@@ -321,26 +320,120 @@ final class WeatherStore {
     }
 }
 
+enum RadarSampler {
+    private static let zoom = 10
+    private static let palette: [(UInt32, Double)] = [
+        (0xF2F2FF, 0.5), (0xA0D2FF, 3), (0x218CFF, 7.5), (0x0041FF, 15),
+        (0xFAF500, 25), (0xFF9900, 40), (0xFF2800, 65), (0xB40068, 90),
+    ]
+
+    static func rainfall(_ frame: RadarFrame, at coordinate: CLLocationCoordinate2D) async -> Double {
+        let scale = pow(2.0, Double(zoom))
+        let x = (coordinate.longitude + 180) / 360 * scale
+        let latitude = coordinate.latitude * .pi / 180
+        let y = (1 - log(tan(latitude) + 1 / cos(latitude)) / .pi) / 2 * scale
+        let tileX = Int(x.rounded(.down))
+        let tileY = Int(y.rounded(.down))
+        let path = frame.template
+            .replacingOccurrences(of: "{z}", with: String(zoom))
+            .replacingOccurrences(of: "{x}", with: String(tileX))
+            .replacingOccurrences(of: "{y}", with: String(tileY))
+        guard let url = URL(string: path),
+              let (data, _) = try? await URLSession.shared.data(from: url),
+              let image = UIImage(data: data)?.cgImage else { return 0 }
+        let pixelX = min(image.width - 1, max(0, Int((x - Double(tileX)) * Double(image.width))))
+        let pixelY = min(image.height - 1, max(0, Int((y - Double(tileY)) * Double(image.height))))
+        guard let color = pixel(image, pixelX, pixelY) else { return 0 }
+        return value(color)
+    }
+
+    private static func pixel(_ image: CGImage, _ x: Int, _ y: Int) -> (Int, Int, Int, Int)? {
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let drawn = bytes.withUnsafeMutableBytes { buffer -> Bool in
+            guard let context = CGContext(
+                data: buffer.baseAddress, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            ) else { return false }
+            context.interpolationQuality = .none
+            context.draw(image, in: CGRect(x: -CGFloat(x), y: -CGFloat(image.height - 1 - y), width: CGFloat(image.width), height: CGFloat(image.height)))
+            return true
+        }
+        guard drawn else { return nil }
+        let alpha = Int(bytes[3])
+        guard alpha > 40 else { return (0, 0, 0, 0) }
+        func channel(_ value: UInt8) -> Int { min(255, Int(value) * 255 / alpha) }
+        return (channel(bytes[0]), channel(bytes[1]), channel(bytes[2]), alpha)
+    }
+
+    private static func value(_ color: (Int, Int, Int, Int)) -> Double {
+        guard color.3 > 40 else { return 0 }
+        var best = 0.0
+        var distance = Int.max
+        for (hex, amount) in palette {
+            let r = Int((hex >> 16) & 0xFF) - color.0
+            let g = Int((hex >> 8) & 0xFF) - color.1
+            let b = Int(hex & 0xFF) - color.2
+            let d = r * r + g * g + b * b
+            if d < distance {
+                distance = d
+                best = amount
+            }
+        }
+        return best
+    }
+}
+
 @Observable
 @MainActor
 final class RadarModel {
     var frames: [RadarFrame] = []
     var index = 0
+    var nowIndex = 0
     var playing = false
     var failed = false
+    var rain: [String: Double] = [:]
+    var sampling = false
     @ObservationIgnored private var player: Task<Void, Never>?
+    @ObservationIgnored private var sampledKey = ""
 
     var current: RadarFrame? { frames.indices.contains(index) ? frames[index] : nil }
+
+    func rainfall(_ position: Int) -> Double? {
+        guard frames.indices.contains(position) else { return nil }
+        return rain[frames[position].id]
+    }
 
     func load() async {
         do {
             let list = try await JMARadar.frames()
+            let wasNow = index == nowIndex
             frames = list
-            index = list.lastIndex { !$0.forecast } ?? 0
+            nowIndex = list.lastIndex { !$0.forecast } ?? 0
+            if wasNow || !frames.indices.contains(index) { index = nowIndex }
             failed = false
         } catch {
             failed = frames.isEmpty
         }
+    }
+
+    func sample(_ coordinate: CLLocationCoordinate2D?) async {
+        guard let coordinate, !frames.isEmpty else { return }
+        let key = String(format: "%.3f,%.3f|", coordinate.latitude, coordinate.longitude) + (frames.last?.id ?? "")
+        guard key != sampledKey else { return }
+        sampledKey = key
+        sampling = true
+        defer { sampling = false }
+        let list = frames
+        var result: [String: Double] = [:]
+        await withTaskGroup(of: (String, Double).self) { group in
+            for frame in list {
+                group.addTask { (frame.id, await RadarSampler.rainfall(frame, at: coordinate)) }
+            }
+            for await (id, value) in group {
+                result[id] = value
+            }
+        }
+        rain = result
     }
 
     func toggle() {
@@ -353,7 +446,7 @@ final class RadarModel {
         player?.cancel()
         player = Task { @MainActor [weak self] in
             while let self, !Task.isCancelled, self.playing {
-                try? await Task.sleep(for: .milliseconds(self.index == self.frames.count - 1 ? 1200 : 550))
+                try? await Task.sleep(for: .milliseconds(self.index == self.frames.count - 1 ? 1200 : 380))
                 guard !Task.isCancelled, self.playing else { return }
                 self.index = (self.index + 1) % self.frames.count
             }
@@ -364,6 +457,11 @@ final class RadarModel {
         playing = false
         player?.cancel()
         player = nil
+    }
+
+    func returnToNow() {
+        stop()
+        index = nowIndex
     }
 }
 
