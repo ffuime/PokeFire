@@ -8,4 +8,3 @@ ios/*.xcodeproj/
 .DS_Store
 i.tmp
 ios/build.log
-ios/Widgets/Info.plist
