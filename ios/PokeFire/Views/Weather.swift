@@ -260,18 +260,127 @@ private enum HourlyItem: Identifiable {
         }
     }
 
-    static func build(_ report: WeatherReport) -> [HourlyItem] {
-        let hours = report.upcomingHours(25)
-        guard let first = hours.first, let last = hours.last else { return [] }
-        var items = hours.enumerated().map { HourlyItem.hour($1, first: $0 == 0) }
+    static func build(_ report: WeatherReport, day: WeatherDay? = nil) -> [HourlyItem] {
         let now = Date()
-        for day in report.days.prefix(3) {
-            for (date, rise) in [(day.sunrise, true), (day.sunset, false)] {
-                guard let date, date > now, date > first.time, date < last.time else { continue }
+        let hours: [WeatherHour]
+        if let day {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = report.zone
+            let start = max(day.date, now.addingTimeInterval(-3600))
+            let end = calendar.date(byAdding: .day, value: 1, to: day.date) ?? day.date
+            hours = report.hours.filter { $0.time > start && $0.time < end }
+        } else {
+            hours = report.upcomingHours(25)
+        }
+        guard let first = hours.first, let last = hours.last else { return [] }
+        let firstIsNow = first.time <= now
+        var items = hours.enumerated().map { HourlyItem.hour($1, first: $0 == 0 && firstIsNow) }
+        for entry in report.days.prefix(4) {
+            for (date, rise) in [(entry.sunrise, true), (entry.sunset, false)] {
+                guard let date, date > now, date > first.time, date < last.time.addingTimeInterval(3600) else { continue }
                 items.append(.sun(date, rise: rise))
             }
         }
         return items.sorted { $0.date < $1.date }
+    }
+}
+
+private struct HourlyStrip: View {
+    let report: WeatherReport
+    let items: [HourlyItem]
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                ForEach(items) { item in
+                    switch item {
+                    case .hour(let hour, let first):
+                        VStack(spacing: 8) {
+                            Text(first ? "今" : WeatherFormat.time(hour.time, report.zone, "H時"))
+                                .font(.system(size: 15, weight: first ? .bold : .medium))
+                                .opacity(first ? 1 : 0.8)
+                            Image(systemName: WeatherCondition.symbol(hour.code, isDay: hour.isDay))
+                                .symbolRenderingMode(.multicolor)
+                                .font(.system(size: 22))
+                                .frame(height: 28)
+                            Text((hour.precipitationProbability ?? 0) >= 10 ? "\(hour.precipitationProbability ?? 0)%" : " ")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Color(hex: 0x8FD3FF))
+                            TemperatureText(value: hour.temperature, size: 19, weight: .medium)
+                        }
+                        .frame(minWidth: 40)
+                    case .sun(let date, let rise):
+                        VStack(spacing: 8) {
+                            Text(WeatherFormat.time(date, report.zone, "H:mm"))
+                                .font(.system(size: 15, weight: .medium))
+                                .opacity(0.8)
+                            Image(systemName: rise ? "sunrise.fill" : "sunset.fill")
+                                .symbolRenderingMode(.multicolor)
+                                .font(.system(size: 22))
+                                .frame(height: 28)
+                            Text(" ")
+                                .font(.system(size: 12, weight: .bold))
+                            Text(rise ? "日の出" : "日の入")
+                                .font(.system(size: 15, weight: .semibold))
+                        }
+                        .frame(minWidth: 46)
+                    }
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct FlipFace: ViewModifier, Animatable {
+    var angle: Double
+
+    var animatableData: Double {
+        get { angle }
+        set { angle = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .rotation3DEffect(.degrees(angle), axis: (x: 0, y: 1, z: 0), perspective: 0.45)
+            .opacity(abs(angle) <= 90 ? 1 : 0)
+            .allowsHitTesting(abs(angle) < 90)
+    }
+}
+
+private struct Skeleton: ViewModifier {
+    let active: Bool
+
+    func body(content: Content) -> some View {
+        if active {
+            content
+                .redacted(reason: .placeholder)
+                .allowsHitTesting(false)
+                .phaseAnimator([0.45, 0.85]) { view, phase in
+                    view.opacity(phase)
+                } animation: { _ in
+                    .easeInOut(duration: 0.85)
+                }
+        } else {
+            content
+        }
+    }
+}
+
+extension WeatherReport {
+    static var placeholder: WeatherReport {
+        let now = Date()
+        let calendar = Calendar.current
+        let hour = calendar.dateInterval(of: .hour, for: now)?.start ?? now
+        let today = calendar.startOfDay(for: now)
+        return WeatherReport(
+            fetchedAt: now,
+            timeZone: TimeZone.current.identifier,
+            current: WeatherCurrent(temperature: 18, apparent: 18, humidity: 50, code: 2, isDay: true, windSpeed: 2, windDirection: 0, pressure: 1013, precipitation: 0),
+            hours: (0..<48).map { WeatherHour(time: hour.addingTimeInterval(Double($0) * 3600), temperature: 18, code: 2, isDay: true) },
+            days: (0..<10).map { WeatherDay(date: calendar.date(byAdding: .day, value: $0, to: today) ?? today, code: 2, high: 22, low: 12, uvIndex: 3, precipitationProbability: 0, precipitationSum: 0, humidity: 50) },
+            yesterday: nil
+        )
     }
 }
 
@@ -286,6 +395,9 @@ struct WeatherView: View {
     @AppStorage(WeatherScene.debugKey) private var debugScene = ""
     @AppStorage(WeatherScene.debugNightKey) private var debugNight = ""
     @AppStorage("weather-header-mode") private var headerMode = 0
+    @State private var selectedDay = 0
+
+    private static let faceHeight: CGFloat = DaysFace.cardHeight + 10 + DaysFace.stripHeight
 
     private var condition: (code: Int, isDay: Bool, scene: WeatherScene) {
         let report = store.report
@@ -301,11 +413,13 @@ struct WeatherView: View {
 
     var body: some View {
         let condition = self.condition
+        let loading = store.report == nil
+        let report = store.report ?? .placeholder
         ZStack {
             WeatherBackground(scene: condition.scene, night: !condition.isDay)
             ScrollView {
                 VStack(spacing: 14) {
-                    header(condition)
+                    header(condition, report, loading)
                     if let error = store.error {
                         Text(error)
                             .font(.footnote.weight(.medium))
@@ -314,22 +428,23 @@ struct WeatherView: View {
                             .padding(.horizontal, 20)
                     }
                     rainCard
-                    if let report = store.report {
-                        hourlyCard(report)
-                    }
+                    hourlyCard(report)
+                        .modifier(Skeleton(active: loading))
                     radarCard
-                    if let report = store.report {
-                        dailyCard(report)
-                        details(report)
-                    }
+                    dailyCard(report)
+                        .modifier(Skeleton(active: loading))
+                    details(report)
+                        .modifier(Skeleton(active: loading))
                     credits
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 32)
             }
             .refreshable {
-                store.refresh()
-                await radar.load()
+                async let weather: Void = store.reload()
+                async let maps: Void = radar.load()
+                _ = await (weather, maps)
+                Haptics.play(.success)
                 await radar.sample(store.coordinate)
             }
             .safeAreaInset(edge: .top, spacing: 0) { topBar }
@@ -405,52 +520,48 @@ struct WeatherView: View {
         .padding(.vertical, 6)
     }
 
-    private func header(_ condition: (code: Int, isDay: Bool, scene: WeatherScene)) -> some View {
-        VStack(spacing: 2) {
+    private func header(_ condition: (code: Int, isDay: Bool, scene: WeatherScene), _ report: WeatherReport, _ loading: Bool) -> some View {
+        let flipped = headerMode == 1 && report.days.count >= 3
+        return VStack(spacing: 2) {
             Text(store.title)
                 .font(.system(size: 30, weight: .regular))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            if let report = store.report {
-                Group {
-                    if headerMode == 1, report.days.count >= 3 {
-                        ThreeDayHeader(report: report)
-                            .transition(.blurReplace)
-                    } else {
-                        currentHeader(report, condition)
-                            .transition(.blurReplace)
-                    }
+                .modifier(Skeleton(active: loading && store.selected == nil && store.here == nil))
+            ZStack {
+                currentHeader(report, condition)
+                    .frame(height: Self.faceHeight)
+                    .contentShape(Rectangle())
+                    .onTapGesture { flip() }
+                    .modifier(FlipFace(angle: flipped ? 180 : 0))
+                if report.days.count >= 3 {
+                    DaysFace(report: report, selected: $selectedDay) { flip() }
+                        .frame(height: Self.faceHeight, alignment: .top)
+                        .modifier(FlipFace(angle: flipped ? 0 : -180))
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    Haptics.play(.light)
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.86)) {
-                        headerMode = headerMode == 1 ? 0 : 1
-                    }
-                }
-                HStack(spacing: 6) {
-                    ForEach(0..<2, id: \.self) { mode in
-                        Capsule()
-                            .fill(.white.opacity(mode == headerMode ? 0.9 : 0.35))
-                            .frame(width: mode == headerMode ? 14 : 6, height: 6)
-                    }
-                }
-                .padding(.top, 10)
-                .animation(.snappy, value: headerMode)
-                .accessibilityHidden(true)
-            } else if store.loading {
-                ProgressView()
-                    .tint(.white)
-                    .frame(height: 140)
-            } else {
-                Text("--")
-                    .font(.system(size: 96, weight: .thin))
-                    .opacity(0.4)
             }
+            .modifier(Skeleton(active: loading))
+            HStack(spacing: 6) {
+                ForEach(0..<2, id: \.self) { mode in
+                    Capsule()
+                        .fill(.white.opacity(mode == headerMode ? 0.9 : 0.35))
+                        .frame(width: mode == headerMode ? 14 : 6, height: 6)
+                }
+            }
+            .padding(.top, 12)
+            .animation(.snappy, value: headerMode)
+            .accessibilityHidden(true)
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 8)
-        .padding(.bottom, 18)
+        .padding(.bottom, 12)
+    }
+
+    private func flip() {
+        Haptics.play(.light)
+        withAnimation(.spring(response: 0.62, dampingFraction: 0.82)) {
+            headerMode = headerMode == 1 ? 0 : 1
+        }
     }
 
     private func currentHeader(_ report: WeatherReport, _ condition: (code: Int, isDay: Bool, scene: WeatherScene)) -> some View {
@@ -480,7 +591,7 @@ struct WeatherView: View {
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
-        .accessibilityHint("タップで3日間の天気に切り替えます")
+        .accessibilityHint("タップで日ごとの天気に切り替えます")
     }
 
     private var rainCard: some View {
@@ -500,53 +611,21 @@ struct WeatherView: View {
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
             } else {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("この先1時間は雨の心配はありません。")
+                        .font(.system(size: 17, weight: .semibold))
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(.white.opacity(0.25))
+                        .frame(height: 120)
+                }
+                .modifier(Skeleton(active: true))
             }
         }
     }
 
     private func hourlyCard(_ report: WeatherReport) -> some View {
         WeatherCard(title: "1時間ごとの予報", symbol: "clock") {
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 16) {
-                    ForEach(HourlyItem.build(report)) { item in
-                        switch item {
-                        case .hour(let hour, let first):
-                            VStack(spacing: 8) {
-                                Text(first ? "今" : WeatherFormat.time(hour.time, report.zone, "H時"))
-                                    .font(.system(size: 15, weight: first ? .bold : .medium))
-                                    .opacity(first ? 1 : 0.8)
-                                Image(systemName: WeatherCondition.symbol(hour.code, isDay: hour.isDay))
-                                    .symbolRenderingMode(.multicolor)
-                                    .font(.system(size: 22))
-                                    .frame(height: 28)
-                                Text((hour.precipitationProbability ?? 0) >= 10 ? "\(hour.precipitationProbability ?? 0)%" : " ")
-                                    .font(.system(size: 12, weight: .bold))
-                                    .foregroundStyle(Color(hex: 0x8FD3FF))
-                                TemperatureText(value: hour.temperature, size: 19, weight: .medium)
-                            }
-                            .frame(minWidth: 40)
-                        case .sun(let date, let rise):
-                            VStack(spacing: 8) {
-                                Text(WeatherFormat.time(date, report.zone, "H:mm"))
-                                    .font(.system(size: 15, weight: .medium))
-                                    .opacity(0.8)
-                                Image(systemName: rise ? "sunrise.fill" : "sunset.fill")
-                                    .symbolRenderingMode(.multicolor)
-                                    .font(.system(size: 22))
-                                    .frame(height: 28)
-                                Text(" ")
-                                    .font(.system(size: 12, weight: .bold))
-                                Text(rise ? "日の出" : "日の入")
-                                    .font(.system(size: 15, weight: .semibold))
-                            }
-                            .frame(minWidth: 46)
-                        }
-                    }
-                }
-            }
-            .scrollIndicators(.hidden)
+            HourlyStrip(report: report, items: HourlyItem.build(report))
         }
     }
 
@@ -689,27 +768,22 @@ private enum DayStyle {
     }
 }
 
-private struct ThreeDayHeader: View {
+private struct DayCard: View {
     let report: WeatherReport
+    let index: Int
+    let compact: Bool
+    let selected: Bool
 
     private static let high = Color(hex: 0xFFA28F)
     private static let low = Color(hex: 0x8FCBFF)
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            ForEach(0..<3, id: \.self) { index in
-                column(index)
-            }
-        }
-    }
-
-    private func column(_ index: Int) -> some View {
         let day = report.days[index]
         let previous: WeatherDay? = index == 0 ? report.yesterday : report.days[index - 1]
-        return VStack(spacing: 8) {
+        VStack(spacing: compact ? 6 : 8) {
             VStack(spacing: 1) {
                 Text(["今日", "明日", "明後日"][index])
-                    .font(.system(size: 15, weight: .bold))
+                    .font(.system(size: compact ? 14 : 16, weight: .bold))
                 HStack(spacing: 2) {
                     Text(WeatherFormat.time(day.date, report.zone, "M/d"))
                         .font(.system(size: 12, weight: .medium))
@@ -722,40 +796,128 @@ private struct ThreeDayHeader: View {
             }
             Image(systemName: WeatherCondition.symbol(day.code))
                 .symbolRenderingMode(.multicolor)
-                .font(.system(size: 38))
-                .frame(height: 46)
-            Text(WeatherCondition.label(day.code))
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .font(.system(size: compact ? 30 : 44))
+                .frame(height: compact ? 36 : 50)
+            if !compact {
+                Text(WeatherCondition.label(day.code))
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
             HStack(spacing: 3) {
                 Image(systemName: "drop.fill")
-                    .font(.system(size: 10))
+                    .font(.system(size: compact ? 9 : 10))
                     .foregroundStyle(Color(hex: 0x8FD3FF))
                 Text("\(day.precipitationProbability ?? 0)%")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: compact ? 12 : 14, weight: .medium))
                     .monospacedDigit()
             }
-            HStack(alignment: .top, spacing: 8) {
-                temperature(day.high, previous?.high, Self.high)
-                temperature(day.low, previous?.low, Self.low)
+            if compact {
+                VStack(spacing: 0) {
+                    TemperatureText(value: day.high, size: 16, weight: .semibold)
+                        .foregroundStyle(Self.high)
+                    TemperatureText(value: day.low, size: 16, weight: .semibold)
+                        .foregroundStyle(Self.low)
+                }
+            } else {
+                HStack(alignment: .top, spacing: 12) {
+                    temperature(day.high, previous?.high, Self.high)
+                    temperature(day.low, previous?.low, Self.low)
+                }
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 14)
-        .padding(.horizontal, 4)
+        .lineLimit(1)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(selected ? 0.35 : 0), lineWidth: 1)
+        )
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
     }
 
     private func temperature(_ value: Double, _ previous: Double?, _ color: Color) -> some View {
         VStack(spacing: 0) {
-            TemperatureText(value: value, size: 22, weight: .medium)
+            TemperatureText(value: value, size: 26, weight: .medium)
                 .foregroundStyle(color)
             Text(DayStyle.diff(value, previous).map { "[\($0)]" } ?? " ")
                 .font(.system(size: 11, weight: .medium))
                 .monospacedDigit()
                 .foregroundStyle(color.opacity(0.75))
+        }
+    }
+}
+
+private struct DaysFace: View {
+    let report: WeatherReport
+    @Binding var selected: Int
+    let onClose: () -> Void
+    @State private var drag: CGFloat = 0
+
+    static let cardHeight: CGFloat = 200
+    static let stripHeight: CGFloat = 118
+    private static let spacing: CGFloat = 8
+
+    private func select(_ index: Int) {
+        let target = min(2, max(0, index))
+        guard target != selected else { return }
+        Haptics.play(.selection)
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.86)) {
+            selected = target
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 10) {
+            GeometryReader { geometry in
+                let width = geometry.size.width
+                let large = (width - Self.spacing) * 0.7
+                let small = width - Self.spacing - large
+                let shift: CGFloat = selected == 0 ? 0 : small + Self.spacing
+                HStack(spacing: Self.spacing) {
+                    ForEach(0..<3, id: \.self) { index in
+                        DayCard(report: report, index: index, compact: index != selected, selected: index == selected)
+                            .frame(width: index == selected ? large : small, height: Self.cardHeight)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if index == selected {
+                                    onClose()
+                                } else {
+                                    select(index)
+                                }
+                            }
+                    }
+                }
+                .offset(x: drag - shift)
+            }
+            .frame(height: Self.cardHeight)
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 12)
+                    .onChanged { value in
+                        guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                        drag = value.translation.width * 0.5
+                    }
+                    .onEnded { value in
+                        let horizontal = value.translation.width
+                        let predicted = value.predictedEndTranslation.width
+                        if abs(horizontal) > abs(value.translation.height) {
+                            if horizontal < -40 || predicted < -120 {
+                                select(selected + 1)
+                            } else if horizontal > 40 || predicted > 120 {
+                                select(selected - 1)
+                            }
+                        }
+                        withAnimation(.spring(response: 0.45, dampingFraction: 0.86)) { drag = 0 }
+                    }
+            )
+            HourlyStrip(report: report, items: HourlyItem.build(report, day: report.days[selected]))
+                .id(selected)
+                .transition(.opacity)
+                .padding(12)
+                .frame(height: Self.stripHeight)
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+                .animation(.easeInOut(duration: 0.2), value: selected)
         }
     }
 }
@@ -839,7 +1001,7 @@ private enum RadarText {
         guard let frame = radar.current, radar.frames.indices.contains(radar.nowIndex) else { return "" }
         let minutes = Int((frame.date.timeIntervalSince(radar.frames[radar.nowIndex].date) / 60).rounded())
         if minutes == 0 { return "現在" }
-        return minutes < 0 ? "\(-minutes)分前" : "\(minutes)分後"
+        return minutes < 0 ? "過去" : "予測"
     }
 }
 

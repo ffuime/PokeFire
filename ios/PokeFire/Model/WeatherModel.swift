@@ -268,6 +268,13 @@ final class WeatherStore {
         task = Task { [weak self] in await self?.load() }
     }
 
+    func reload() async {
+        task?.cancel()
+        let next = Task { [weak self] in await self?.load() }
+        task = next
+        await next.value
+    }
+
     private func load() async {
         loading = true
         error = nil
