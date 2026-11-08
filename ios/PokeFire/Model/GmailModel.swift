@@ -221,6 +221,16 @@ enum Mailbox: String, CaseIterable, Identifiable {
     var showsRecipient: Bool { self == .sent || self == .scheduled || self == .drafts }
 }
 
+extension Set where Element == String {
+    mutating func set(_ label: String, _ on: Bool) {
+        if on {
+            insert(label)
+        } else {
+            remove(label)
+        }
+    }
+}
+
 struct MailItem: Identifiable, Hashable {
     let account: String
     let messageID: String
@@ -785,12 +795,12 @@ final class GmailStore {
 
     func setRead(_ item: MailItem, _ read: Bool) {
         guard item.unread == read else { return }
-        update(item.id) { read ? $0.labels.remove("UNREAD") : $0.labels.insert("UNREAD") }
+        update(item.id) { $0.labels.set("UNREAD", !read) }
         unread[item.account, default: 0] += read ? -1 : 1
         Task {
             let ok = await modify(item, add: read ? [] : ["UNREAD"], remove: read ? ["UNREAD"] : [])
             if !ok {
-                update(item.id) { read ? $0.labels.insert("UNREAD") : $0.labels.remove("UNREAD") }
+                update(item.id) { $0.labels.set("UNREAD", read) }
                 showToast("既読の切り替えに失敗しました")
             }
             await refreshUnread()
@@ -799,7 +809,7 @@ final class GmailStore {
 
     func toggleStar(_ item: MailItem) {
         let star = !item.starred
-        update(item.id) { star ? $0.labels.insert("STARRED") : $0.labels.remove("STARRED") }
+        update(item.id) { $0.labels.set("STARRED", star) }
         if star {
             var copy = item
             copy.labels.insert("STARRED")
@@ -811,7 +821,7 @@ final class GmailStore {
         Task {
             let ok = await modify(item, add: star ? ["STARRED"] : [], remove: star ? [] : ["STARRED"])
             if !ok {
-                update(item.id) { star ? $0.labels.remove("STARRED") : $0.labels.insert("STARRED") }
+                update(item.id) { $0.labels.set("STARRED", !star) }
                 showToast("スターの切り替えに失敗しました")
             }
         }
